@@ -1,0 +1,95 @@
+{
+  "id": "chatcmpl-wm-parallel",
+  "object": "chat.completion",
+  "created": 1735689600,
+  "model": "wm-parallel",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "c1",
+            "type": "function",
+            "function": {
+              "name": "query_telemetry",
+              "arguments": "{\"signal\": \"METRICS\", \"service\": \"orders-api\"}"
+            }
+          },
+          {
+            "id": "c2",
+            "type": "function",
+            "function": {
+              "name": "query_telemetry",
+              "arguments": "{\"signal\": \"LOGS\", \"service\": \"orders-api\"}"
+            }
+          },
+          {
+            "id": "c3",
+            "type": "function",
+            "function": {
+              "name": "query_telemetry",
+              "arguments": "{\"signal\": \"TRACES\", \"service\": \"orders-api\"}"
+            }
+          },
+          {
+            "id": "c4",
+            "type": "function",
+            "function": {
+              "name": "list_remediations",
+              "arguments": "{}"
+            }
+          },
+          {
+            "id": "c5",
+            "type": "function",
+            "function": {
+              "name": "query_telemetry",
+              "arguments": "{\"signal\": \"DEPLOYS\", \"service\": \"orders-api\"}"
+            }
+          },
+          {
+            "id": "c6",
+            "type": "function",
+            "function": {
+              "name": "query_telemetry",
+              "arguments": "{\"signal\": \"METRICS\", \"service\": \"orders-db\"}"
+            }
+          },
+          {
+            "id": "c7",
+            "type": "function",
+            "function": {
+              "name": "query_telemetry",
+              "arguments": "{\"signal\": \"LOGS\", \"service\": \"orders-db\"}"
+            }
+          },
+          {
+            "id": "c8",
+            "type": "function",
+            "function": {
+              "name": "query_telemetry",
+              "arguments": "{\"signal\": \"TRACES\", \"service\": \"orders-db\"}"
+            }
+          },
+          {
+            "id": "c9",
+            "type": "function",
+            "function": {
+              "name": "query_telemetry",
+              "arguments": "{\"signal\": \"DEPLOYS\", \"service\": \"orders-db\"}"
+            }
+          }
+        ]
+      },
+      "finish_reason": "tool_calls"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 42,
+    "completion_tokens": 7,
+    "total_tokens": 49
+  }
+}

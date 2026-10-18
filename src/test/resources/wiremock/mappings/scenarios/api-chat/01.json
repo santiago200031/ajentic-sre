@@ -1,0 +1,24 @@
+{
+  "scenarioName": "wm-api-chat",
+  "requiredScenarioState": "Started",
+  "priority": 1,
+  "request": {
+    "method": "POST",
+    "urlPath": "/v1/chat/completions",
+    "bodyPatterns": [
+      {
+        "matchesJsonPath": {
+          "expression": "$.model",
+          "equalTo": "wm-api-chat"
+        }
+      }
+    ]
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "bodyFileName": "llm-responses/api-chat/01.json"
+  }
+}

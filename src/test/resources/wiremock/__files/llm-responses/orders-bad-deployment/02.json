@@ -1,0 +1,31 @@
+{
+  "id": "chatcmpl-wm-orders",
+  "object": "chat.completion",
+  "created": 1735689600,
+  "model": "wm-orders",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "c2",
+            "type": "function",
+            "function": {
+              "name": "declare_diagnosis",
+              "arguments": "{\"service\": \"orders-api\", \"rootCause\": \"bad application deployment\"}"
+            }
+          }
+        ]
+      },
+      "finish_reason": "tool_calls"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 42,
+    "completion_tokens": 7,
+    "total_tokens": 49
+  }
+}

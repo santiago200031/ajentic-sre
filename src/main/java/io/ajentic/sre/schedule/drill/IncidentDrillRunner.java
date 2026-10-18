@@ -1,0 +1,51 @@
+package io.ajentic.sre.schedule.drill;
+
+import io.ajentic.sre.schedule.engine.ScheduledJob;
+import io.ajentic.sre.rl.Environment;
+import io.ajentic.sre.rl.episode.EpisodeResult;
+import io.ajentic.sre.rl.episode.EpisodeRunner;
+import io.ajentic.sre.rl.policy.PolicyFactory;
+import io.ajentic.sre.rl.simulation.EnvironmentFactory;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
+
+@ApplicationScoped
+public class IncidentDrillRunner {
+
+    private static final int HISTORY_LIMIT = 50;
+
+    private final EnvironmentFactory environments;
+    private final EpisodeRunner runner;
+    private final PolicyFactory policies;
+    private final List<EpisodeResult> history = new CopyOnWriteArrayList<>();
+
+    @Inject
+    public IncidentDrillRunner(EnvironmentFactory environments, EpisodeRunner runner, PolicyFactory policies) {
+        this.environments = environments;
+        this.runner = runner;
+        this.policies = policies;
+    }
+
+    public EpisodeResult drill(String scenarioId) {
+        Environment environment = environments.create(scenarioId, 42L);
+        EpisodeResult result = runner.run(
+                UUID.randomUUID().toString(), environment, policies.byName("heuristic"));
+        history.add(result);
+        while (history.size() > HISTORY_LIMIT) {
+            history.removeFirst();
+        }
+        return result;
+    }
+
+    public ScheduledJob job(String scenarioId) {
+        return context -> drill(scenarioId);
+    }
+
+    public List<EpisodeResult> recent() {
+        return List.copyOf(history);
+    }
+}

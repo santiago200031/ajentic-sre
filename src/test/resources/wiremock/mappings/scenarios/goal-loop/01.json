@@ -1,0 +1,24 @@
+{
+  "scenarioName": "wm-goal",
+  "requiredScenarioState": "Started",
+  "priority": 1,
+  "request": {
+    "method": "POST",
+    "urlPath": "/v1/chat/completions",
+    "bodyPatterns": [
+      {
+        "matchesJsonPath": {
+          "expression": "$.model",
+          "equalTo": "wm-goal"
+        }
+      }
+    ]
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "bodyFileName": "llm-responses/goal-loop/01.json"
+  }
+}

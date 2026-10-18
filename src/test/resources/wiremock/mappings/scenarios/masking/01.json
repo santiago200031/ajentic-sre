@@ -1,0 +1,24 @@
+{
+  "scenarioName": "wm-mask",
+  "requiredScenarioState": "Started",
+  "priority": 1,
+  "request": {
+    "method": "POST",
+    "urlPath": "/v1/chat/completions",
+    "bodyPatterns": [
+      {
+        "matchesJsonPath": {
+          "expression": "$.model",
+          "equalTo": "wm-mask"
+        }
+      }
+    ]
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "bodyFileName": "llm-responses/masking/01.json"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "scenarioName": "wm-orders",
+  "requiredScenarioState": "Started",
+  "priority": 1,
+  "request": {
+    "method": "POST",
+    "urlPath": "/v1/chat/completions",
+    "bodyPatterns": [
+      {
+        "matchesJsonPath": {
+          "expression": "$.model",
+          "equalTo": "wm-orders"
+        }
+      }
+    ]
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "bodyFileName": "llm-responses/orders-bad-deployment/01.json"
+  },
+  "newScenarioState": "turn2"
+}

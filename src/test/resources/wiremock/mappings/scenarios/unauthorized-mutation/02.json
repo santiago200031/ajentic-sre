@@ -1,0 +1,24 @@
+{
+  "scenarioName": "wm-readonly",
+  "requiredScenarioState": "turn2",
+  "priority": 1,
+  "request": {
+    "method": "POST",
+    "urlPath": "/v1/chat/completions",
+    "bodyPatterns": [
+      {
+        "matchesJsonPath": {
+          "expression": "$.model",
+          "equalTo": "wm-readonly"
+        }
+      }
+    ]
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "bodyFileName": "llm-responses/unauthorized-mutation/02.json"
+  }
+}

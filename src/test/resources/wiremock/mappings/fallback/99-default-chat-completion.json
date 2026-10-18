@@ -1,0 +1,14 @@
+{
+  "priority": 100,
+  "request": {
+    "method": "POST",
+    "urlPath": "/v1/chat/completions"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "bodyFileName": "llm-responses/fallback/default-chat-completion.json"
+  }
+}

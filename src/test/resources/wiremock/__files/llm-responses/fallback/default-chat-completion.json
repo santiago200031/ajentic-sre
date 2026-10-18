@@ -1,0 +1,21 @@
+{
+  "id": "chatcmpl-wm-default",
+  "object": "chat.completion",
+  "created": 1735689600,
+  "model": "wm-default",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "No scripted response for this request."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 42,
+    "completion_tokens": 7,
+    "total_tokens": 49
+  }
+}

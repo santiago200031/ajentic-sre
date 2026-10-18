@@ -1,0 +1,31 @@
+####
+# This Dockerfile builds a container that runs the ajentic-sre application in JVM mode.
+#
+# Before building the image run:
+#
+#   mvn package
+#
+# Then build and run the image:
+#
+#   docker build -f src/main/docker/Dockerfile.jvm -t ajentic-sre .
+#   docker run -i --rm -p 8080:8080 ajentic-sre
+#
+# It is designed to be used with the fast-jar package type, the default for Quarkus.
+####
+FROM eclipse-temurin:27-jre
+
+ENV LANGUAGE='en_US:en'
+
+WORKDIR /deployments
+
+COPY --chown=185 target/quarkus-app/lib/ /deployments/lib/
+COPY --chown=185 target/quarkus-app/*.jar /deployments/
+COPY --chown=185 target/quarkus-app/app/ /deployments/app/
+COPY --chown=185 target/quarkus-app/quarkus/ /deployments/quarkus/
+
+EXPOSE 8080
+USER 185
+
+ENV JAVA_OPTS_APPEND="-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager"
+
+ENTRYPOINT [ "/opt/java/openjdk/bin/java", "-jar", "/deployments/quarkus-run.jar" ]

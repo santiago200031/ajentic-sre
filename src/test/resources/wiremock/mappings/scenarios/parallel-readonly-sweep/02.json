@@ -1,0 +1,24 @@
+{
+  "scenarioName": "wm-parallel",
+  "requiredScenarioState": "turn2",
+  "priority": 1,
+  "request": {
+    "method": "POST",
+    "urlPath": "/v1/chat/completions",
+    "bodyPatterns": [
+      {
+        "matchesJsonPath": {
+          "expression": "$.model",
+          "equalTo": "wm-parallel"
+        }
+      }
+    ]
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "bodyFileName": "llm-responses/parallel-readonly-sweep/02.json"
+  }
+}
