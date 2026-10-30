@@ -6,6 +6,8 @@ import io.ajentic.sre.agent.llm.LlmClient;
 import io.ajentic.sre.agent.llm.LlmRequest;
 import io.ajentic.sre.agent.llm.LlmResponse;
 import io.ajentic.sre.agent.llm.ToolCall;
+import io.ajentic.sre.agent.masking.MaskingSession;
+import io.ajentic.sre.agent.masking.SensitiveDataMasker;
 import io.ajentic.sre.agent.tool.Capability;
 import io.ajentic.sre.agent.tool.Tool;
 import io.ajentic.sre.agent.tool.ToolAuthorization;
@@ -32,6 +34,7 @@ public final class AgentSession {
     private final ToolRegistry tools;
     private final Environment environment;
     private final ToolAuthorization authorization;
+    private final MaskingSession maskingSession;
     private final Conversation conversation = new Conversation();
 
     public AgentSession(
@@ -52,12 +55,26 @@ public final class AgentSession {
             Environment environment,
             String systemPrompt,
             ToolAuthorization authorization) {
+        this(id, config, llm, tools, environment, systemPrompt, authorization,
+                new SensitiveDataMasker().newSession());
+    }
+
+    public AgentSession(
+            String id,
+            AgentSessionConfig config,
+            LlmClient llm,
+            ToolRegistry tools,
+            Environment environment,
+            String systemPrompt,
+            ToolAuthorization authorization,
+            MaskingSession maskingSession) {
         this.id = id;
         this.config = config;
         this.llm = llm;
         this.tools = tools;
         this.environment = environment;
         this.authorization = authorization;
+        this.maskingSession = maskingSession;
         if (systemPrompt != null && !systemPrompt.isBlank()) {
             conversation.add(ChatMessage.system(systemPrompt));
         }
@@ -76,6 +93,11 @@ public final class AgentSession {
     }
 
     public ChatTurnResult chat(String userMessage) {
+        return ScopedValue.where(AgentExecutionContext.MASKING_SESSION, maskingSession)
+                .call(() -> chatScoped(userMessage));
+    }
+
+    private ChatTurnResult chatScoped(String userMessage) {
         conversation.add(ChatMessage.user(userMessage));
         List<ToolCall> lastToolCalls = List.of();
 

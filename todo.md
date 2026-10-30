@@ -5,32 +5,32 @@ suite offline (`mvn test`, WireMock stubs, no model, no network), and targets Ja
 
 ## Branch map and merge order
 
-| # | Branch | Track | Scope | Depends on |
-|---|--------|-------|-------|------------|
-| 1 | `fix/masking-multiturn-toolcalls` | 1 | Mask prior-turn `toolCalls`; scope masking per session | — |
-| 2 | `fix/tool-step-terminal-semantics` | 1 | Read tools through `Environment.step`; terminal only when solved | — |
-| 3 | `feat/symptom-first-alerts` | 1 | Unspoiled initial observation | 2 |
-| 4 | `fix/cli-mcp-stdio-isolation` | 1 | No `:8080` bind for CLI/MCP; clean stdout | — |
-| 5 | `fix/episode-cursor-scoping` | 1 | Per-session/request episode targeting | 4 |
-| 6 | `refactor/schedule-scenario-reference` | 1 | Store `scenarioId`, not a lambda; race-free `run` | — |
-| 7 | `feat/prometheus-episode-metrics` | 1 | Micrometer counters/timers for episodes, tools, tokens | 2 |
-| 8 | `feat/local-docker-stack` | 1 | `docker-compose.yml`: app + Prometheus + Grafana (+ LocalStack) | 7 |
-| 9 | `feat/scenario-packs` | 2 | External YAML/JSON scenario loading | 3 |
-| 10 | `feat/topology-cascading-failures` | 2 | Service DAG + downstream→upstream degradation | 3, 9 |
-| 11 | `feat/investigation-tools` | 2 | `inspect_recent_changes`, `correlate_anomalies`, topology tool | 10 |
-| 12 | `feat/stagnation-breaker` | 2 | Duplicate tool-call detection with synthetic hint | 2 |
-| 13 | `feat/token-usage-budget` | 2 | Cumulative usage in `Conversation`/`ChatResponse` | — |
-| 14 | `feat/llm-policy-adapter` | 2 | `@PolicyModel(LLM)` ReAct policy | 2, 13 |
-| 15 | `feat/benchmark-cli` | 2 | `benchmark` subcommand + scorecard | 14 |
-| 16 | `feat/environment-backends` | 3 | `ajentic.environment.backend` strategy | 6, 10 |
-| 17 | `feat/live-telemetry-adapters` | 3 | `local-container` / `cloud-live` read-only adapters | 16 |
-| 18 | `feat/sse-chat-stream` | 3 | `/chat/stream` SSE | 13 |
-| 19 | `feat/alert-webhooks` | 3 | Alertmanager/PagerDuty/SNS intake | 16, 18 |
-| 20 | `feat/llm-fallback-router` | 3 | Local-first composite LLM client | 13 |
-| 21 | `feat/multicloud-identifier-masking` | 3 | GCP/Azure/K8s/Bearer categories | 1 |
-| 22 | `feat/approval-gates` | 3 | `ALLOW \| DENY \| REQUIRE_APPROVAL` | 18 |
-| 23 | `feat/episodic-memory` | 3 | `search_past_incidents` + `.ajentic/incidents.jsonl` | 6, 22 |
-| 24 | `feat/file-state-store` | 3 | Durable schedules/drills/episodes | 6 |
+| # | Branch | Track | Scope | Depends on | Status |
+|---|--------|-------|-------|------------|--------|
+| 1 | `fix/masking-multiturn-toolcalls` | 1 | Mask prior-turn `toolCalls`; scope masking per session | — | ✅ done |
+| 2 | `fix/tool-step-terminal-semantics` | 1 | Read tools through `Environment.step`; terminal only when solved | — | ⬜ todo |
+| 3 | `feat/symptom-first-alerts` | 1 | Unspoiled initial observation | 2 | ⬜ todo |
+| 4 | `fix/cli-mcp-stdio-isolation` | 1 | No `:8080` bind for CLI/MCP; clean stdout | — | ⬜ todo |
+| 5 | `fix/episode-cursor-scoping` | 1 | Per-session/request episode targeting | 4 | ⬜ todo |
+| 6 | `refactor/schedule-scenario-reference` | 1 | Store `scenarioId`, not a lambda; race-free `run` | — | ⬜ todo |
+| 7 | `feat/prometheus-episode-metrics` | 1 | Micrometer counters/timers for episodes, tools, tokens | 2 | ⬜ todo |
+| 8 | `feat/local-docker-stack` | 1 | `docker-compose.yml`: app + Prometheus + Grafana (+ LocalStack) | 7 | ⬜ todo |
+| 9 | `feat/scenario-packs` | 2 | External YAML/JSON scenario loading | 3 | ⬜ todo |
+| 10 | `feat/topology-cascading-failures` | 2 | Service DAG + downstream→upstream degradation | 3, 9 | ⬜ todo |
+| 11 | `feat/investigation-tools` | 2 | `inspect_recent_changes`, `correlate_anomalies`, topology tool | 10 | ⬜ todo |
+| 12 | `feat/stagnation-breaker` | 2 | Duplicate tool-call detection with synthetic hint | 2 | ⬜ todo |
+| 13 | `feat/token-usage-budget` | 2 | Cumulative usage in `Conversation`/`ChatResponse` | — | ⬜ todo |
+| 14 | `feat/llm-policy-adapter` | 2 | `@PolicyModel(LLM)` ReAct policy | 2, 13 | ⬜ todo |
+| 15 | `feat/benchmark-cli` | 2 | `benchmark` subcommand + scorecard | 14 | ⬜ todo |
+| 16 | `feat/environment-backends` | 3 | `ajentic.environment.backend` strategy | 6, 10 | ⬜ todo |
+| 17 | `feat/live-telemetry-adapters` | 3 | `local-container` / `cloud-live` read-only adapters | 16 | ⬜ todo |
+| 18 | `feat/sse-chat-stream` | 3 | `/chat/stream` SSE | 13 | ⬜ todo |
+| 19 | `feat/alert-webhooks` | 3 | Alertmanager/PagerDuty/SNS intake | 16, 18 | ⬜ todo |
+| 20 | `feat/llm-fallback-router` | 3 | Local-first composite LLM client | 13 | ⬜ todo |
+| 21 | `feat/multicloud-identifier-masking` | 3 | GCP/Azure/K8s/Bearer categories | 1 | ⬜ todo |
+| 22 | `feat/approval-gates` | 3 | `ALLOW \| DENY \| REQUIRE_APPROVAL` | 18 | ⬜ todo |
+| 23 | `feat/episodic-memory` | 3 | `search_past_incidents` + `.ajentic/incidents.jsonl` | 6, 22 | ⬜ todo |
+| 24 | `feat/file-state-store` | 3 | Durable schedules/drills/episodes | 6 | ⬜ todo |
 
 Recommended landing order: 1 → 2 → 4 → 5 → 6 → 3 → 13 → 12 → 21 → 7 → 8 → 9 → 10 → 11 → 14 → 15 → 16 → 17 → 18 →
 19 → 20 → 22 → 23 → 24. Branches 1, 2, 4, 6, 13 are independent and can be opened in parallel.
@@ -53,17 +53,15 @@ through untouched. The assistant message stored in `Conversation` has real ident
 because `unmaskResponse` restores them. On turn N+1 those arguments are replayed to the provider in the clear.
 A fresh `MaskingSession` per LLM call also means placeholders are not stable across one agent loop.
 
-- [ ] Mask `ToolCall.arguments()` in `maskRequest` (recursively for nested maps/lists, not only top-level strings).
-- [ ] Mask nested values and non-String scalars' string forms consistently; add a depth guard.
-- [ ] Scope one `MaskingSession` per `AgentSession`: create it in `AgentSession` (or `AgentSessionFactory`), bind it
-      via `AgentExecutionContext.MASKING_SESSION`, and have the interceptor reuse the bound session instead of
-      creating a new one per call. Keep the per-call fallback for direct `LlmClient` use.
-- [ ] Ensure `unmaskResponse` covers `content()`, `toolCalls().arguments()`, and (defensively) tool-call ids only if
-      they can carry data — ids must stay verbatim for protocol correlation.
-- [ ] Test: 3-turn session where turn 1 tool arguments contain an IPv4, an AWS ARN, and an email; assert the
-      WireMock request bodies for turns 2 and 3 contain no originals and that placeholders are consistent.
-- [ ] Test: streaming/fallback-safe `MaskingSession` null handling; no `NPE` when `originalsByPlaceholder` is empty.
-- [ ] Test: parallel read-only tool execution under ScopedValue does not cross-contaminate sessions.
+- [x] Mask `ToolCall.arguments()` in `maskRequest` (recursively for nested maps/lists, not only top-level strings).
+- [x] Preserve non-string scalars so tool schemas keep their types, with a recursion depth guard.
+- [x] Scope one `MaskingSession` per `AgentSession`: create it in `AgentSessionFactory`, bind it in `chat` via
+      `AgentExecutionContext.MASKING_SESSION`, and have the interceptor reuse the bound session instead of creating
+      a new one per call. Keep the per-call fallback for direct `LlmClient` use.
+- [x] Ensure `unmaskResponse` covers `content()` and nested `toolCalls().arguments()`; tool-call ids stay verbatim.
+- [x] E2E test: a two-turn session whose first tool call carries an IPv4, an AWS ARN, and an email; every outbound
+      WireMock body is free of the originals and reuses `[[IP_1]]` (no `[[IP_2]]`).
+- [x] E2E test: nested map/list tool-call arguments are masked before they reach the provider.
 
 **Files.** `agent/masking/SensitiveDataMaskingInterceptor.java`, `agent/masking/MaskingSession.java`,
 `agent/session/AgentSession.java`, `agent/session/AgentSessionFactory.java`, `agent/llm/MaskingLlmClient.java`,

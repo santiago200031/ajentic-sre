@@ -1,0 +1,31 @@
+{
+  "id": "chatcmpl-wm-mask-turns-1",
+  "object": "chat.completion",
+  "created": 1735689600,
+  "model": "wm-mask-turns",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call-diagnosis",
+            "type": "function",
+            "function": {
+              "name": "declare_diagnosis",
+              "arguments": "{\"service\": \"10.1.2.3\", \"rootCause\": \"arn:aws:logs:us-east-1:123456789012:log-group:checkout reported by ops@example.com\"}"
+            }
+          }
+        ]
+      },
+      "finish_reason": "tool_calls"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 40,
+    "completion_tokens": 12,
+    "total_tokens": 52
+  }
+}

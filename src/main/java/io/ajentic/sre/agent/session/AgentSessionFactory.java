@@ -1,6 +1,7 @@
 package io.ajentic.sre.agent.session;
 
 import io.ajentic.sre.agent.llm.LlmClient;
+import io.ajentic.sre.agent.masking.SensitiveDataMasker;
 import io.ajentic.sre.agent.tool.ToolAuthorization;
 import io.ajentic.sre.agent.tool.ToolRegistry;
 import io.ajentic.sre.rl.Environment;
@@ -17,17 +18,20 @@ public class AgentSessionFactory {
     private final ToolRegistry tools;
     private final EnvironmentFactory environments;
     private final ToolAuthorization authorization;
+    private final SensitiveDataMasker masker;
 
     @Inject
     public AgentSessionFactory(
             LlmClient llm,
             ToolRegistry tools,
             EnvironmentFactory environments,
-            ToolAuthorization authorization) {
+            ToolAuthorization authorization,
+            SensitiveDataMasker masker) {
         this.llm = llm;
         this.tools = tools;
         this.environments = environments;
         this.authorization = authorization;
+        this.masker = masker;
     }
 
     public AgentSession create(AgentSessionConfig config) {
@@ -39,7 +43,8 @@ public class AgentSessionFactory {
                 tools,
                 environment,
                 systemPrompt(environment),
-                authorization);
+                authorization,
+                masker.newSession());
     }
 
     private static String systemPrompt(Environment environment) {

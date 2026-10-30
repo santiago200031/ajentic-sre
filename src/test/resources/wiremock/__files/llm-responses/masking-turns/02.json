@@ -1,0 +1,21 @@
+{
+  "id": "chatcmpl-wm-mask-turns-2",
+  "object": "chat.completion",
+  "created": 1735689601,
+  "model": "wm-mask-turns",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "Diagnosis recorded."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 80,
+    "completion_tokens": 4,
+    "total_tokens": 84
+  }
+}

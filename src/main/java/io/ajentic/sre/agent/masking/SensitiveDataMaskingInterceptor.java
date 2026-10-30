@@ -11,14 +11,13 @@ import jakarta.interceptor.AroundInvoke;
 import jakarta.interceptor.Interceptor;
 import jakarta.interceptor.InvocationContext;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Cross-cutting guardrail for LLM traffic. For each {@link LlmRequest} it opens a {@link MaskingSession}, replaces
  * identifiers in the outgoing messages, binds the session as a scoped value, and restores the originals in the
- * response text and tool-call arguments.
+ * response text and tool-call arguments. When the agent has already bound a session for its whole conversation, the
+ * interceptor reuses it so placeholders stay stable across turns.
  */
 @MaskSensitiveData
 @Interceptor
@@ -34,10 +33,13 @@ public class SensitiveDataMaskingInterceptor {
         if (parameters.length != 1 || !(parameters[0] instanceof LlmRequest request)) {
             return context.proceed();
         }
-        MaskingSession session = masker.newSession();
+        MaskingSession bound = AgentExecutionContext.maskingSession();
+        MaskingSession session = bound == null ? masker.newSession() : bound;
         context.setParameters(new Object[]{maskRequest(session, request)});
-        LlmResponse response = ScopedValue.where(AgentExecutionContext.MASKING_SESSION, session)
-                .call(() -> (LlmResponse) context.proceed());
+        LlmResponse response = bound == null
+                ? ScopedValue.where(AgentExecutionContext.MASKING_SESSION, session)
+                        .call(() -> (LlmResponse) context.proceed())
+                : (LlmResponse) context.proceed();
         return unmaskResponse(session, response);
     }
 
@@ -46,7 +48,7 @@ public class SensitiveDataMaskingInterceptor {
                 .map(message -> new ChatMessage(
                         message.role(),
                         session.mask(message.content()),
-                        message.toolCalls(),
+                        maskToolCalls(session, message.toolCalls()),
                         message.toolCallId()))
                 .toList();
         return new LlmRequest(masked, request.tools(), request.model());
@@ -60,17 +62,15 @@ public class SensitiveDataMaskingInterceptor {
                 response.finishReason());
     }
 
-    private static List<ToolCall> unmaskToolCalls(MaskingSession session, List<ToolCall> toolCalls) {
+    private static List<ToolCall> maskToolCalls(MaskingSession session, List<ToolCall> toolCalls) {
         return toolCalls.stream()
-                .map(call -> new ToolCall(call.id(), call.name(), unmaskArguments(session, call.arguments())))
+                .map(call -> new ToolCall(call.id(), call.name(), session.maskArguments(call.arguments())))
                 .toList();
     }
 
-    private static Map<String, Object> unmaskArguments(MaskingSession session, Map<String, Object> arguments) {
-        Map<String, Object> unmasked = new LinkedHashMap<>();
-        arguments.forEach((key, value) -> unmasked.put(
-                key,
-                value instanceof String text ? session.unmask(text) : value));
-        return unmasked;
+    private static List<ToolCall> unmaskToolCalls(MaskingSession session, List<ToolCall> toolCalls) {
+        return toolCalls.stream()
+                .map(call -> new ToolCall(call.id(), call.name(), session.unmaskArguments(call.arguments())))
+                .toList();
     }
 }

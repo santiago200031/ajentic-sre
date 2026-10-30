@@ -5,6 +5,7 @@ import io.ajentic.sre.agent.llm.LlmClient;
 import io.ajentic.sre.agent.llm.LlmProperties;
 import io.ajentic.sre.agent.llm.LlmRequest;
 import io.ajentic.sre.agent.llm.LlmResponse;
+import io.ajentic.sre.agent.llm.ToolCall;
 import io.ajentic.sre.agent.session.AgentSession;
 import io.ajentic.sre.agent.session.AgentSessionConfig;
 import io.ajentic.sre.agent.session.ChatTurnResult;
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.containing;
 import static com.github.tomakehurst.wiremock.client.WireMock.matchingJsonPath;
@@ -54,6 +56,9 @@ class AgentSessionEndToEndTest {
 
     @BeforeEach
     void resetWireMock() {
+        if (!WireMockLlmTestResource.live()) {
+            WireMockLlmTestResource.server().resetRequests();
+        }
         WireMockLlmTestResource.resetScenarios();
     }
 
@@ -98,6 +103,55 @@ class AgentSessionEndToEndTest {
                     .withRequestBody(matchingJsonPath("$.messages[0].content", containing("[[EMAIL_1]]")))
                     .withRequestBody(matchingJsonPath("$.messages[0].content", containing("[[API_KEY_1]]"))));
         }
+    }
+
+    @Test
+    void masksToolCallArgumentsReplayedInLaterTurns() {
+        AgentSession session = session("orders-bad-deployment", modelFor("wm-mask-turns"));
+
+        assertEquals("Diagnosis recorded.", session.chat("Investigate the incident.").answer());
+
+        if (WireMockLlmTestResource.live()) {
+            return;
+        }
+        List<String> bodies = WireMockLlmTestResource.server().getAllServeEvents().stream()
+                .map(event -> event.getRequest().getBodyAsString())
+                .toList();
+        assertFalse(bodies.isEmpty(), "expected at least one outbound request");
+        for (String body : bodies) {
+            assertFalse(body.contains("10.1.2.3"), body);
+            assertFalse(body.contains("ops@example.com"), body);
+            assertFalse(body.contains("arn:aws:logs"), body);
+        }
+        assertTrue(bodies.stream().anyMatch(body -> body.contains("[[IP_1]]")), bodies.toString());
+        assertTrue(bodies.stream().anyMatch(body -> body.contains("[[ARN_1]]")), bodies.toString());
+        assertTrue(bodies.stream().anyMatch(body -> body.contains("[[EMAIL_1]]")), bodies.toString());
+        assertTrue(bodies.stream().noneMatch(body -> body.contains("[[IP_2]]")), bodies.toString());
+    }
+
+    @Test
+    void masksNestedToolCallArgumentsBeforeTheModel() {
+        ToolCall nested = new ToolCall("call-1", "lookup", Map.of(
+                "filters", Map.of("hosts", List.of("10.9.8.7", "oncall@example.com")),
+                "limit", 5));
+
+        llm.complete(new LlmRequest(
+                List.of(ChatMessage.assistant("checking", List.of(nested))),
+                List.of(),
+                modelFor("wm-mask")));
+
+        if (WireMockLlmTestResource.live()) {
+            return;
+        }
+        WireMockLlmTestResource.server().verify(postRequestedFor(urlEqualTo("/v1/chat/completions"))
+                .withRequestBody(matchingJsonPath("$.messages[0].tool_calls[0].function.arguments",
+                        containing("[[IP_1]]")))
+                .withRequestBody(matchingJsonPath("$.messages[0].tool_calls[0].function.arguments",
+                        containing("[[EMAIL_1]]"))));
+        String body = WireMockLlmTestResource.server().getAllServeEvents().getFirst()
+                .getRequest().getBodyAsString();
+        assertFalse(body.contains("10.9.8.7"), body);
+        assertFalse(body.contains("oncall@example.com"), body);
     }
 
     @Test
