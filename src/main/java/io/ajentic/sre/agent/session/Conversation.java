@@ -1,6 +1,7 @@
 package io.ajentic.sre.agent.session;
 
 import io.ajentic.sre.agent.llm.ChatMessage;
+import io.ajentic.sre.agent.llm.TokenUsage;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -12,9 +13,18 @@ import java.util.List;
 public final class Conversation {
 
     private final List<ChatMessage> messages = new ArrayList<>();
+    private TokenUsage usage = TokenUsage.empty();
 
     public synchronized void add(ChatMessage message) {
         messages.add(message);
+    }
+
+    public synchronized void addUsage(TokenUsage used) {
+        usage = usage.plus(used);
+    }
+
+    public synchronized TokenUsage usage() {
+        return usage;
     }
 
     public synchronized List<ChatMessage> messages() {

@@ -9,6 +9,7 @@ import io.ajentic.sre.rl.simulation.EnvironmentFactory;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.UUID;
 
@@ -21,6 +22,7 @@ public class AgentSessionFactory {
     private final ToolAuthorization authorization;
     private final SensitiveDataMasker masker;
     private final MeterRegistry meters;
+    private final int maxTokens;
 
     @Inject
     public AgentSessionFactory(
@@ -29,20 +31,22 @@ public class AgentSessionFactory {
             EnvironmentFactory environments,
             ToolAuthorization authorization,
             SensitiveDataMasker masker,
-            MeterRegistry meters) {
+            MeterRegistry meters,
+            @ConfigProperty(name = "ajentic.agent.max-tokens", defaultValue = "0") int maxTokens) {
         this.llm = llm;
         this.tools = tools;
         this.environments = environments;
         this.authorization = authorization;
         this.masker = masker;
         this.meters = meters;
+        this.maxTokens = maxTokens;
     }
 
     public AgentSession create(AgentSessionConfig config) {
         Environment environment = environments.create(config.scenarioId(), config.seed());
         return new AgentSession(
                 UUID.randomUUID().toString(),
-                config,
+                config.withMaxTokens(maxTokens),
                 llm,
                 tools,
                 environment,

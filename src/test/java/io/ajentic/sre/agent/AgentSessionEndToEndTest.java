@@ -73,6 +73,24 @@ class AgentSessionEndToEndTest {
     }
 
     @Test
+    void stopsBeforeTheNextLlmCallWhenTheTokenBudgetIsSpent() {
+        AgentSessionConfig config = AgentSessionConfig.forScenario("orders-bad-deployment")
+                .withModel(modelFor("wm-orders"))
+                .withMaxTokens(1);
+        Environment environment = environments.create(config.scenarioId(), config.seed());
+        AgentSession session = new AgentSession(
+                "session-budget", config, llm, tools, environment, "You are a test SRE agent.");
+
+        ChatTurnResult result = session.chat("Investigate the incident.");
+
+        assertTrue(result.answer().startsWith("Token budget exhausted"), result.answer());
+        assertEquals(49, result.usage().totalTokens());
+        assertEquals(1, session.conversation().messages().stream()
+                .filter(message -> message.role() == io.ajentic.sre.agent.llm.ChatRole.TOOL)
+                .count(), "the second LLM call must not happen");
+    }
+
+    @Test
     void chatUntilGoalRunsUntilTheGoalIsSatisfied() {
         AgentSession session = session("orders-bad-deployment", modelFor("wm-goal"));
 

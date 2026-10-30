@@ -19,7 +19,7 @@ suite offline (`mvn test`, WireMock stubs, no model, no network), and targets Ja
 | 10 | `feat/topology-cascading-failures` | 2 | Service DAG + downstream→upstream degradation | 3, 9 | ⬜ todo |
 | 11 | `feat/investigation-tools` | 2 | `inspect_recent_changes`, `correlate_anomalies`, topology tool | 10 | ⬜ todo |
 | 12 | `feat/stagnation-breaker` | 2 | Duplicate tool-call detection with synthetic hint | 2 | ⬜ todo |
-| 13 | `feat/token-usage-budget` | 2 | Cumulative usage in `Conversation`/`ChatResponse` | — | ⬜ todo |
+| 13 | `feat/token-usage-budget` | 2 | Cumulative usage in `Conversation`/`ChatResponse` | — | ✅ done |
 | 14 | `feat/llm-policy-adapter` | 2 | `@PolicyModel(LLM)` ReAct policy | 2, 13 | ⬜ todo |
 | 15 | `feat/benchmark-cli` | 2 | `benchmark` subcommand + scorecard | 14 | ⬜ todo |
 | 16 | `feat/environment-backends` | 3 | `ajentic.environment.backend` strategy | 6, 10 | ⬜ todo |
@@ -252,13 +252,15 @@ overwrite each other's active episode unless every call passes `_episodeId`.
 
 ### 13. `feat/token-usage-budget`
 
-- [ ] Accumulate `TokenUsage` (prompt/completion/total) in `Conversation`; expose `Conversation.usage()`.
-- [ ] Add usage to `ChatTurnResult` and `ChatResponse` (backward-compatible field addition).
-- [ ] Enforce an optional budget (`ajentic.agent.max-tokens`): soft warning to the model, hard stop before the next
-      LLM call when exceeded, with a clear finish reason.
-- [ ] Feed the token metrics from branch 7.
-- [ ] Test: scripted two-call turn reports summed usage; exceeding the budget stops the loop.
-- [ ] Test: `/api/v1/.../chat` JSON includes usage.
+- [x] Accumulate `TokenUsage` (prompt/completion/total) in `Conversation`; expose `Conversation.usage()`.
+- [x] Add usage to `ChatTurnResult` and `ChatResponse` as a new trailing field.
+- [x] Enforce an optional hard budget (`ajentic.agent.max-tokens`, default `0` = unlimited): stop before the next
+      LLM call once cumulative usage is reached, and answer with a clear budget message. A separate soft warning
+      prompt is not implemented.
+- [x] Token metrics from branch 7 stay fed per LLM response.
+- [x] Test: a scripted turn reports the summed usage (49 tokens) and a one-token budget stops before the second
+      LLM call.
+- [x] Test: `/api/v1/agent/sessions/{id}/chat` JSON includes `usage.totalTokens`.
 
 **Files.** `agent/session/Conversation.java`, `AgentSession.java`, `ChatTurnResult.java`,
 `api/payload/ChatResponse.java`, `api/resource/AgentResource.java`.

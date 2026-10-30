@@ -62,7 +62,8 @@ public class AgentResource {
     public ChatResponse chat(@RestPath String id, @Valid ChatRequest request) {
         AgentSession session = require(id);
         ChatTurnResult result = session.chat(request.message());
-        return new ChatResponse(session.id(), result.answer(), result.observation(), result.toolCalls());
+        return new ChatResponse(session.id(), result.answer(), result.observation(), result.toolCalls(),
+                result.usage());
     }
 
     @DELETE

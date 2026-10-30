@@ -119,14 +119,20 @@ public final class AgentSession {
         List<ToolCall> lastToolCalls = List.of();
 
         for (int iteration = 0; iteration < config.maxIterations(); iteration++) {
+            if (overBudget()) {
+                String answer = "Token budget exhausted after " + conversation.usage().totalTokens() + " tokens.";
+                conversation.add(ChatMessage.assistant(answer));
+                return new ChatTurnResult(answer, lastToolCalls, environment.observe(), conversation.usage());
+            }
             LlmResponse response = llm.complete(
                     new LlmRequest(conversation.messages(), tools.descriptors(), config.model()));
             recordTokens(response);
+            conversation.addUsage(response.usage());
 
             if (!response.hasToolCalls()) {
                 String answer = response.content() == null ? "" : response.content();
                 conversation.add(ChatMessage.assistant(answer));
-                return new ChatTurnResult(answer, lastToolCalls, environment.observe());
+                return new ChatTurnResult(answer, lastToolCalls, environment.observe(), conversation.usage());
             }
 
             conversation.add(ChatMessage.assistant(response.content(), response.toolCalls()));
@@ -138,7 +144,7 @@ public final class AgentSession {
             }
         }
 
-        return new ChatTurnResult(finalizeAnswer(), lastToolCalls, environment.observe());
+        return new ChatTurnResult(finalizeAnswer(), lastToolCalls, environment.observe(), conversation.usage());
     }
 
     public ChatTurnResult chatUntilGoal(String userMessage, Goal goal) {
@@ -149,6 +155,10 @@ public final class AgentSession {
             turn = chat("Continue until the goal is met: " + goal.description());
         }
         return turn;
+    }
+
+    private boolean overBudget() {
+        return config.maxTokens() > 0 && conversation.usage().totalTokens() >= config.maxTokens();
     }
 
     private void recordTokens(LlmResponse response) {

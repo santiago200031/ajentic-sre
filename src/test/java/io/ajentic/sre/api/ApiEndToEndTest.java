@@ -11,6 +11,7 @@ import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasItems;
 import static org.hamcrest.Matchers.is;
@@ -137,7 +138,8 @@ class ApiEndToEndTest {
                 .then()
                 .statusCode(200)
                 .body("answer", not(blankOrNullString()))
-                .body("sessionId", is(sessionId));
+                .body("sessionId", is(sessionId))
+                .body("usage.totalTokens", greaterThan(0));
 
         given()
                 .when().get("/q/metrics")

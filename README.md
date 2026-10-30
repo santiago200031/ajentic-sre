@@ -254,6 +254,7 @@ sends `Authorization: Bearer <key>`, unless `ajentic.llm.api-key-header` says ot
 | `ajentic.llm.api-version` | | Azure only |
 | `ajentic.llm.api-key-header` | | Override the auth header |
 | `ajentic.tools.allow-mutations` | `true` | Gate for mutating tools |
+| `ajentic.agent.max-tokens` | `0` | Cumulative session token budget; `0` disables the hard stop |
 | `ajentic.mcp.default-scenario` | `checkout-latency-db-pool` | Episode bootstrap |
 
 </details>
