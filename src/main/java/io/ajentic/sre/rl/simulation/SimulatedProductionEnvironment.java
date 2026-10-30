@@ -68,8 +68,8 @@ public final class SimulatedProductionEnvironment implements Environment {
         this.terminal = false;
         this.reason = TerminationReason.NONE;
         this.observation = buildObservation(
-                "Incident detected on " + scenario.culpritService() + ".",
-                system.query(TelemetrySignal.METRICS, scenario.culpritService()));
+                "Alert: " + scenario.alertingService() + " reports a downstream error spike.",
+                system.query(TelemetrySignal.METRICS, scenario.alertingService()));
         return observation;
     }
 

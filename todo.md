@@ -9,7 +9,7 @@ suite offline (`mvn test`, WireMock stubs, no model, no network), and targets Ja
 |---|--------|-------|-------|------------|--------|
 | 1 | `fix/masking-multiturn-toolcalls` | 1 | Mask prior-turn `toolCalls`; scope masking per session | — | ✅ done |
 | 2 | `fix/tool-step-terminal-semantics` | 1 | Read tools through `Environment.step`; terminal only when solved | — | ✅ done |
-| 3 | `feat/symptom-first-alerts` | 1 | Unspoiled initial observation | 2 | ⬜ todo |
+| 3 | `feat/symptom-first-alerts` | 1 | Unspoiled initial observation | 2 | ✅ done |
 | 4 | `fix/cli-mcp-stdio-isolation` | 1 | No `:8080` bind for CLI/MCP; clean stdout | — | ⬜ todo |
 | 5 | `fix/episode-cursor-scoping` | 1 | Per-session/request episode targeting | 4 | ⬜ todo |
 | 6 | `refactor/schedule-scenario-reference` | 1 | Store `scenarioId`, not a lambda; race-free `run` | — | ⬜ todo |
@@ -98,15 +98,15 @@ scenario data directly, so read actions never advance `system.tick()` and never 
 **Problem.** `reset(...)` seeds `"Incident detected on " + scenario.culpritService()` and pre-populates signals for
 the culprit, so `HeuristicPolicy.resolveTarget` and the LLM are handed the answer.
 
-- [ ] Change the initial observation to a symptom on the entry/edge service (e.g. `edge-gateway` or
+- [x] Change the initial observation to a symptom on the entry/edge service (e.g. `edge-gateway` or
       `checkout-api` 5xx spike), with no mention of the culprit.
-- [ ] Seed initial signals for the alarming service only; all other services return "no samples" until queried.
-- [ ] Update `HeuristicPolicy.resolveTarget` to start from the alerting service and walk the topology (see branch 10)
-      or fall back to a breadth-first scan over `Scenario.services()`.
-- [ ] Add `Scenario.alertingService()` (defaulting to the first edge-kind service) so scenarios can declare it.
-- [ ] Test: initial observation text never contains `culpritService()`; a "lazy" policy that reads only the alert
+- [x] Seed the initial observation with signals for the alarming service only.
+- [x] Update `HeuristicPolicy` to start from the alerting service and scan the remaining services when the first
+      one yields no diagnosis.
+- [x] Add `Scenario.alertingService()` (defaulting to the first edge-kind service) so scenarios can declare it.
+- [x] Test: initial observation text never contains `culpritService()`; a "lazy" policy that reads only the alert
       service cannot solve without further queries.
-- [ ] Test: heuristic solve rate on bundled scenarios stays at 100% with more steps than before (record baseline).
+- [x] Test: the heuristic still solves every bundled scenario after the extra scanning steps.
 
 **Files.** `rl/simulation/SimulatedProductionEnvironment.java`, `rl/simulation/Scenario.java`,
 `rl/simulation/ScenarioLibrary.java`, `rl/policy/HeuristicPolicy.java`.

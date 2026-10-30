@@ -24,6 +24,19 @@ public record Scenario(
         return faults.isEmpty() ? services.getFirst().name() : faults.getFirst().service();
     }
 
+    /** The entry service that reports the first symptom, deliberately not the culprit when one is available. */
+    public String alertingService() {
+        return services.stream()
+                .filter(service -> service.kind() == ServiceKind.GATEWAY)
+                .map(ServiceSpec::name)
+                .findFirst()
+                .orElseGet(() -> services.stream()
+                        .map(ServiceSpec::name)
+                        .filter(name -> !name.equals(culpritService()))
+                        .findFirst()
+                        .orElseGet(this::culpritService));
+    }
+
     public Set<FaultKind> faultKinds() {
         return faults.stream().map(Fault::kind).collect(Collectors.toUnmodifiableSet());
     }

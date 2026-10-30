@@ -20,6 +20,8 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class IncidentResponseEndToEndTest {
@@ -40,6 +42,18 @@ class IncidentResponseEndToEndTest {
         assertTrue(result.solved(), () -> "scenario was not solved end to end: " + result);
         assertEquals(TerminationReason.RESOLVED, result.terminationReason(), result::toString);
         assertTrue(result.totalReward() > 0.5, () -> "reward too low: " + result.totalReward());
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("scenarios")
+    void initialAlertDoesNotNameTheCulprit(Scenario scenario) {
+        Environment environment = new SimulatedProductionEnvironment(scenario, 2026L, new IncidentRewardFunction());
+
+        Observation first = environment.observe();
+
+        assertFalse(first.feedback().contains(scenario.culpritService()), first.feedback());
+        assertEquals(scenario.alertingService(), first.signals().getFirst().service(), first::toString);
+        assertNotEquals(scenario.culpritService(), scenario.alertingService());
     }
 
     @Test

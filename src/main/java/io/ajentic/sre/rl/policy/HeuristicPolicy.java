@@ -31,6 +31,7 @@ public final class HeuristicPolicy implements Policy {
 
     private final FaultClassifier classifier;
     private final Deque<TelemetrySignal> pending = new ArrayDeque<>(INVESTIGATION);
+    private final Deque<String> pendingTargets = new ArrayDeque<>();
 
     public HeuristicPolicy() {
         this(new FaultClassifier());
@@ -57,6 +58,9 @@ public final class HeuristicPolicy implements Policy {
         collected.addAll(observation.signals());
         if (target == null) {
             target = resolveTarget(observation);
+            observation.serviceHealth().keySet().stream()
+                    .filter(name -> !name.equals(target))
+                    .forEach(pendingTargets::add);
         }
 
         if (diagnosis == null && !pending.isEmpty()) {
@@ -65,6 +69,10 @@ public final class HeuristicPolicy implements Policy {
 
         if (diagnosis == null) {
             diagnosis = classifier.classify(new ArrayList<>(collected)).orElse(null);
+            if (diagnosis == null && !pendingTargets.isEmpty()) {
+                target = pendingTargets.poll();
+                return new QueryTelemetry(TelemetrySignal.LOGS, target);
+            }
             if (diagnosis == null) {
                 if (!remediationsListed) {
                     remediationsListed = true;

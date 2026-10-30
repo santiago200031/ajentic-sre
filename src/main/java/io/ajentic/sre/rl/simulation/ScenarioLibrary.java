@@ -58,6 +58,7 @@ public class ScenarioLibrary implements ScenarioRepository {
                         "The payments worker leaks memory until the liveness probe restarts it.",
                         FaultKind.MEMORY_LEAK.incidentSummary(),
                         List.of(
+                                new ServiceSpec("edge-gateway", ServiceKind.GATEWAY, 3),
                                 new ServiceSpec("payments-api", ServiceKind.API, 3),
                                 new ServiceSpec("payments-worker", ServiceKind.WORKER, 2),
                                 new ServiceSpec("ledger-db", ServiceKind.DATABASE, 1)),
@@ -73,6 +74,7 @@ public class ScenarioLibrary implements ScenarioRepository {
                         "Auth traffic fails TLS verification after the serving certificate expired.",
                         FaultKind.CERTIFICATE_EXPIRY.incidentSummary(),
                         List.of(
+                                new ServiceSpec("edge-gateway", ServiceKind.GATEWAY, 3),
                                 new ServiceSpec("auth-api", ServiceKind.API, 3),
                                 new ServiceSpec("identity-db", ServiceKind.DATABASE, 1)),
                         List.of(new Fault(FaultKind.CERTIFICATE_EXPIRY, "auth-api", 0.9)),
@@ -87,6 +89,7 @@ public class ScenarioLibrary implements ScenarioRepository {
                         "Cluster DNS stops resolving internal service names, breaking search fan-out.",
                         FaultKind.DNS_FAILURE.incidentSummary(),
                         List.of(
+                                new ServiceSpec("edge-gateway", ServiceKind.GATEWAY, 3),
                                 new ServiceSpec("search-api", ServiceKind.API, 3),
                                 new ServiceSpec("search-index", ServiceKind.CACHE, 2)),
                         List.of(new Fault(FaultKind.DNS_FAILURE, "search-api", 0.85)),
@@ -101,6 +104,7 @@ public class ScenarioLibrary implements ScenarioRepository {
                         "A recent orders-api deployment introduced a regression that raises 5xx responses.",
                         FaultKind.BAD_DEPLOYMENT.incidentSummary(),
                         List.of(
+                                new ServiceSpec("edge-gateway", ServiceKind.GATEWAY, 3),
                                 new ServiceSpec("orders-api", ServiceKind.API, 4),
                                 new ServiceSpec("orders-db", ServiceKind.DATABASE, 1)),
                         List.of(new Fault(FaultKind.BAD_DEPLOYMENT, "orders-api", 0.8)),
@@ -115,6 +119,7 @@ public class ScenarioLibrary implements ScenarioRepository {
                         "The storage worker node is evicting pods because its volume is nearly full.",
                         FaultKind.DISK_PRESSURE.incidentSummary(),
                         List.of(
+                                new ServiceSpec("edge-gateway", ServiceKind.GATEWAY, 3),
                                 new ServiceSpec("storage-worker", ServiceKind.WORKER, 2),
                                 new ServiceSpec("object-store", ServiceKind.DATABASE, 1)),
                         List.of(new Fault(FaultKind.DISK_PRESSURE, "storage-worker", 0.85)),
