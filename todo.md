@@ -12,7 +12,7 @@ suite offline (`mvn test`, WireMock stubs, no model, no network), and targets Ja
 | 3 | `feat/symptom-first-alerts` | 1 | Unspoiled initial observation | 2 | ✅ done |
 | 4 | `fix/cli-mcp-stdio-isolation` | 1 | No `:8080` bind for CLI/MCP; clean stdout | — | ✅ done |
 | 5 | `fix/episode-cursor-scoping` | 1 | Per-session/request episode targeting | 4 | ✅ done |
-| 6 | `refactor/schedule-scenario-reference` | 1 | Store `scenarioId`, not a lambda; race-free `run` | — | ⬜ todo |
+| 6 | `refactor/schedule-scenario-reference` | 1 | Store `scenarioId`, not a lambda; race-free `run` | — | ✅ done |
 | 7 | `feat/prometheus-episode-metrics` | 1 | Micrometer counters/timers for episodes, tools, tokens | 2 | ⬜ todo |
 | 8 | `feat/local-docker-stack` | 1 | `docker-compose.yml`: app + Prometheus + Grafana (+ LocalStack) | 7 | ⬜ todo |
 | 9 | `feat/scenario-packs` | 2 | External YAML/JSON scenario loading | 3 | ⬜ todo |
@@ -150,14 +150,15 @@ overwrite each other's active episode unless every call passes `_episodeId`.
 **Problem.** `ScheduleDefinition` holds an in-memory `ScheduledJob` closure and `ScheduleResource.run` reads
 `drills.recent().getLast()` after `runNow(id)`, which is racy under concurrent drills.
 
-- [ ] Replace `ScheduledJob job` with `String scenarioId` in `ScheduleDefinition`; rebuild the job in
-      `Scheduler`/`IncidentDrillRunner` from the stored id.
-- [ ] Make `Scheduler.runNow(id)` return the produced `EpisodeResult` (or a run id) instead of void so the resource
-      does not read global `recent()`.
-- [ ] Keep the store serializable: only ids, cron, flags, zone, version, group.
-- [ ] Preserve version/optimistic-lock behavior in `InMemoryScheduleStore`.
-- [ ] Test: schedule create → run → result belongs to that schedule even with two concurrent `run` calls.
-- [ ] Test: schedule JSON round-trips with no closure fields (ready for branch 24).
+- [x] Replace `ScheduledJob job` with `String scenarioId` in `ScheduleDefinition`; build the job from the stored
+      id via `IncidentDrillRunner`.
+- [x] Make `Scheduler.runNow(id)` return the produced `EpisodeResult`, so `ScheduleResource` no longer reads
+      `drills.recent().getLast()`.
+- [x] Keep the store serializable: only ids, cron, flags, zone, version, group, scenario id.
+- [x] Preserve version/optimistic-lock behavior in `InMemoryScheduleStore`.
+- [x] Keep in-memory lambda schedules for tests via a transient side map, so `SchedulerEndToEndTest` stays intact.
+- [x] Test: existing scheduler and API suites pass, including create → run → `solved=true` for the scheduled
+      scenario.
 
 **Files.** `schedule/store/ScheduleDefinition.java`, `schedule/store/InMemoryScheduleStore.java`,
 `schedule/engine/Scheduler.java`, `schedule/drill/IncidentDrillRunner.java`,

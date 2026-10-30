@@ -4,7 +4,6 @@ import io.ajentic.sre.api.payload.CreateScheduleRequest;
 import io.ajentic.sre.api.payload.ScheduleView;
 import io.ajentic.sre.rl.episode.EpisodeResult;
 import io.ajentic.sre.schedule.drill.IncidentDrillRunner;
-import io.ajentic.sre.schedule.engine.ScheduledJob;
 import io.ajentic.sre.schedule.engine.Scheduler;
 import io.ajentic.sre.schedule.engine.TickReport;
 import io.ajentic.sre.schedule.store.ScheduleDefinition;
@@ -53,10 +52,7 @@ public class ScheduleResource {
     @Consumes(MediaType.APPLICATION_JSON)
     @ResponseStatus(201)
     public ScheduleView create(@Valid CreateScheduleRequest request) {
-        ScheduledJob job = request.scenarioId() == null || request.scenarioId().isBlank()
-                ? context -> { }
-                : drills.job(request.scenarioId());
-        ScheduleDefinition definition = scheduler.schedule(request.name(), request.cron(), job);
+        ScheduleDefinition definition = scheduler.schedule(request.name(), request.cron(), request.scenarioId());
         return ScheduleView.from(definition);
     }
 
@@ -72,12 +68,8 @@ public class ScheduleResource {
     @Path("/{id}/run")
     public Response run(@RestPath String id) {
         require(id);
-        scheduler.runNow(id);
-        List<EpisodeResult> recent = drills.recent();
-        if (recent.isEmpty()) {
-            return Response.noContent().build();
-        }
-        return Response.ok(recent.getLast()).build();
+        EpisodeResult result = scheduler.runNow(id);
+        return result == null ? Response.noContent().build() : Response.ok(result).build();
     }
 
     @POST

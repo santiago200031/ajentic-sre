@@ -1,6 +1,8 @@
 package io.ajentic.sre.schedule.engine;
 
+import io.ajentic.sre.rl.episode.EpisodeResult;
 import io.ajentic.sre.schedule.cron.CronExpression;
+import io.ajentic.sre.schedule.drill.IncidentDrillRunner;
 import io.ajentic.sre.schedule.store.ScheduleDefinition;
 import io.ajentic.sre.schedule.store.ScheduleNotFoundException;
 import io.ajentic.sre.schedule.store.ScheduleStore;
@@ -27,6 +29,8 @@ public class Scheduler {
     private final ScheduleStore store;
     private final SchedulerClock clock;
     private final SchedulerSettings settings;
+    private final IncidentDrillRunner drills;
+    private final Map<String, ScheduledJob> adHocJobs = new ConcurrentHashMap<>();
     private final Executor executor;
     private final Semaphore permits;
     private final Map<String, Instant> lastRuns = new ConcurrentHashMap<>();
@@ -35,28 +39,53 @@ public class Scheduler {
     private volatile Instant lastTickedAt;
 
     @Inject
-    public Scheduler(ScheduleStore store, SchedulerClock clock, SchedulerSettings settings) {
-        this(store, clock, settings, Executors.newVirtualThreadPerTaskExecutor(), settings.maxConcurrentRuns());
+    public Scheduler(ScheduleStore store, SchedulerClock clock, SchedulerSettings settings, IncidentDrillRunner drills) {
+        this(store, clock, settings, Executors.newVirtualThreadPerTaskExecutor(), settings.maxConcurrentRuns(), drills);
     }
 
     Scheduler(ScheduleStore store, SchedulerClock clock, SchedulerSettings settings, Executor executor,
             int maxConcurrentRuns) {
+        this(store, clock, settings, executor, maxConcurrentRuns, null);
+    }
+
+    Scheduler(ScheduleStore store, SchedulerClock clock, SchedulerSettings settings, Executor executor,
+            int maxConcurrentRuns, IncidentDrillRunner drills) {
         this.store = store;
         this.clock = clock;
         this.settings = settings;
+        this.drills = drills;
         this.executor = executor;
         this.permits = new Semaphore(Math.max(1, maxConcurrentRuns));
         this.lastTickedAt = clock.now();
     }
 
-    public ScheduleDefinition schedule(String name, String cron, ScheduledJob job) {
+    public ScheduleDefinition schedule(String name, String cron, String scenarioId) {
         return store.add(new ScheduleDefinition(
-                null, name, cron, true, false, 0L, null, ZoneId.of(settings.zone()), job));
+                null, name, cron, true, false, 0L, null, ZoneId.of(settings.zone()),
+                scenarioId == null || scenarioId.isBlank() ? null : scenarioId));
     }
 
-    public void runNow(String id) {
+    /** In-memory schedules for tests and embedding; production schedules persist a scenario id instead. */
+    public ScheduleDefinition schedule(String name, String cron, ScheduledJob job) {
+        ScheduleDefinition definition = schedule(name, cron, (String) null);
+        adHocJobs.put(definition.id(), job);
+        return definition;
+    }
+
+    public EpisodeResult runNow(String id) {
         ScheduleDefinition definition = store.byId(id).orElseThrow(() -> new ScheduleNotFoundException(id));
-        definition.job().run(new ScheduleContext(definition.id(), definition.name(), clock.now()));
+        if (definition.scenarioId() != null) {
+            return drills.drill(definition.scenarioId());
+        }
+        jobFor(definition).run(new ScheduleContext(definition.id(), definition.name(), clock.now()));
+        return null;
+    }
+
+    private ScheduledJob jobFor(ScheduleDefinition definition) {
+        if (definition.scenarioId() != null && drills != null) {
+            return drills.job(definition.scenarioId());
+        }
+        return adHocJobs.getOrDefault(definition.id(), context -> { });
     }
 
     public synchronized TickReport tick() {
@@ -120,7 +149,7 @@ public class Scheduler {
     private void dispatch(RunRequest request) {
         executor.execute(() -> {
             try {
-                request.definition().job().run(new ScheduleContext(
+                jobFor(request.definition()).run(new ScheduleContext(
                         request.definition().id(),
                         request.definition().name(),
                         request.scheduledAt()));

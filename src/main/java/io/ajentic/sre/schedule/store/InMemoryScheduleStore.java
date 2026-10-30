@@ -52,7 +52,7 @@ public class InMemoryScheduleStore implements ScheduleStore {
                 1L,
                 loopGroupId,
                 definition.zone(),
-                definition.job());
+                definition.scenarioId());
         schedules.put(id, stored);
         idByIdentity.put(identity, id);
         idByName.putIfAbsent(stored.name(), id);
@@ -78,7 +78,7 @@ public class InMemoryScheduleStore implements ScheduleStore {
                 current.version() + 1,
                 current.loopGroupId(),
                 changed.zone(),
-                changed.job());
+                changed.scenarioId());
         String previousIdentity = current.identity();
         String nextIdentity = candidate.identity();
         if (!previousIdentity.equals(nextIdentity) && idByIdentity.containsKey(nextIdentity)) {

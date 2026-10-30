@@ -1,7 +1,6 @@
 package io.ajentic.sre.schedule.store;
 
 import io.ajentic.sre.schedule.cron.CronExpression;
-import io.ajentic.sre.schedule.engine.ScheduledJob;
 
 import java.time.ZoneId;
 
@@ -14,11 +13,10 @@ public record ScheduleDefinition(
         long version,
         String loopGroupId,
         ZoneId zone,
-        ScheduledJob job) {
+        String scenarioId) {
 
     public ScheduleDefinition {
         CronExpression.parse(cron);
-        job = job == null ? context -> { } : job;
         zone = zone == null ? ZoneId.of("UTC") : zone;
     }
 
@@ -27,6 +25,6 @@ public record ScheduleDefinition(
     }
 
     public ScheduleDefinition withCron(String newCron) {
-        return new ScheduleDefinition(id, name, newCron, enabled, stopped, version, loopGroupId, zone, job);
+        return new ScheduleDefinition(id, name, newCron, enabled, stopped, version, loopGroupId, zone, scenarioId);
     }
 }

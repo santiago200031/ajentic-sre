@@ -1,6 +1,5 @@
 package io.ajentic.sre.cli;
 
-import io.ajentic.sre.schedule.drill.IncidentDrillRunner;
 import io.ajentic.sre.schedule.store.ScheduleDefinition;
 import io.ajentic.sre.schedule.store.ScheduleStore;
 import io.ajentic.sre.schedule.engine.Scheduler;
@@ -20,9 +19,6 @@ public class SchedulesCommand implements Runnable {
 
     @Inject
     ScheduleStore store;
-
-    @Inject
-    IncidentDrillRunner drills;
 
     @Option(names = "--add", description = "Name of the schedule to create.")
     String add;
@@ -47,7 +43,7 @@ public class SchedulesCommand implements Runnable {
                     report.executed().size(), report.deferred().size(), report.recoveryBacklog());
         }
         if (add != null && cron != null && scenario != null) {
-            scheduler.schedule(add, cron, drills.job(scenario));
+            scheduler.schedule(add, cron, scenario);
         }
         if (run != null) {
             store.byName(run).ifPresent(definition -> scheduler.runNow(definition.id()));
