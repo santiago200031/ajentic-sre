@@ -124,7 +124,7 @@ public final class SimulatedProductionEnvironment implements Environment {
             terminal = true;
             reason = TerminationReason.CATASTROPHIC;
             effects.add(TransitionEffect.CATASTROPHIC);
-        } else if (system.allFaultsResolved()) {
+        } else if (diagnosed && system.allFaultsResolved()) {
             terminal = true;
             reason = TerminationReason.RESOLVED;
             effects.add(TransitionEffect.RESOLVED);

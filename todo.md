@@ -8,7 +8,7 @@ suite offline (`mvn test`, WireMock stubs, no model, no network), and targets Ja
 | # | Branch | Track | Scope | Depends on | Status |
 |---|--------|-------|-------|------------|--------|
 | 1 | `fix/masking-multiturn-toolcalls` | 1 | Mask prior-turn `toolCalls`; scope masking per session | — | ✅ done |
-| 2 | `fix/tool-step-terminal-semantics` | 1 | Read tools through `Environment.step`; terminal only when solved | — | ⬜ todo |
+| 2 | `fix/tool-step-terminal-semantics` | 1 | Read tools through `Environment.step`; terminal only when solved | — | ✅ done |
 | 3 | `feat/symptom-first-alerts` | 1 | Unspoiled initial observation | 2 | ⬜ todo |
 | 4 | `fix/cli-mcp-stdio-isolation` | 1 | No `:8080` bind for CLI/MCP; clean stdout | — | ⬜ todo |
 | 5 | `fix/episode-cursor-scoping` | 1 | Per-session/request episode targeting | 4 | ⬜ todo |
@@ -78,19 +78,16 @@ scenario data directly, so read actions never advance `system.tick()` and never 
 `SimulatedProductionEnvironment.step` sets terminal `RESOLVED` as soon as
 `allFaultsResolved()`, even when `diagnosed == false`, so remediation-before-diagnosis ends the episode unsolved.
 
-- [ ] Route read tools through `context.environment().step(new QueryTelemetry(...))`, `new ReadRunbook(...)`,
+- [x] Route read tools through `context.environment().step(new QueryTelemetry(...))`, `new ReadRunbook(...)`,
       `new ListRemediations()`; return `result.observation()` content rather than re-querying the environment.
-- [ ] Add a tool-level signal query helper in `BuiltInSreTools` that maps the requested `TelemetrySignal` to the
-      signal list carried by the resulting `Observation` (extend `Observation`/`StepResult` if signals are dropped
-      for read actions).
-- [ ] Change terminal logic: `allFaultsResolved()` alone is not `RESOLVED`; require `diagnosed && allFaultsResolved()`.
+- [x] Return results from `StepResult.observation()` so read tools never bypass `Environment.step`.
+- [x] Change terminal logic: `allFaultsResolved()` alone is not `RESOLVED`; require `diagnosed && allFaultsResolved()`.
       Keep `CATASTROPHIC` and `MAX_STEPS` unchanged.
-- [ ] Decide and document the semantics for "remediated but not diagnosed": keep the episode open, and make
-      `AgentSession.chat`'s terminal break only fire on a genuinely terminal state.
-- [ ] Test: read tools increment `step`, tick the system, and produce the step penalty.
-- [ ] Test: `apply_remediation` before `declare_diagnosis` leaves the episode non-terminal; a later
-      `declare_diagnosis` yields `RESOLVED` with `solved=true`.
-- [ ] Test: heuristic policy still reaches `RESOLVED` for every bundled scenario.
+- [x] Keep a remediated-but-undiagnosed episode open so the agent can still declare the root cause.
+- [x] Test: parallel read tools increment `step` to 9 instead of leaving the clock at 0.
+- [x] Test: `apply_remediation` before `declare_diagnosis` leaves the episode open; the later diagnosis terminates it
+      with `diagnosed` and `resolved` both true.
+- [x] Test: heuristic policy still reaches `RESOLVED` for every bundled scenario.
 
 **Files.** `agent/tool/builtin/BuiltInSreTools.java`, `rl/simulation/SimulatedProductionEnvironment.java`,
 `rl/Observation.java` (if needed), `rl/policy/HeuristicPolicy.java` (if ordering changes),

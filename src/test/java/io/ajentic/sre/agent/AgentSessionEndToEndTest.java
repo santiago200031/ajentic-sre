@@ -173,6 +173,18 @@ class AgentSessionEndToEndTest {
     }
 
     @Test
+    void remediationBeforeDiagnosisDoesNotEndTheEpisodeSolved() {
+        AgentSession session = session("orders-bad-deployment", modelFor("wm-early-remediation"));
+
+        ChatTurnResult result = session.chat("Remediate first, diagnose after.");
+
+        assertTrue(result.observation().diagnosed(), result::toString);
+        assertTrue(result.observation().resolved(), result::toString);
+        assertTrue(session.environment().isTerminal(), "diagnosis plus resolved faults should terminate");
+        assertEquals(2, session.environment().observe().step());
+    }
+
+    @Test
     void executesReadOnlyToolCallsAcrossVirtualThreads() {
         AgentSession session = session("orders-bad-deployment", modelFor("wm-parallel"));
         ChatTurnResult result = session.chat("Sweep telemetry in parallel.");
@@ -181,6 +193,7 @@ class AgentSessionEndToEndTest {
         assertEquals(9, session.conversation().messages().stream()
                 .filter(message -> message.role() == io.ajentic.sre.agent.llm.ChatRole.TOOL)
                 .count());
+        assertEquals(9, session.environment().observe().step(), "read tools must advance the simulation clock");
     }
 
     private AgentSession session(String scenarioId, String model) {

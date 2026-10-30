@@ -1,0 +1,31 @@
+{
+  "id": "chatcmpl-wm-early-remediation-2",
+  "object": "chat.completion",
+  "created": 1735689601,
+  "model": "wm-early-remediation",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call-diagnose",
+            "type": "function",
+            "function": {
+              "name": "declare_diagnosis",
+              "arguments": "{\"service\": \"orders-api\", \"rootCause\": \"bad application deployment\"}"
+            }
+          }
+        ]
+      },
+      "finish_reason": "tool_calls"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 60,
+    "completion_tokens": 10,
+    "total_tokens": 70
+  }
+}

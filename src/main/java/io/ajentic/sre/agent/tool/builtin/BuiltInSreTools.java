@@ -13,6 +13,9 @@ import io.ajentic.sre.rl.StepResult;
 import io.ajentic.sre.rl.TelemetrySignal;
 import io.ajentic.sre.rl.action.ApplyRemediation;
 import io.ajentic.sre.rl.action.DeclareDiagnosis;
+import io.ajentic.sre.rl.action.ListRemediations;
+import io.ajentic.sre.rl.action.QueryTelemetry;
+import io.ajentic.sre.rl.action.ReadRunbook;
 import io.ajentic.sre.rl.action.RemediationKind;
 import io.ajentic.sre.rl.episode.EpisodeCursor;
 import io.ajentic.sre.rl.episode.EpisodeHandle;
@@ -67,7 +70,8 @@ public class BuiltInSreTools {
             @ToolParam("Telemetry signal to fetch.") TelemetrySignal signal,
             @ToolParam("Service name to inspect.") String service,
             ToolContext context) {
-        List<ObservedSignal> signals = context.environment().signals(signal, service);
+        StepResult result = context.environment().step(new QueryTelemetry(signal, service));
+        List<ObservedSignal> signals = result.observation().signals();
         if (signals.isEmpty()) {
             return ToolResult.ok("No " + signal + " samples for " + service + ".");
         }
@@ -78,6 +82,7 @@ public class BuiltInSreTools {
     public ToolResult readRunbook(
             @ToolParam("Runbook identifier from the observation.") String runbookId,
             ToolContext context) {
+        context.environment().step(new ReadRunbook(runbookId));
         String scenarioId = context.environment().spec().scenarioId();
         Scenario scenario = scenarios.byId(scenarioId)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown scenario: " + scenarioId));
@@ -90,7 +95,8 @@ public class BuiltInSreTools {
 
     @AgentTool(name = "list_remediations", description = "List the remediation actions that can be applied.")
     public ToolResult listRemediations(ToolContext context) {
-        List<RemediationKind> remediations = context.environment().observe().availableRemediations();
+        StepResult result = context.environment().step(new ListRemediations());
+        List<RemediationKind> remediations = result.observation().availableRemediations();
         String content = remediations.stream()
                 .map(kind -> "- %s: %s".formatted(kind, kind.description()))
                 .collect(Collectors.joining("\n"));

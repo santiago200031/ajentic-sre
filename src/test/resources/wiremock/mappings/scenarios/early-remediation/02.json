@@ -1,0 +1,24 @@
+{
+  "scenarioName": "wm-early-remediation",
+  "requiredScenarioState": "turn2",
+  "priority": 1,
+  "request": {
+    "method": "POST",
+    "urlPath": "/v1/chat/completions",
+    "bodyPatterns": [
+      {
+        "matchesJsonPath": {
+          "expression": "$.model",
+          "equalTo": "wm-early-remediation"
+        }
+      }
+    ]
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "bodyFileName": "llm-responses/early-remediation/02.json"
+  }
+}
