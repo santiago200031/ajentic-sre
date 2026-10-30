@@ -18,7 +18,7 @@ suite offline (`mvn test`, WireMock stubs, no model, no network), and targets Ja
 | 9 | `feat/scenario-packs` | 2 | External YAML/JSON scenario loading | 3 | ✅ done |
 | 10 | `feat/topology-cascading-failures` | 2 | Service DAG + downstream→upstream degradation | 3, 9 | ⬜ todo |
 | 11 | `feat/investigation-tools` | 2 | `inspect_recent_changes`, `correlate_anomalies`, topology tool | 10 | ⬜ todo |
-| 12 | `feat/stagnation-breaker` | 2 | Duplicate tool-call detection with synthetic hint | 2 | ⬜ todo |
+| 12 | `feat/stagnation-breaker` | 2 | Duplicate tool-call detection with synthetic hint | 2 | ✅ done |
 | 13 | `feat/token-usage-budget` | 2 | Cumulative usage in `Conversation`/`ChatResponse` | — | ✅ done |
 | 14 | `feat/llm-policy-adapter` | 2 | `@PolicyModel(LLM)` ReAct policy | 2, 13 | ⬜ todo |
 | 15 | `feat/benchmark-cli` | 2 | `benchmark` subcommand + scorecard | 14 | ⬜ todo |
