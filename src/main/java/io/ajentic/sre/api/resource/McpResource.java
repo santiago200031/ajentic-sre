@@ -13,6 +13,12 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
+import org.eclipse.microprofile.openapi.annotations.media.Content;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
+import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.jboss.resteasy.reactive.ResponseStatus;
 
 import java.util.List;
@@ -26,6 +32,7 @@ import java.util.UUID;
  */
 @Path("/api/v1/mcp")
 @ApplicationScoped
+@Tag(name = "MCP", description = "Model Context Protocol HTTP streamable transport")
 @RunOnVirtualThread
 public class McpResource {
 
@@ -39,6 +46,10 @@ public class McpResource {
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
+    @Operation(summary = "Handle a JSON-RPC request", description = "Processes one JSON-RPC 2.0 request or batch; notifications return 202.")
+    @APIResponse(responseCode = "200", description = "The JSON-RPC response",
+            content = @Content(schema = @Schema(type = SchemaType.STRING)))
+    @APIResponse(responseCode = "202", description = "Accepted notification")
     public Response handleJsonRpc(String requestBody, @HeaderParam("Mcp-Session-Id") String sessionId) {
         String scope = sessionId == null || sessionId.isBlank() ? UUID.randomUUID().toString() : sessionId;
         String response = handler.handle(requestBody, scope);
@@ -52,6 +63,9 @@ public class McpResource {
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
+    @Operation(summary = "Describe the MCP server", description = "Returns server name, protocol version, and capabilities.")
+    @APIResponse(responseCode = "200", description = "The server description",
+            content = @Content(schema = @Schema(type = SchemaType.OBJECT)))
     public Map<String, Object> describe() {
         return Map.of(
                 "server", McpProtocolHandler.SERVER_NAME,
@@ -62,6 +76,8 @@ public class McpResource {
 
     @DELETE
     @ResponseStatus(204)
+    @Operation(summary = "Reset MCP sessions", description = "Clears the default episode, or a single session when a session id is given.")
+    @APIResponse(responseCode = "204", description = "Reset")
     public void reset(@HeaderParam("Mcp-Session-Id") String sessionId) {
         if (sessionId == null || sessionId.isBlank()) {
             handler.reset();

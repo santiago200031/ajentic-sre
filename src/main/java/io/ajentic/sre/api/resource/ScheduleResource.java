@@ -23,12 +23,21 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.jboss.resteasy.reactive.ResponseStatus;
 import org.jboss.resteasy.reactive.RestPath;
+import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.media.Content;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
+import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 import java.util.List;
 
+/**
+ * Versioned cron scheduler for recurring and manual incident drills.
+ */
 @Path("/api/v1/schedules")
 @Produces(MediaType.APPLICATION_JSON)
 @ApplicationScoped
+@Tag(name = "Schedules", description = "Versioned cron scheduler for recurring and manual drills")
 @RunOnVirtualThread
 public class ScheduleResource {
 
@@ -44,6 +53,9 @@ public class ScheduleResource {
     }
 
     @GET
+    @Operation(summary = "List schedules", description = "Returns every scheduled drill.")
+    @APIResponse(responseCode = "200", description = "The schedule list",
+            content = @Content(schema = @Schema(implementation = ScheduleView.class)))
     public List<ScheduleView> list() {
         return store.all().stream().map(ScheduleView::from).toList();
     }
@@ -51,6 +63,8 @@ public class ScheduleResource {
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
     @ResponseStatus(201)
+    @Operation(summary = "Create a schedule", description = "Registers a cron-driven drill for a scenario.")
+    @APIResponse(responseCode = "201", description = "Created schedule")
     public ScheduleView create(@Valid CreateScheduleRequest request) {
         ScheduleDefinition definition = scheduler.schedule(request.name(), request.cron(), request.scenarioId());
         return ScheduleView.from(definition);
@@ -59,6 +73,9 @@ public class ScheduleResource {
     @DELETE
     @Path("/{id}")
     @ResponseStatus(204)
+    @Operation(summary = "Stop a schedule", description = "Disables a schedule by id.")
+    @APIResponse(responseCode = "204", description = "Stopped")
+    @APIResponse(responseCode = "404", description = "Unknown schedule")
     public void stop(@RestPath String id) {
         require(id);
         store.stop(id);
@@ -66,6 +83,11 @@ public class ScheduleResource {
 
     @POST
     @Path("/{id}/run")
+    @Operation(summary = "Run a schedule now", description = "Executes a schedule immediately; 204 when nothing ran.")
+    @APIResponse(responseCode = "200", description = "The drill result",
+            content = @Content(schema = @Schema(implementation = EpisodeResult.class)))
+    @APIResponse(responseCode = "204", description = "Nothing ran")
+    @APIResponse(responseCode = "404", description = "Unknown schedule")
     public Response run(@RestPath String id) {
         require(id);
         EpisodeResult result = scheduler.runNow(id);
@@ -74,12 +96,17 @@ public class ScheduleResource {
 
     @POST
     @Path("/tick")
+    @Operation(summary = "Run one scheduler tick", description = "Advances the scheduler by one tick and reports what ran.")
+    @APIResponse(responseCode = "200", description = "The tick report")
     public TickReport tick() {
         return scheduler.tick();
     }
 
     @GET
     @Path("/drills")
+    @Operation(summary = "List recent drills", description = "Returns the most recent scheduled drill runs.")
+    @APIResponse(responseCode = "200", description = "The drill results",
+            content = @Content(schema = @Schema(implementation = EpisodeResult.class)))
     public List<EpisodeResult> drills() {
         return drills.recent();
     }
