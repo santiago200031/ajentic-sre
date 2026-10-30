@@ -528,6 +528,7 @@ Decisions already taken (do not re-litigate in review):
 - **Optional integration.** Blank `ajentic.github.token` (the default) degrades to analysis-only: the turn still
   returns root cause + proposed patch, and GitHub tools answer "token not configured" instead of throwing.
 - **Mutations are opt-in twice.** All write tools are `Capability.MUTATE`, so `ajentic.tools.allow-mutations=false`
+  rejects them at dispatch time, and a missing/blank `ajentic.github.token` prevents network writes.
 ### Architecture & Sequence: Cloud Error Alert → Zero-Clone Code Fix, CI & PR Workflow
 
 Extend `ajentic-sre` beyond simulated infrastructure incidents so it can also act as an **autonomous code-fixing SRE agent** for external repositories:

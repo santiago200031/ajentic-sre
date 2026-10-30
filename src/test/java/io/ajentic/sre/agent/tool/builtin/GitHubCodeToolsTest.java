@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -95,9 +96,75 @@ class GitHubCodeToolsTest {
     }
 
     @Test
+    void readsMultilineFileContentDecoded() {
+        GitHubClient.FileContent content = github.readFile("acme/checkout-service", "src/main/java/MultilineApp.java", "main")
+                .orElseThrow();
+        assertTrue(content.content().contains("multiline"));
+        assertEquals("blob-multi", content.sha());
+    }
+
+    @Test
+    void listsFilesWithPrefix() {
+        List<String> files = github.listFiles("acme/checkout-service", "main", "src/");
+        assertEquals(2, files.size());
+        assertTrue(files.contains("src/main/java/App.java"));
+        assertTrue(files.contains("src/test/java/AppTest.java"));
+        assertFalse(files.contains("README.md"));
+    }
+
+    @Test
+    void toleratesExistingBranch() {
+        // WireMock returns 422 "Reference already exists" for ajentic/existing-branch; should not throw
+        github.createBranch("acme/checkout-service", "ajentic/existing-branch", "main");
+    }
+
+    @Test
+    void reusesExistingOpenPullRequest() {
+        // WireMock returns 422 for creating PR on ajentic/existing-pr, then lists open PRs returning #99
+        GitHubClient.PullRequest pr = github.createPullRequest("acme/checkout-service", "Fix", "Body",
+                "ajentic/existing-pr", "main");
+        assertEquals(99, pr.number());
+        assertEquals("https://github.com/acme/checkout-service/pull/99", pr.url());
+    }
+
+    @Test
+    void commitsFileUpdateWithExistingSha() {
+        String sha = github.commitFile("acme/checkout-service", "ajentic/fix-1234",
+                "src/test/java/AppTest.java", "updated content", "update test", "blob2");
+        assertEquals("commit789", sha);
+    }
+
+    @Test
     void reportsMissingTokenForMutations() {
-        GitHubClient noToken = new GitHubClient(new ObjectMapper(),
+        GitHubClient noTokenClient = new GitHubClient(new ObjectMapper(),
                 "http://localhost:" + GitHubTestResource.server().port(), "", Duration.ofSeconds(30));
-        assertFalse(noToken.hasToken());
+        assertFalse(noTokenClient.hasToken());
+
+        GitHubCodeTools unauthedTools = new GitHubCodeTools(noTokenClient);
+        ToolResult branchRes = unauthedTools.createBranch("acme/checkout-service", "ajentic/test", "main");
+        assertFalse(branchRes.success());
+        assertTrue(branchRes.content().contains("token not configured"));
+
+        ToolResult commitRes = unauthedTools.commitFile("acme/checkout-service", "ajentic/test", "f.txt", "c", "m", null);
+        assertFalse(commitRes.success());
+        assertTrue(commitRes.content().contains("token not configured"));
+
+        ToolResult prRes = unauthedTools.createPullRequest("acme/checkout-service", "t", "b", "ajentic/test", "main");
+        assertFalse(prRes.success());
+        assertTrue(prRes.content().contains("token not configured"));
+    }
+
+    @Test
+    void mutationGateBlocksMutatingToolsWhenDisabled() {
+        io.ajentic.sre.agent.tool.DefaultToolAuthorization readOnlyAuth =
+                new io.ajentic.sre.agent.tool.DefaultToolAuthorization(false);
+
+        io.ajentic.sre.agent.tool.ToolDescriptor readTool =
+                new io.ajentic.sre.agent.tool.ToolDescriptor("github_list_files", "desc", Map.of(), io.ajentic.sre.agent.tool.Capability.READ);
+        io.ajentic.sre.agent.tool.ToolDescriptor mutateTool =
+                new io.ajentic.sre.agent.tool.ToolDescriptor("github_commit_file", "desc", Map.of(), io.ajentic.sre.agent.tool.Capability.MUTATE);
+
+        assertTrue(readOnlyAuth.isAuthorized(readTool));
+        assertFalse(readOnlyAuth.isAuthorized(mutateTool));
     }
 }

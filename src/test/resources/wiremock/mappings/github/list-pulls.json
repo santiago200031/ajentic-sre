@@ -1,0 +1,19 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/repos/acme/checkout-service/pulls"
+  },
+  "response": {
+    "status": 200,
+    "jsonBody": [
+      {
+        "number": 99,
+        "state": "open",
+        "html_url": "https://github.com/acme/checkout-service/pull/99",
+        "head": {
+          "ref": "ajentic/existing-pr"
+        }
+      }
+    ]
+  }
+}

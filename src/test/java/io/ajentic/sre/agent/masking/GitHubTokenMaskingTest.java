@@ -34,4 +34,14 @@ class GitHubTokenMaskingTest {
         assertFalse(masked.contains("ghs_1234567890abcdefghijklmnopqrstuvwx"), masked);
         assertTrue(masked.contains("[[API_KEY_1]]"), masked);
     }
+
+    @Test
+    void masksRealFormatFineGrainedGithubToken() {
+        MaskingSession session = new SensitiveDataMasker().newSession();
+        // Uses the fine-grained format (prefix, underscore separator, 82 chars) without embedding an active secret
+        String pat = "github_pat_" + "11AAAAAAA0123456789012_abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        String masked = session.mask("Authorization: Bearer " + pat + " for testing");
+        assertFalse(masked.contains(pat), masked);
+        assertTrue(masked.contains("[[API_KEY_1]]"), masked);
+    }
 }

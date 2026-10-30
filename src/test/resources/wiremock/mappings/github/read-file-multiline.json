@@ -1,0 +1,15 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/repos/acme/checkout-service/contents/src/main/java/MultilineApp.java"
+  },
+  "response": {
+    "status": 200,
+    "jsonBody": {
+      "type": "file",
+      "encoding": "base64",
+      "content": "cHVibGljIGNsYXNzIE11bHRpbGluZUFwcCB7CiAgICBwdWJsaWMgc3RhdGljIHZvaWQgbWFp\nbignU3RyaW5nW10gYXJncykgewogICAgICAgIFN5c3RlbS5vdXQucHJpbnRsbigibXVsdGlsa\nW5lIik7CiAgICB9Cn0K",
+      "sha": "blob-multi"
+    }
+  }
+}

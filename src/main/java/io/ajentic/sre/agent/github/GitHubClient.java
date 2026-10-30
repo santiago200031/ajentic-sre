@@ -47,7 +47,7 @@ public class GitHubClient {
         this.http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
         this.mapper = mapper;
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
-        this.token = token.filter(value -> !value.isBlank());
+        this.token = token.map(String::strip).filter(value -> !value.isBlank());
         this.timeout = timeout;
     }
 
@@ -112,7 +112,7 @@ public class GitHubClient {
         if (encoded == null) {
             return Optional.empty();
         }
-        String content = new String(Base64.getDecoder().decode(encoded), StandardCharsets.UTF_8);
+        String content = new String(Base64.getMimeDecoder().decode(encoded), StandardCharsets.UTF_8);
         guardSize(content);
         return Optional.of(new FileContent(content, text(node, "sha")));
     }
@@ -123,8 +123,15 @@ public class GitHubClient {
         requireBranch(newBranch);
         JsonNode ref = get("/repos/" + repo + "/git/ref/heads/" + encode(fromRef));
         String sha = text(ref, "sha");
-        post("/repos/" + repo + "/git/refs",
-                "{\"ref\":\"refs/heads/" + newBranch + "\",\"sha\":\"" + sha + "\"}");
+        try {
+            post("/repos/" + repo + "/git/refs",
+                    "{\"ref\":\"refs/heads/" + newBranch + "\",\"sha\":\"" + sha + "\"}");
+        } catch (GitHubException error) {
+            if (error.getMessage() != null && error.getMessage().contains("Reference already exists")) {
+                return;
+            }
+            throw error;
+        }
     }
 
     /** Commits {@code content} at {@code path}; pass {@code existingSha} to update an existing file. Returns the sha. */
@@ -168,8 +175,34 @@ public class GitHubClient {
                 + "\",\"body\":\"" + json(body)
                 + "\",\"head\":\"" + json(head)
                 + "\",\"base\":\"" + json(base) + "\"}";
-        JsonNode root = post("/repos/" + repo + "/pulls", payload);
-        return new PullRequest(intChild(root, "number"), text(root, "html_url"));
+        try {
+            JsonNode root = post("/repos/" + repo + "/pulls", payload);
+            return new PullRequest(intChild(root, "number"), text(root, "html_url"));
+        } catch (GitHubException error) {
+            if (error.getMessage() != null && (error.getMessage().contains("422")
+                    || error.getMessage().toLowerCase().contains("already exists"))) {
+                PullRequest existing = findOpenPullRequest(repo, head);
+                if (existing != null) {
+                    return existing;
+                }
+            }
+            throw error;
+        }
+    }
+
+    private PullRequest findOpenPullRequest(String repo, String head) {
+        try {
+            JsonNode pulls = get("/repos/" + repo + "/pulls?state=open");
+            for (JsonNode pr : range(pulls)) {
+                JsonNode headNode = child(pr, "head");
+                String ref = headNode != null ? text(headNode, "ref") : null;
+                if (head.equals(ref) || (ref != null && (head.endsWith("/" + ref) || head.endsWith(":" + ref)))) {
+                    return new PullRequest(intChild(pr, "number"), text(pr, "html_url"));
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
     }
 
     private JsonNode get(String path) {
