@@ -1,4 +1,4 @@
-.PHONY: dev test verify package
+.PHONY: dev test verify package lab-up lab-down
 
 dev:
 	mvn quarkus:dev
@@ -11,3 +11,10 @@ verify:
 
 package:
 	mvn package
+
+lab-up:
+	mvn package -DskipTests
+	docker compose up --build
+
+lab-down:
+	docker compose down

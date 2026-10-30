@@ -1,0 +1,32 @@
+services:
+  ajentic-sre:
+    build:
+      context: .
+      dockerfile: src/main/docker/Dockerfile.jvm
+    ports:
+      - "8080:8080"
+    environment:
+      AJENTIC_LLM_BASE_URL: ${AJENTIC_LLM_BASE_URL:-http://host.docker.internal:9931/v1}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  prometheus:
+    image: prom/prometheus:v3.7.3
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./src/main/docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - ajentic-sre
+
+  grafana:
+    image: grafana/grafana:12.4.1
+    ports:
+      - "3000:3000"
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+    volumes:
+      - ./src/main/docker/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus

@@ -114,6 +114,18 @@ docker run -i --rm -p 8080:8080 ajentic-sre
 The image is Linux-only and runs on Eclipse Temurin 27. Pass configuration as environment variables, for
 example `AJENTIC_LLM_BASE_URL`, `AJENTIC_LLM_MODEL`, or `QUARKUS_HTTP_PORT`.
 
+### Local observability stack
+
+```bash
+make lab-up     # build the image, then app + Prometheus + Grafana
+make lab-down
+```
+
+The app is on `:8080`, Prometheus on `:9090`, and Grafana on `:3000` (anonymous admin, dashboard
+"Ajentic SRE"). Prometheus scrapes `/q/metrics` every 15s; the scrape config is
+`src/main/docker/prometheus.yml` and the Grafana provisioning lives under `src/main/docker/grafana/`.
+`AJENTIC_LLM_BASE_URL` defaults to the host llama.cpp router via `host.docker.internal`.
+
 ## Use the CLI
 
 ```bash

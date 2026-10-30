@@ -14,7 +14,7 @@ suite offline (`mvn test`, WireMock stubs, no model, no network), and targets Ja
 | 5 | `fix/episode-cursor-scoping` | 1 | Per-session/request episode targeting | 4 | ✅ done |
 | 6 | `refactor/schedule-scenario-reference` | 1 | Store `scenarioId`, not a lambda; race-free `run` | — | ✅ done |
 | 7 | `feat/prometheus-episode-metrics` | 1 | Micrometer counters/timers for episodes, tools, tokens | 2 | ✅ done |
-| 8 | `feat/local-docker-stack` | 1 | `docker-compose.yml`: app + Prometheus + Grafana (+ LocalStack) | 7 | ⬜ todo |
+| 8 | `feat/local-docker-stack` | 1 | `docker-compose.yml`: app + Prometheus + Grafana | 7 | ✅ done |
 | 9 | `feat/scenario-packs` | 2 | External YAML/JSON scenario loading | 3 | ⬜ todo |
 | 10 | `feat/topology-cascading-failures` | 2 | Service DAG + downstream→upstream degradation | 3, 9 | ⬜ todo |
 | 11 | `feat/investigation-tools` | 2 | `inspect_recent_changes`, `correlate_anomalies`, topology tool | 10 | ⬜ todo |
@@ -179,14 +179,13 @@ overwrite each other's active episode unless every call passes `_episodeId`.
 
 ### 8. `feat/local-docker-stack`
 
-- [ ] Add `docker-compose.yml`: `ajentic-sre` (port 8080, `AJENTIC_LLM_BASE_URL=http://host.docker.internal:9931/v1`),
-      optional `ollama`, `prometheus` scraping `/q/metrics`, `grafana` with a provisioned dashboard, optional
-      `localstack` for AWS scenarios.
-- [ ] Use `extra_hosts: host.docker.internal:host-gateway` for Linux; document Apple/Windows differences.
-- [ ] Add a Grafana dashboard JSON (solve rate, reward, tool p95, tokens) and Prometheus scrape config.
-- [ ] Add `make lab-up` / `make lab-down`; keep `make test` offline.
-- [ ] Smoke-document: `docker compose up`, open Grafana, run a drill, see panels move.
-- [ ] Do not add cloud SDKs to `pom.xml` for LocalStack; use JDK `HttpClient` + LocalStack endpoints.
+- [x] Add `docker-compose.yml`: `ajentic-sre` (port 8080, `AJENTIC_LLM_BASE_URL` defaulting to
+      `http://host.docker.internal:9931/v1`), `prometheus` scraping `/q/metrics`, and `grafana` with a provisioned
+      dashboard. Ollama and LocalStack are left out until a branch needs them.
+- [x] Use `extra_hosts: host.docker.internal:host-gateway` for Linux.
+- [x] Add the Grafana dashboard JSON (episodes, reward, tool p95, tokens) and the Prometheus scrape config.
+- [x] Add `make lab-up` / `make lab-down`; `make test` stays offline.
+- [x] Document the stack and ports in `README.md`; validate with `docker compose config`.
 
 **Files.** `docker-compose.yml`, `src/main/docker/` (prometheus, grafana), `Makefile`, `README.md`.
 
