@@ -294,4 +294,57 @@ class ApiEndToEndTest {
                 .statusCode(200)
                 .body("result.contents[0].mimeType", is("application/json"));
     }
+
+    @Test
+    void redirectsRootToSwaggerUi() {
+        given()
+                .redirects().follow(false)
+                .when().get("/")
+                .then()
+                .statusCode(303)
+                .header("Location", containsString("/q/swagger-ui"));
+    }
+
+    @Test
+    void servesSwaggerUiAndOpenApiSpec() {
+        given()
+                .when().get("/q/swagger-ui/")
+                .then()
+                .statusCode(200);
+
+        given()
+                .when().get("/q/openapi")
+                .then()
+                .statusCode(200)
+                .body(containsString("Ajentic SRE"));
+    }
+
+    @Test
+    void answersOneShotInvestigationWithoutRetainedSession() {
+        given()
+                .contentType("application/json")
+                .body(Map.of(
+                        "scenarioId", "checkout-latency-db-pool",
+                        "question", "Why is checkout slow?",
+                        "model", "wm-api-chat"))
+                .when().post("/api/v1/agent/ask")
+                .then()
+                .statusCode(200)
+                .body("answer", not(blankOrNullString()))
+                .body("usage.totalTokens", greaterThan(0));
+    }
+
+    @Test
+    void runsOneShotSimulationWithoutRetainedEpisode() {
+        given()
+                .contentType("application/json")
+                .body(Map.of(
+                        "scenarioId", "checkout-latency-db-pool",
+                        "policy", "heuristic"))
+                .when().post("/api/v1/episodes/simulate")
+                .then()
+                .statusCode(200)
+                .body("scenarioId", is("checkout-latency-db-pool"))
+                .body("solved", is(true));
+    }
 }

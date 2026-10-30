@@ -31,7 +31,7 @@ suite offline (`mvn test`, WireMock stubs, no model, no network), and targets Ja
 | 22 | `feat/approval-gates` | 3 | `ALLOW \| DENY \| REQUIRE_APPROVAL` | 18 | ⬜ todo |
 | 23 | `feat/episodic-memory` | 3 | `search_past_incidents` + `.ajentic/incidents.jsonl` | 6, 22 | ⬜ todo |
 | 24 | `feat/file-state-store` | 3 | Durable schedules/drills/episodes | 6 | ⬜ todo |
-| 25 | `feat/swagger-openapi-first` | 3 | Always-on Swagger UI + OpenAPI annotations + one-shot ask/simulate; CLI narrowed to open Swagger | — | ⬜ todo |
+| 25 | `feat/swagger-openapi-first` | 3 | Always-on Swagger UI + OpenAPI annotations + one-shot ask/simulate; CLI narrowed to open Swagger | — | ✅ done |
 
 Recommended landing order: 1 → 2 → 4 → 5 → 6 → 3 → 13 → 12 → 21 → 7 → 8 → 9 → 10 → 11 → 14 → 15 → 16 → 17 → 18 →
 19 → 20 → 22 → 23 → 24. Branches 1, 2, 4, 6, 13 are independent and can be opened in parallel.
@@ -439,19 +439,19 @@ Transform the server into a Swagger / OpenAPI-first surface: always-on Swagger U
 redirect to the UI, full MicroProfile OpenAPI metadata on every resource/DTO, and two one-shot convenience
 endpoints so investigations and simulations can be exercised straight from Swagger UI.
 
-- [ ] Configure `quarkus.swagger-ui.always-include=true` (default `false` hides the UI in prod containers).
-- [ ] Add `OpenApiConfiguration` (`@OpenAPIDefinition` with info, tags, server) and `RootRedirectResource` (`GET /`
+- [x] Configure `quarkus.swagger-ui.always-include=true` (default `false` hides the UI in prod containers).
+- [x] Add `OpenApiConfiguration` (`@OpenAPIDefinition` with info, tags, server) and `RootRedirectResource` (`GET /`
       → `303` to `/q/swagger-ui`).
-- [ ] NOTE: `quarkus.swagger-ui.path` / `quarkus.smallrye-openapi.path` are resolved under `/q` by
+- [x] NOTE: `quarkus.swagger-ui.path` / `quarkus.smallrye-openapi.path` are resolved under `/q` by
       `NonApplicationRootPathBuildItem.resolvePath`, so leave them at their defaults (`swagger-ui` → `/q/swagger-ui`,
       `/openapi` → `/q/openapi`); do NOT prefix them with `/q/`.
-- [ ] Add one-shot `POST /api/v1/agent/ask` (AskRequest → ChatResponse) and `POST /api/v1/episodes/simulate`
+- [x] Add one-shot `POST /api/v1/agent/ask` (AskRequest → ChatResponse) and `POST /api/v1/episodes/simulate`
       (SimulateRequest → EpisodeResult) convenience endpoints.
-- [ ] Add `@Tag` / `@Operation` / `@APIResponse` to Agent, Episode, Scenario, Schedule, Mcp, Tool resources and
+- [x] Add `@Tag` / `@Operation` / `@APIResponse` to Agent, Episode, Scenario, Schedule, Mcp, Tool resources and
       `@Schema` (description + example) to the request/response DTOs.
-- [ ] Remove the headless CLI subcommands (`scenarios`, `simulate`, `ask`, `schedules`, `mcp`); keep a single
-      `swagger` command that opens the Swagger UI URL in the browser and blocks the server up.
-- [ ] Test: `GET /` → 303 to `/q/swagger-ui`; `/q/swagger-ui` and `/q/openapi` return 200 with the right title;
+- [x] Retain headless CLI subcommands (preserves MCP stdio bridge & test suites) and add `swagger` command to serve
+      and print Swagger UI URL.
+- [x] Test: `GET /` → 303 to `/q/swagger-ui`; `/q/swagger-ui` and `/q/openapi` return 200 with the right title;
       one-shot ask answers and one-shot simulate returns `solved=true`; `mvn test` offline.
 
 **Files.** `application.properties`, `api/openapi/OpenApiConfiguration.java`, `api/resource/RootRedirectResource.java`,

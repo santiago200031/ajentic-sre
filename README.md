@@ -142,12 +142,13 @@ to stderr; stdout carries only command output (and the MCP JSON-RPC stream for `
 | `ask "<question>" [--scenario <id>]`                                               | Ask the LLM agent one question        |
 | `schedules [--add <name> --cron '<cron>' --scenario <id>] [--tick] [--run <name>]` | Manage drills                         |
 | `serve`                                                                            | Start the HTTP API and block          |
+| `swagger`                                                                          | Start the HTTP API and show Swagger UI URL |
 | `mcp`                                                                              | Serve tools over MCP on stdin/stdout  |
 
 ## Use the REST API
 
-Everything lives under `/api/v1`. OpenAPI is at `/q/openapi`, Swagger UI at `/q/swagger-ui`, health at
-`/q/health`, and Prometheus metrics at `/q/metrics` (episode, tool, and LLM token counters/timers).
+Everything lives under `/api/v1`. Root `/` redirects (303) straight to Swagger UI at `/q/swagger-ui`, OpenAPI is at
+`/q/openapi`, health at `/q/health`, and Prometheus metrics at `/q/metrics` (episode, tool, and LLM token counters/timers).
 
 ```bash
 curl -s localhost:8080/api/v1/scenarios | jq
@@ -167,16 +168,19 @@ curl -s -X POST localhost:8080/api/v1/episodes/$EPISODE/run \
 
 | Method                    | Path                            | Purpose                                   |
 | ------------------------- | ------------------------------- | ----------------------------------------- |
+| `GET`                     | `/`                             | Redirect (303) to `/q/swagger-ui`         |
 | `GET`                     | `/scenarios`, `/scenarios/{id}` | Scenario library                          |
 | `GET`                     | `/tools`                        | Tool catalog                              |
 | `POST`                    | `/episodes`                     | Start an episode                          |
 | `GET`                     | `/episodes/{id}`                | Episode state                             |
 | `POST`                    | `/episodes/{id}/actions`        | Apply one action                          |
 | `POST`                    | `/episodes/{id}/run`            | Run a policy to completion                |
+| `POST`                    | `/episodes/simulate`            | One-shot episode simulation               |
 | `DELETE`                  | `/episodes/{id}`                | Forget an episode                         |
 | `POST`                    | `/agent/sessions`               | Start an LLM session                      |
 | `GET`                     | `/agent/sessions/{id}`          | Session state                             |
 | `POST`                    | `/agent/sessions/{id}/chat`     | One ReAct turn                            |
+| `POST`                    | `/agent/ask`                    | One-shot incident investigation           |
 | `DELETE`                  | `/agent/sessions/{id}`          | End a session                             |
 | `GET` / `POST` / `DELETE` | `/schedules` …                  | See [scheduled drills](#scheduled-drills) |
 | `GET` / `POST` / `DELETE` | `/mcp`                          | See [MCP](#use-mcp)                       |

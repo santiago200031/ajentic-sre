@@ -50,7 +50,7 @@ Surefire is configured with `<skipITs>true</skipITs>`, so failsafe integration t
 ## Entrypoints & layout
 
 - CLI: `io.ajentic.sre.cli.AjenticCommand` (picocli). Subcommands: `scenarios`, `simulate`, `ask`, `schedules`,
-  `serve`, `mcp`.
+  `serve`, `swagger`, `mcp`.
 - `mvn quarkus:dev -Dquarkus.args="mcp"` runs the MCP stdio bridge.
 - REST surface under `/api/v1`; OpenAPI at `/q/openapi`, Swagger UI at `/q/swagger-ui`, health at `/q/health`.
 - Packages under `io.ajentic.sre`:

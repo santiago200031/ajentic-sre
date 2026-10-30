@@ -31,7 +31,7 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
  * Autonomous ReAct investigation agent. Sessions are bounded by a Caffeine cache so a hosted deployment cannot grow
  * without limit; {@link #ask(AskRequest)} runs a one-shot investigation without leaving a session behind.
  */
-@Path("/api/v1/agent/sessions")
+@Path("/api/v1/agent")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 @ApplicationScoped
@@ -49,6 +49,7 @@ public class AgentResource {
     }
 
     @POST
+    @Path("/sessions")
     @ResponseStatus(201)
     @Operation(summary = "Create an investigation session", description = "Starts a session bound to a scenario and seed.")
     @APIResponse(responseCode = "201", description = "Created session")
@@ -63,7 +64,7 @@ public class AgentResource {
     }
 
     @GET
-    @Path("/{id}")
+    @Path("/sessions/{id}")
     @Operation(summary = "Get a session", description = "Returns the session and its current observation.")
     @APIResponse(responseCode = "200", description = "The session")
     @APIResponse(responseCode = "404", description = "Unknown session")
@@ -72,7 +73,7 @@ public class AgentResource {
     }
 
     @POST
-    @Path("/{id}/chat")
+    @Path("/sessions/{id}/chat")
     @Operation(summary = "Send a chat turn", description = "Advances the agent with a user message and returns the turn result.")
     @APIResponse(responseCode = "200", description = "The chat turn result")
     @APIResponse(responseCode = "404", description = "Unknown session")
@@ -101,8 +102,15 @@ public class AgentResource {
         }
     }
 
+    @POST
+    @Path("/sessions/ask")
+    @Operation(hidden = true)
+    public ChatResponse askSessions(@Valid AskRequest request) {
+        return ask(request);
+    }
+
     @DELETE
-    @Path("/{id}")
+    @Path("/sessions/{id}")
     @ResponseStatus(204)
     @Operation(summary = "Delete a session", description = "Removes an investigation session.")
     @APIResponse(responseCode = "204", description = "Deleted")

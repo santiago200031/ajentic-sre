@@ -1,0 +1,8 @@
+{
+	"mcpServers": {
+		"quarkus-mcp": {
+			"url": "http://localhost:8080/q/dev-mcp",
+			"type": "http"
+		}
+	}
+}

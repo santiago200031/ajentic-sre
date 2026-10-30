@@ -37,6 +37,7 @@ class CliEndToEndTest {
         assertTrue(CliMain.headless("scenarios"));
         assertTrue(CliMain.headless("mcp"));
         assertFalse(CliMain.headless("serve"));
+        assertFalse(CliMain.headless("swagger"));
         assertFalse(CliMain.headless());
     }
 }

@@ -19,6 +19,6 @@ public class CliMain {
     }
 
     static boolean headless(String... args) {
-        return args.length > 0 && !"serve".equals(args[0]);
+        return args.length > 0 && !"serve".equals(args[0]) && !"swagger".equals(args[0]);
     }
 }
