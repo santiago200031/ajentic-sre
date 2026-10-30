@@ -1,6 +1,7 @@
 package io.ajentic.sre.agent;
 
 import io.ajentic.sre.agent.llm.ChatMessage;
+import io.ajentic.sre.agent.llm.ChatRole;
 import io.ajentic.sre.agent.llm.LlmClient;
 import io.ajentic.sre.agent.llm.LlmProperties;
 import io.ajentic.sre.agent.llm.LlmRequest;
@@ -21,6 +22,8 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 
@@ -212,6 +215,54 @@ class AgentSessionEndToEndTest {
                 .filter(message -> message.role() == io.ajentic.sre.agent.llm.ChatRole.TOOL)
                 .count());
         assertEquals(9, session.environment().observe().step(), "read tools must advance the simulation clock");
+    }
+
+    @Test
+    void stopsAfterRepeatedIdenticalToolCallsBeforeMaxIterations() {
+        ToolCall same = new ToolCall("call-1", "query_telemetry",
+                Map.of("signal", "LOGS", "service", "orders-api"));
+        int[] calls = new int[1];
+        AgentSession session = new AgentSession(
+                "session-stall",
+                AgentSessionConfig.forScenario("orders-bad-deployment").withModel(modelFor("wm-orders")),
+                request -> { calls[0]++; return LlmResponse.toolCalls(List.of(same)); },
+                tools,
+                environments.create("orders-bad-deployment", 1L),
+                "You are a test SRE agent.");
+
+        ChatTurnResult result = session.chat("Investigate the incident.");
+
+        assertTrue(result.answer().startsWith("Stalled"), result.answer());
+        assertEquals(3, calls[0], "escalate-after stops the loop, not maxIterations");
+        assertEquals(3, session.conversation().messages().stream()
+                .filter(message -> message.role() == ChatRole.TOOL).count());
+    }
+
+    @Test
+    void repeatedReadsAcrossTurnsAreNotFlagged() {
+        ToolCall read = new ToolCall("call-1", "query_telemetry",
+                Map.of("signal", "LOGS", "service", "orders-api"));
+        Deque<LlmResponse> script = new ArrayDeque<>(List.of(
+                LlmResponse.toolCalls(List.of(read)),
+                LlmResponse.finalAnswer("first investigation complete"),
+                LlmResponse.toolCalls(List.of(read)),
+                LlmResponse.finalAnswer("second investigation complete")));
+        int[] calls = new int[1];
+        AgentSession session = new AgentSession(
+                "session-cross",
+                AgentSessionConfig.forScenario("orders-bad-deployment").withModel(modelFor("wm-orders")),
+                request -> { calls[0]++; return script.poll(); },
+                tools,
+                environments.create("orders-bad-deployment", 1L),
+                "You are a test SRE agent.");
+
+        ChatTurnResult first = session.chat("Investigate turn one.");
+        ChatTurnResult second = session.chat("Investigate turn two.");
+
+        assertEquals("first investigation complete", first.answer(), first::toString);
+        assertEquals("second investigation complete", second.answer(), second::toString);
+        assertEquals(4, calls[0], "both turns ran their read without a premature stall");
+        assertEquals(2, session.environment().observe().step(), "each turn executed the read once");
     }
 
     private AgentSession session(String scenarioId, String model) {

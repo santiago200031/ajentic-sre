@@ -255,6 +255,8 @@ sends `Authorization: Bearer <key>`, unless `ajentic.llm.api-key-header` says ot
 | `ajentic.llm.api-key-header` | | Override the auth header |
 | `ajentic.tools.allow-mutations` | `true` | Gate for mutating tools |
 | `ajentic.agent.max-tokens` | `0` | Cumulative session token budget; `0` disables the hard stop |
+| `ajentic.agent.stagnation.threshold` | `2` | Repeated identical tool call count that yields a "try something else" hint |
+| `ajentic.agent.stagnation.escalate-after` | `3` | Repeated identical tool call count that stops the loop with a diagnostic answer |
 | `ajentic.mcp.default-scenario` | `checkout-latency-db-pool` | Episode bootstrap |
 
 </details>

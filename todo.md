@@ -238,14 +238,15 @@ overwrite each other's active episode unless every call passes `_episodeId`.
 
 ### 12. `feat/stagnation-breaker`
 
-- [ ] In `AgentSession.chat`, keep a per-turn `(toolName, canonicalizedArguments)` multiset; on the 2nd identical
-      call return a synthetic observation hint ("You already called X with Y; try Z") without re-executing.
-- [ ] On the 3rd identical call, escalate: suggest unused tools and, after a configurable threshold, stop the loop
-      with a diagnostic answer rather than burning `maxIterations`.
-- [ ] Config: `ajentic.agent.stagnation.threshold` (default 2), `ajentic.agent.stagnation.escalate-after` (3).
-- [ ] Ensure synthetic results are still appended as `tool` messages so the transcript stays protocol-valid.
-- [ ] Test: a scripted LLM that repeats the same call 5 times terminates early with a hint, not `maxIterations`.
-- [ ] Test: legitimately repeated reads across turns are not flagged.
+- [x] In `AgentSession.chat`, keep a per-turn `(toolName, canonicalizedArguments)` multiset; on the 2nd identical
+      call return a synthetic "try a different tool/arguments" hint without re-executing.
+- [x] On the 3rd identical call (`escalate-after`), escalate: append the diagnostic result as a `tool` message and
+      stop the loop with a `Stalled:` answer rather than burning `maxIterations`.
+- [x] Config: `ajentic.agent.stagnation.threshold` (default 2), `ajentic.agent.stagnation.escalate-after` (3).
+- [x] Synthetic results are appended as `tool` messages so the transcript stays protocol-valid.
+- [x] Test: a scripted LLM that repeats the same call 5 times terminates at 3 LLM calls with a `Stalled:` answer
+      (not `maxIterations`); 3 tool messages recorded.
+- [x] Test: legitimately repeated reads across turns are not flagged (per-turn repeats map resets each `chat`).
 
 **Files.** `agent/session/AgentSession.java`, `agent/session/Conversation.java`,
 `agent/session/AgentSessionConfig.java`, `application.properties`.

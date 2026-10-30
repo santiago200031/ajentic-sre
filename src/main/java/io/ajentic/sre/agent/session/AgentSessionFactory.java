@@ -23,6 +23,8 @@ public class AgentSessionFactory {
     private final SensitiveDataMasker masker;
     private final MeterRegistry meters;
     private final int maxTokens;
+    private final int stagnationThreshold;
+    private final int stagnationEscalateAfter;
 
     @Inject
     public AgentSessionFactory(
@@ -32,7 +34,11 @@ public class AgentSessionFactory {
             ToolAuthorization authorization,
             SensitiveDataMasker masker,
             MeterRegistry meters,
-            @ConfigProperty(name = "ajentic.agent.max-tokens", defaultValue = "0") int maxTokens) {
+            @ConfigProperty(name = "ajentic.agent.max-tokens", defaultValue = "0") int maxTokens,
+            @ConfigProperty(name = "ajentic.agent.stagnation.threshold", defaultValue = "2")
+            int stagnationThreshold,
+            @ConfigProperty(name = "ajentic.agent.stagnation.escalate-after", defaultValue = "3")
+            int stagnationEscalateAfter) {
         this.llm = llm;
         this.tools = tools;
         this.environments = environments;
@@ -40,13 +46,15 @@ public class AgentSessionFactory {
         this.masker = masker;
         this.meters = meters;
         this.maxTokens = maxTokens;
+        this.stagnationThreshold = stagnationThreshold;
+        this.stagnationEscalateAfter = stagnationEscalateAfter;
     }
 
     public AgentSession create(AgentSessionConfig config) {
         Environment environment = environments.create(config.scenarioId(), config.seed());
         return new AgentSession(
                 UUID.randomUUID().toString(),
-                config.withMaxTokens(maxTokens),
+                config.withMaxTokens(maxTokens).withStagnation(stagnationThreshold, stagnationEscalateAfter),
                 llm,
                 tools,
                 environment,

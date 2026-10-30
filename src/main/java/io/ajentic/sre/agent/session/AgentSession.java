@@ -20,6 +20,9 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -117,6 +120,7 @@ public final class AgentSession {
     private ChatTurnResult chatScoped(String userMessage) {
         conversation.add(ChatMessage.user(userMessage));
         List<ToolCall> lastToolCalls = List.of();
+        Map<String, Integer> repeats = new ConcurrentHashMap<>();
 
         for (int iteration = 0; iteration < config.maxIterations(); iteration++) {
             if (overBudget()) {
@@ -137,7 +141,12 @@ public final class AgentSession {
 
             conversation.add(ChatMessage.assistant(response.content(), response.toolCalls()));
             lastToolCalls = response.toolCalls();
-            executeAll(response.toolCalls());
+            if (executeAll(response.toolCalls(), repeats)) {
+                String answer = "Stalled: repeated identical tool calls produced no new evidence. "
+                        + "Try a different tool or different arguments.";
+                conversation.add(ChatMessage.assistant(answer));
+                return new ChatTurnResult(answer, lastToolCalls, environment.observe(), conversation.usage());
+            }
 
             if (environment.isTerminal()) {
                 break;
@@ -172,12 +181,22 @@ public final class AgentSession {
                 .increment(response.usage().completionTokens());
     }
 
-    private void executeAll(List<ToolCall> toolCalls) {
+    private boolean executeAll(List<ToolCall> toolCalls, Map<String, Integer> repeats) {
         String[] results = new String[toolCalls.size()];
         List<Integer> readOnly = new ArrayList<>();
         List<Integer> mutating = new ArrayList<>();
+        boolean stalled = false;
         for (int index = 0; index < toolCalls.size(); index++) {
-            if (isReadOnly(toolCalls.get(index))) {
+            ToolCall call = toolCalls.get(index);
+            int seen = repeats.merge(call.name() + new TreeMap<>(call.arguments()), 1, Integer::sum);
+            if (seen >= config.stagnationEscalateAfter()) {
+                results[index] = "Stalled: " + call.name() + " was already called " + seen
+                        + " times with the same arguments.";
+                stalled = true;
+            } else if (seen >= config.stagnationThreshold()) {
+                results[index] = "You already called " + call.name()
+                        + " with these arguments; try a different tool or arguments.";
+            } else if (isReadOnly(call)) {
                 readOnly.add(index);
             } else {
                 mutating.add(index);
@@ -190,6 +209,7 @@ public final class AgentSession {
         for (int index = 0; index < toolCalls.size(); index++) {
             conversation.add(ChatMessage.tool(toolCalls.get(index).id(), results[index]));
         }
+        return stalled;
     }
 
     private void runReadOnly(List<ToolCall> toolCalls, List<Integer> indexes, String[] results) {

@@ -1,13 +1,21 @@
 package io.ajentic.sre.agent.session;
 
-import io.ajentic.sre.agent.llm.TokenUsage;
-
-public record AgentSessionConfig(String scenarioId, long seed, String model, int maxIterations, int maxTokens) {
+public record AgentSessionConfig(
+        String scenarioId,
+        long seed,
+        String model,
+        int maxIterations,
+        int maxTokens,
+        int stagnationThreshold,
+        int stagnationEscalateAfter) {
 
     private static final int DEFAULT_MAX_ITERATIONS = 8;
+    private static final int DEFAULT_STAGNATION_THRESHOLD = 2;
+    private static final int DEFAULT_STAGNATION_ESCALATE_AFTER = 3;
 
     public AgentSessionConfig(String scenarioId, long seed, String model, int maxIterations) {
-        this(scenarioId, seed, model, maxIterations, 0);
+        this(scenarioId, seed, model, maxIterations, 0,
+                DEFAULT_STAGNATION_THRESHOLD, DEFAULT_STAGNATION_ESCALATE_AFTER);
     }
 
     public static AgentSessionConfig forScenario(String scenarioId) {
@@ -15,10 +23,17 @@ public record AgentSessionConfig(String scenarioId, long seed, String model, int
     }
 
     public AgentSessionConfig withModel(String model) {
-        return new AgentSessionConfig(scenarioId, seed, model, maxIterations, maxTokens);
+        return new AgentSessionConfig(
+                scenarioId, seed, model, maxIterations, maxTokens, stagnationThreshold, stagnationEscalateAfter);
     }
 
     public AgentSessionConfig withMaxTokens(int tokens) {
-        return new AgentSessionConfig(scenarioId, seed, model, maxIterations, tokens);
+        return new AgentSessionConfig(
+                scenarioId, seed, model, maxIterations, tokens, stagnationThreshold, stagnationEscalateAfter);
+    }
+
+    public AgentSessionConfig withStagnation(int threshold, int escalateAfter) {
+        return new AgentSessionConfig(
+                scenarioId, seed, model, maxIterations, maxTokens, threshold, escalateAfter);
     }
 }
