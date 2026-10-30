@@ -295,6 +295,26 @@ sends `Authorization: Bearer <key>`, unless `ajentic.llm.api-key-header` says ot
 
 </details>
 
+## Identifier masking
+
+Every LLM request passes through `SensitiveDataMaskingInterceptor`, which replaces sensitive identifiers with
+stable `[[CATEGORY_N]]` placeholders and restores them in the response. Categories are applied longest (most
+specific) first, so compound identifiers are redacted whole before generic patterns can match inside them.
+
+| Category      | Placeholder | Matches                                                                                       |
+| ------------- | ----------- | ------------------------------------------------------------------------------------------- |
+| `ARN`         | `[[ARN_N]]`     | AWS ARNs (`arn:aws...`)                                                                      |
+| `GCP_RESOURCE`| `[[GCP_N]]`   | GCP resource paths (`//*.googleapis.com/projects/...`, `.../locations/...`)                 |
+| `AZURE_RESOURCE`| `[[AZURE_N]]` | Azure resource ids (`/subscriptions/<guid>/resourceGroups/...`)                             |
+| `K8S_OBJECT`  | `[[K8S_N]]`   | Kubernetes object name + uid pairs (`db-creds:<uuid>`); bare UUIDs are not masked           |
+| `API_KEY`     | `[[API_KEY_N]]` | `sk-`, `ghp_`/`ghs_`/... GitHub tokens, `github_pat_`, AWS access key ids (`AKIA...`)       |
+| `BEARER`      | `[[BEARER_N]]`  | `Bearer <token>` with 16+ token characters (known API-key prefixes stay in `API_KEY`)      |
+| `EMAIL`       | `[[EMAIL_N]]`  | Email addresses                                                                             |
+| `NAMESPACE`   | `[[NAMESPACE_N]]` | `namespace_` / `cluster-` / `project-` / `account-` qualified names                       |
+| `POD`         | `[[POD_N]]`   | Kubernetes pod names (`name-hexhash-suffix`)                                               |
+| `IP`          | `[[IP_N]]`    | IPv4 addresses                                                                              |
+| `ACCOUNT`     | `[[ACCOUNT_N]]` | 12-digit account ids                                                                       |
+
 ## Test
 
 `mvn test` needs no model and no network.
@@ -305,6 +325,7 @@ sends `Authorization: Bearer <key>`, unless `ajentic.llm.api-key-header` says ot
 | `AgentSessionEndToEndTest`     | ReAct loop over the real HTTP client against WireMock        |
 | `GitHubCodeToolsTest`          | Zero-clone GitHub REST operations over WireMock              |
 | `GitHubTokenMaskingTest`       | PAT masking (classic `ghp_`, fine-grained `github_pat_`, app `ghs_`) |
+| `MulticloudMaskingTest`          | GCP/Azure/K8s/Bearer/AWS categories: round-trip, stability, no over-masking |
 | `LlmConsumerPactContractTest`  | OpenAI-compatible and Azure wire contracts (`target/pacts/`) |
 | `SchedulerEndToEndTest`        | Cron correctness, versioning, concurrency, recovery          |
 | `ApiEndToEndTest`              | REST surface, including the MCP HTTP transport               |

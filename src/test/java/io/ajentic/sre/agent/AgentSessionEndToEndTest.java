@@ -176,6 +176,30 @@ class AgentSessionEndToEndTest {
     }
 
     @Test
+    void masksMulticloudIdentifiersBeforeTheModel() {
+        String gcp = "//storage.googleapis.com/projects/billing-proj-123456789/objects/app.log";
+        String azure = "/subscriptions/550e8400-e29b-41d4-a716-446655440000/resourceGroups/prod-rg/website";
+        String k8s = "db-creds:550e8400-e29b-41d4-a716-446655440000";
+        String bearer = "Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJzcmUifQ.c2ln";
+
+        llm.complete(new LlmRequest(
+                List.of(ChatMessage.user(gcp + " then " + azure + " secret " + k8s + " with " + bearer)),
+                List.of(),
+                modelFor("wm-mask")));
+
+        if (WireMockLlmTestResource.live()) {
+            return;
+        }
+        String body = WireMockLlmTestResource.server().getAllServeEvents().getFirst()
+                .getRequest().getBodyAsString();
+        assertFalse(body.contains("storage.googleapis.com"), body);
+        assertFalse(body.contains("550e8400-e29b-41d4-a716-446655440000"), body);
+        assertFalse(body.contains("eyJhbGciOiJIUzI1NiJ9"), body);
+        assertTrue(body.contains("[[GCP_1]]") && body.contains("[[AZURE_1]]")
+                && body.contains("[[K8S_1]]") && body.contains("[[BEARER_1]]"), body);
+    }
+
+    @Test
     void unauthorizedMutationsAreReportedInsteadOfExecuted() {
         AgentSession session = new AgentSession(
                 "read-only",

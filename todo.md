@@ -27,7 +27,7 @@ suite offline (`mvn test`, WireMock stubs, no model, no network), and targets Ja
 | 18 | `feat/sse-chat-stream` | 3 | `/chat/stream` SSE | 13 | ⬜ todo |
 | 19 | `feat/alert-webhooks` | 3 | Alertmanager/PagerDuty/SNS intake | 16, 18 | ⬜ todo |
 | 20 | `feat/llm-fallback-router` | 3 | Local-first composite LLM client | 13 | ⬜ todo |
-| 21 | `feat/multicloud-identifier-masking` | 3 | GCP/Azure/K8s/Bearer categories | 1 | ⬜ todo |
+| 21 | `feat/multicloud-identifier-masking` | 3 | GCP/Azure/K8s/Bearer categories | 1 | ✅ done |
 | 22 | `feat/approval-gates` | 3 | `ALLOW \| DENY \| REQUIRE_APPROVAL` | 18 | ⬜ todo |
 | 23 | `feat/episodic-memory` | 3 | `search_past_incidents` + `.ajentic/incidents.jsonl` | 6, 22 | ⬜ todo |
 | 24 | `feat/file-state-store` | 3 | Durable schedules/drills/episodes | 6 | ⬜ todo |
