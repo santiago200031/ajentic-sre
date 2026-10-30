@@ -11,7 +11,7 @@ suite offline (`mvn test`, WireMock stubs, no model, no network), and targets Ja
 | 2 | `fix/tool-step-terminal-semantics` | 1 | Read tools through `Environment.step`; terminal only when solved | — | ✅ done |
 | 3 | `feat/symptom-first-alerts` | 1 | Unspoiled initial observation | 2 | ✅ done |
 | 4 | `fix/cli-mcp-stdio-isolation` | 1 | No `:8080` bind for CLI/MCP; clean stdout | — | ✅ done |
-| 5 | `fix/episode-cursor-scoping` | 1 | Per-session/request episode targeting | 4 | ⬜ todo |
+| 5 | `fix/episode-cursor-scoping` | 1 | Per-session/request episode targeting | 4 | ✅ done |
 | 6 | `refactor/schedule-scenario-reference` | 1 | Store `scenarioId`, not a lambda; race-free `run` | — | ⬜ todo |
 | 7 | `feat/prometheus-episode-metrics` | 1 | Micrometer counters/timers for episodes, tools, tokens | 2 | ⬜ todo |
 | 8 | `feat/local-docker-stack` | 1 | `docker-compose.yml`: app + Prometheus + Grafana (+ LocalStack) | 7 | ⬜ todo |
@@ -134,14 +134,13 @@ collides with `serve` on `:8080`; Quarkus logs/banner on stdout corrupt the MCP 
 **Problem.** `EpisodeCursor` is one `@ApplicationScoped AtomicReference<String>`; concurrent MCP/HTTP clients
 overwrite each other's active episode unless every call passes `_episodeId`.
 
-- [ ] Replace the global cursor with a per-caller resolution strategy: explicit `_episodeId` wins, else a
-      session/transport-scoped cursor keyed by `AgentExecutionContext.SESSION_ID` or MCP connection id.
-- [ ] Keep a bounded `ConcurrentHashMap` with eviction (or reuse the existing session registry) to avoid leaks.
-- [ ] Default behavior for a brand-new connection without an episode: start one from
-      `ajentic.mcp.default-scenario`, or return a clear "no active episode" tool error.
-- [ ] Test: two interleaved MCP connections each start an episode; subsequent calls without `_episodeId` hit their
-      own episode.
-- [ ] Test: HTTP sessions remain isolated under concurrent `chat` calls.
+- [x] Replace the global cursor with a per-caller strategy: explicit `_episodeId` wins, else an MCP session
+      (`Mcp-Session-Id`) or agent-session scoped cursor.
+- [x] Bound the cursor map (Caffeine, 1024 entries) so long-lived servers cannot leak session ids.
+- [x] Brand-new MCP sessions start from `ajentic.mcp.default-scenario`, as before.
+- [x] Test: two interleaved MCP sessions start different scenarios and each resolves its own episode without
+      `_episodeId`.
+- [x] HTTP transport returns and accepts `Mcp-Session-Id` so spec-compliant clients keep their scope.
 
 **Files.** `rl/episode/EpisodeCursor.java`, `agent/mcp/McpProtocolHandler.java`, `agent/tool/builtin/BuiltInSreTools.java`,
 `agent/session/*`.

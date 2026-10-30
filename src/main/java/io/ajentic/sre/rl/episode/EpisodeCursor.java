@@ -1,28 +1,38 @@
 package io.ajentic.sre.rl.episode;
 
+import com.github.benmanes.caffeine.cache.Caffeine;
 import jakarta.enterprise.context.ApplicationScoped;
 
+import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Tracks the episode a tool call targets when the caller does not name one explicitly. Shared by the MCP transport
- * and the lifecycle tools so both agree on the active episode.
+ * Tracks the episode a tool call targets when the caller does not name one explicitly. Scoped per MCP session or
+ * agent session so concurrent clients cannot overwrite each other's active episode.
  */
 @ApplicationScoped
 public class EpisodeCursor {
 
-    private final AtomicReference<String> active = new AtomicReference<>();
+    public static final String DEFAULT_SCOPE = "stdio";
 
-    public String activeId() {
-        return active.get();
+    private final Map<String, String> active = Caffeine.newBuilder()
+            .maximumSize(1024)
+            .<String, String>build()
+            .asMap();
+
+    public String activeId(String scope) {
+        return active.get(scope == null ? DEFAULT_SCOPE : scope);
     }
 
-    public void activate(String episodeId) {
-        active.set(episodeId);
+    public void activate(String scope, String episodeId) {
+        active.put(scope == null ? DEFAULT_SCOPE : scope, episodeId);
     }
 
-    public Optional<String> clear() {
-        return Optional.ofNullable(active.getAndSet(null));
+    public Optional<String> clear(String scope) {
+        return Optional.ofNullable(active.remove(scope == null ? DEFAULT_SCOPE : scope));
+    }
+
+    public void clearAll() {
+        active.clear();
     }
 }

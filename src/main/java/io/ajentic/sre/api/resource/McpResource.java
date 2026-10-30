@@ -7,6 +7,7 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.HeaderParam;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
@@ -16,6 +17,7 @@ import org.jboss.resteasy.reactive.ResponseStatus;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Streamable HTTP transport for the Model Context Protocol. {@code POST} accepts a single JSON-RPC 2.0 request or a
@@ -37,12 +39,15 @@ public class McpResource {
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
-    public Response handleJsonRpc(String requestBody) {
-        String response = handler.handle(requestBody);
+    public Response handleJsonRpc(String requestBody, @HeaderParam("Mcp-Session-Id") String sessionId) {
+        String scope = sessionId == null || sessionId.isBlank() ? UUID.randomUUID().toString() : sessionId;
+        String response = handler.handle(requestBody, scope);
         if (response == null) {
-            return Response.accepted().build();
+            return Response.accepted().header("Mcp-Session-Id", scope).build();
         }
-        return Response.ok(response, MediaType.APPLICATION_JSON_TYPE).build();
+        return Response.ok(response, MediaType.APPLICATION_JSON_TYPE)
+                .header("Mcp-Session-Id", scope)
+                .build();
     }
 
     @GET
@@ -57,7 +62,11 @@ public class McpResource {
 
     @DELETE
     @ResponseStatus(204)
-    public void reset() {
-        handler.reset();
+    public void reset(@HeaderParam("Mcp-Session-Id") String sessionId) {
+        if (sessionId == null || sessionId.isBlank()) {
+            handler.reset();
+        } else {
+            handler.reset(sessionId);
+        }
     }
 }

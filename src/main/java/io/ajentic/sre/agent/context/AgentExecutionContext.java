@@ -13,6 +13,9 @@ public final class AgentExecutionContext {
 
     public static final ScopedValue<MaskingSession> MASKING_SESSION = ScopedValue.newInstance();
 
+    /** MCP transport session id, used to scope per-connection episode state. */
+    public static final ScopedValue<String> MCP_SCOPE = ScopedValue.newInstance();
+
     public static final ScopedValue<ToolContext> TOOL_CONTEXT = ScopedValue.newInstance();
 
     private AgentExecutionContext() {
@@ -28,5 +31,9 @@ public final class AgentExecutionContext {
 
     public static ToolContext toolContext() {
         return TOOL_CONTEXT.isBound() ? TOOL_CONTEXT.get() : null;
+    }
+
+    public static String mcpScope() {
+        return MCP_SCOPE.isBound() ? MCP_SCOPE.get() : null;
     }
 }

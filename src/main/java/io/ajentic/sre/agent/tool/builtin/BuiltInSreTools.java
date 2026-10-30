@@ -2,6 +2,7 @@ package io.ajentic.sre.agent.tool.builtin;
 
 import io.ajentic.sre.agent.integration.IncidentSummary;
 import io.ajentic.sre.agent.integration.NotificationChannel;
+import io.ajentic.sre.agent.context.AgentExecutionContext;
 import io.ajentic.sre.agent.tool.AgentTool;
 import io.ajentic.sre.agent.tool.Capability;
 import io.ajentic.sre.agent.tool.ToolBox;
@@ -159,7 +160,10 @@ public class BuiltInSreTools {
             Long seed) {
         String target = scenarioId == null || scenarioId.isBlank() ? defaultScenarioId : scenarioId;
         EpisodeHandle handle = episodes.start(target, seed);
-        cursor.activate(handle.id());
+        String scope = AgentExecutionContext.mcpScope() == null
+                ? AgentExecutionContext.sessionId()
+                : AgentExecutionContext.mcpScope();
+        cursor.activate(scope, handle.id());
         return ToolResult.ok(
                 "Started episode %s for scenario %s.".formatted(handle.id(), target),
                 Map.of("episodeId", handle.id(), "scenarioId", target));

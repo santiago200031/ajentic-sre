@@ -2,6 +2,7 @@ package io.ajentic.sre.agent.mcp;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.ajentic.sre.agent.context.AgentExecutionContext;
 import io.ajentic.sre.agent.tool.Tool;
 import io.ajentic.sre.agent.tool.ToolAuthorization;
 import io.ajentic.sre.agent.tool.ToolContext;
@@ -91,6 +92,16 @@ public class McpProtocolHandler {
      * when there is nothing to reply to (a lone notification).
      */
     public String handle(String json) {
+        return handle(json, EpisodeCursor.DEFAULT_SCOPE);
+    }
+
+    /** Handles one document within an MCP session, so per-connection episode cursors stay isolated. */
+    public String handle(String json, String scope) {
+        String effective = scope == null || scope.isBlank() ? EpisodeCursor.DEFAULT_SCOPE : scope;
+        return ScopedValue.where(AgentExecutionContext.MCP_SCOPE, effective).call(() -> handleScoped(json));
+    }
+
+    private String handleScoped(String json) {
         JsonNode request;
         try {
             request = mapper.readTree(json);
@@ -129,7 +140,12 @@ public class McpProtocolHandler {
 
     /** Clears the active default episode, used by the HTTP {@code DELETE} transport hook. */
     public void reset() {
-        cursor.clear().ifPresent(episodes::delete);
+        cursor.clearAll();
+    }
+
+    /** Clears the active episode for one MCP session. */
+    public void reset(String scope) {
+        cursor.clear(scope).ifPresent(episodes::delete);
     }
 
     private Object dispatch(McpMethod method, JsonNode params) {
@@ -198,7 +214,6 @@ public class McpProtocolHandler {
             }
             context = new ToolContext(handle.id(), handle.environment());
         }
-
         try {
             ToolResult result = tool.get().invoke(new ToolInvocation(name, arguments), context);
             return result.success() ? toolResult(result) : toolError(result.content());
@@ -280,7 +295,8 @@ public class McpProtocolHandler {
         if (episodeId != null) {
             return episodes.find(episodeId).orElseThrow(() -> new UnknownEpisodeException(episodeId));
         }
-        String activeId = cursor.activeId();
+        String scope = AgentExecutionContext.mcpScope();
+        String activeId = cursor.activeId(scope);
         if (activeId != null && scenarioId == null) {
             Optional<EpisodeHandle> active = episodes.find(activeId);
             if (active.isPresent()) {
@@ -289,7 +305,7 @@ public class McpProtocolHandler {
         }
         String target = scenarioId == null ? defaultScenarioId : scenarioId;
         EpisodeHandle handle = episodes.start(target, DEFAULT_SEED);
-        cursor.activate(handle.id());
+        cursor.activate(scope, handle.id());
         return handle;
     }
 

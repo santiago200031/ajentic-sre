@@ -98,6 +98,29 @@ class McpProtocolEndToEndTest {
     }
 
     @Test
+    void keepsActiveEpisodesIsolatedPerMcpSession() {
+        assertTrue(handler.handle("""
+                {"jsonrpc":"2.0","id":1,"method":"tools/call","params":
+                {"name":"start_episode","arguments":{"scenarioId":"checkout-latency-db-pool"}}}""", "client-a")
+                .contains("episodeId"));
+        assertTrue(handler.handle("""
+                {"jsonrpc":"2.0","id":1,"method":"tools/call","params":
+                {"name":"start_episode","arguments":{"scenarioId":"payments-memory-leak"}}}""", "client-b")
+                .contains("episodeId"));
+
+        String checkout = handler.handle("""
+                {"jsonrpc":"2.0","id":2,"method":"tools/call","params":
+                {"name":"query_telemetry","arguments":{"signal":"LOGS","service":"orders-db"}}}""", "client-a");
+        assertTrue(checkout.contains("\"isError\":false"), checkout);
+
+        String payments = handler.handle("""
+                {"jsonrpc":"2.0","id":2,"method":"tools/call","params":
+                {"name":"query_telemetry","arguments":{"signal":"LOGS","service":"orders-db"}}}""", "client-b");
+        assertTrue(payments.contains("\"isError\":true"), payments);
+        assertTrue(payments.contains("orders-db"), payments);
+    }
+
+    @Test
     void recoversFromMalformedJsonWithParseError() {
         String broken = handler.handle("{ this is not json");
         assertTrue(broken.contains("-32700"), broken);
