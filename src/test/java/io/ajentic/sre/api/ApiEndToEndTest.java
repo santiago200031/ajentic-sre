@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasItems;
 import static org.hamcrest.Matchers.is;
@@ -63,6 +64,13 @@ class ApiEndToEndTest {
                 .body("solved", is(true))
                 .body("diagnosed", is(true))
                 .body("resolved", is(true));
+
+        given()
+                .when().get("/q/metrics")
+                .then()
+                .statusCode(200)
+                .body(containsString("ajentic_episodes_started_total"))
+                .body(containsString("ajentic_episodes_finished_total"));
     }
 
     @Test
@@ -130,6 +138,12 @@ class ApiEndToEndTest {
                 .statusCode(200)
                 .body("answer", not(blankOrNullString()))
                 .body("sessionId", is(sessionId));
+
+        given()
+                .when().get("/q/metrics")
+                .then()
+                .statusCode(200)
+                .body(containsString("ajentic_llm_tokens_total"));
     }
 
     @Test

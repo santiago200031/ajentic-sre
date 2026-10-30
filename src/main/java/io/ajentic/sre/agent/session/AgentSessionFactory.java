@@ -6,6 +6,7 @@ import io.ajentic.sre.agent.tool.ToolAuthorization;
 import io.ajentic.sre.agent.tool.ToolRegistry;
 import io.ajentic.sre.rl.Environment;
 import io.ajentic.sre.rl.simulation.EnvironmentFactory;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -19,6 +20,7 @@ public class AgentSessionFactory {
     private final EnvironmentFactory environments;
     private final ToolAuthorization authorization;
     private final SensitiveDataMasker masker;
+    private final MeterRegistry meters;
 
     @Inject
     public AgentSessionFactory(
@@ -26,12 +28,14 @@ public class AgentSessionFactory {
             ToolRegistry tools,
             EnvironmentFactory environments,
             ToolAuthorization authorization,
-            SensitiveDataMasker masker) {
+            SensitiveDataMasker masker,
+            MeterRegistry meters) {
         this.llm = llm;
         this.tools = tools;
         this.environments = environments;
         this.authorization = authorization;
         this.masker = masker;
+        this.meters = meters;
     }
 
     public AgentSession create(AgentSessionConfig config) {
@@ -44,7 +48,8 @@ public class AgentSessionFactory {
                 environment,
                 systemPrompt(environment),
                 authorization,
-                masker.newSession());
+                masker.newSession(),
+                meters);
     }
 
     private static String systemPrompt(Environment environment) {

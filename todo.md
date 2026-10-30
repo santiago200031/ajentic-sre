@@ -13,7 +13,7 @@ suite offline (`mvn test`, WireMock stubs, no model, no network), and targets Ja
 | 4 | `fix/cli-mcp-stdio-isolation` | 1 | No `:8080` bind for CLI/MCP; clean stdout | — | ✅ done |
 | 5 | `fix/episode-cursor-scoping` | 1 | Per-session/request episode targeting | 4 | ✅ done |
 | 6 | `refactor/schedule-scenario-reference` | 1 | Store `scenarioId`, not a lambda; race-free `run` | — | ✅ done |
-| 7 | `feat/prometheus-episode-metrics` | 1 | Micrometer counters/timers for episodes, tools, tokens | 2 | ⬜ todo |
+| 7 | `feat/prometheus-episode-metrics` | 1 | Micrometer counters/timers for episodes, tools, tokens | 2 | ✅ done |
 | 8 | `feat/local-docker-stack` | 1 | `docker-compose.yml`: app + Prometheus + Grafana (+ LocalStack) | 7 | ⬜ todo |
 | 9 | `feat/scenario-packs` | 2 | External YAML/JSON scenario loading | 3 | ⬜ todo |
 | 10 | `feat/topology-cascading-failures` | 2 | Service DAG + downstream→upstream degradation | 3, 9 | ⬜ todo |
@@ -166,13 +166,13 @@ overwrite each other's active episode unless every call passes `_episodeId`.
 
 ### 7. `feat/prometheus-episode-metrics`
 
-- [ ] Add Micrometer counters/timers (registry already on the classpath): `ajentic.episodes.started`,
-      `ajentic.episodes.solved`, `ajentic.episode.reward` (distribution), `ajentic.episode.steps`,
-      `ajentic.tool.invocations{tool,capability}`, `ajentic.tool.latency{tool}`, `ajentic.llm.tokens{kind}`.
-- [ ] Instrument `EpisodeService`, `ToolRegistry`/`AgentSession.invoke`, and the LLM client; tag by scenario id and
-      provider/model, with bounded tag cardinality.
-- [ ] Expose `/q/metrics`; assert names exist in a test and document the scrape config.
-- [ ] Update `src/main/docker/Dockerfile.jvm` only if extra config is required (metrics endpoint is already served).
+- [x] Report `ajentic.episodes.started`, `ajentic.episodes.finished{solved}` (the solved/unresolved split replaces a
+      separate `episodes.solved` counter), `ajentic.episode.reward`, `ajentic.episode.steps`,
+      `ajentic.tool.invocations{tool,capability}`, `ajentic.tool.latency{tool}`, and `ajentic.llm.tokens{kind,model}`.
+- [x] Instrument `EpisodeService` and `AgentSession` (tool invocation and every LLM response); tags are scenario id,
+      tool name, capability, and the configured model, all bounded configuration values.
+- [x] Expose `/q/metrics` (already served by the Prometheus registry) and assert the metric names through the API.
+- [x] No `Dockerfile.jvm` change needed; the endpoint is served by the existing build.
 
 **Files.** new `metrics/` package (or `health/`), `rl/episode/EpisodeService.java`, `agent/session/AgentSession.java`,
 `agent/llm/OpenAiCompatibleLlmClient.java`.

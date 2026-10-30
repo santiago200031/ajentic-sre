@@ -15,7 +15,9 @@ import io.ajentic.sre.agent.tool.ToolContext;
 import io.ajentic.sre.agent.tool.ToolInvocation;
 import io.ajentic.sre.agent.tool.ToolRegistry;
 import io.ajentic.sre.rl.Environment;
+import io.micrometer.core.instrument.MeterRegistry;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -35,6 +37,7 @@ public final class AgentSession {
     private final Environment environment;
     private final ToolAuthorization authorization;
     private final MaskingSession maskingSession;
+    private final MeterRegistry meters;
     private final Conversation conversation = new Conversation();
 
     public AgentSession(
@@ -68,6 +71,19 @@ public final class AgentSession {
             String systemPrompt,
             ToolAuthorization authorization,
             MaskingSession maskingSession) {
+        this(id, config, llm, tools, environment, systemPrompt, authorization, maskingSession, null);
+    }
+
+    public AgentSession(
+            String id,
+            AgentSessionConfig config,
+            LlmClient llm,
+            ToolRegistry tools,
+            Environment environment,
+            String systemPrompt,
+            ToolAuthorization authorization,
+            MaskingSession maskingSession,
+            MeterRegistry meters) {
         this.id = id;
         this.config = config;
         this.llm = llm;
@@ -75,6 +91,7 @@ public final class AgentSession {
         this.environment = environment;
         this.authorization = authorization;
         this.maskingSession = maskingSession;
+        this.meters = meters;
         if (systemPrompt != null && !systemPrompt.isBlank()) {
             conversation.add(ChatMessage.system(systemPrompt));
         }
@@ -104,6 +121,7 @@ public final class AgentSession {
         for (int iteration = 0; iteration < config.maxIterations(); iteration++) {
             LlmResponse response = llm.complete(
                     new LlmRequest(conversation.messages(), tools.descriptors(), config.model()));
+            recordTokens(response);
 
             if (!response.hasToolCalls()) {
                 String answer = response.content() == null ? "" : response.content();
@@ -131,6 +149,17 @@ public final class AgentSession {
             turn = chat("Continue until the goal is met: " + goal.description());
         }
         return turn;
+    }
+
+    private void recordTokens(LlmResponse response) {
+        if (meters == null) {
+            return;
+        }
+        String model = config.model();
+        meters.counter("ajentic.llm.tokens", "kind", "prompt", "model", model)
+                .increment(response.usage().promptTokens());
+        meters.counter("ajentic.llm.tokens", "kind", "completion", "model", model)
+                .increment(response.usage().completionTokens());
     }
 
     private void executeAll(List<ToolCall> toolCalls) {
@@ -213,8 +242,19 @@ public final class AgentSession {
         if (context == null) {
             context = new ToolContext(id, environment);
         }
-        var result = tool.invoke(new ToolInvocation(call.name(), call.arguments()), context);
-        return result.success() ? result.content() : "Tool error: " + result.content();
+        long start = System.nanoTime();
+        try {
+            var result = tool.invoke(new ToolInvocation(call.name(), call.arguments()), context);
+            return result.success() ? result.content() : "Tool error: " + result.content();
+        } finally {
+            if (meters != null) {
+                meters.timer("ajentic.tool.latency", "tool", call.name())
+                        .record(Duration.ofNanos(System.nanoTime() - start));
+                meters.counter("ajentic.tool.invocations",
+                        "tool", call.name(),
+                        "capability", tool.descriptor().capability().name()).increment();
+            }
+        }
     }
 
     private String finalizeAnswer() {

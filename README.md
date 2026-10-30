@@ -134,8 +134,8 @@ to stderr; stdout carries only command output (and the MCP JSON-RPC stream for `
 
 ## Use the REST API
 
-Everything lives under `/api/v1`. OpenAPI is at `/q/openapi`, Swagger UI at `/q/swagger-ui`, and health at
-`/q/health`.
+Everything lives under `/api/v1`. OpenAPI is at `/q/openapi`, Swagger UI at `/q/swagger-ui`, health at
+`/q/health`, and Prometheus metrics at `/q/metrics` (episode, tool, and LLM token counters/timers).
 
 ```bash
 curl -s localhost:8080/api/v1/scenarios | jq

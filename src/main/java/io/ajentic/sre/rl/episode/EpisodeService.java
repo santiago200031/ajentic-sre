@@ -4,6 +4,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import io.ajentic.sre.rl.Environment;
 import io.ajentic.sre.rl.policy.Policy;
 import io.ajentic.sre.rl.simulation.EnvironmentFactory;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -22,12 +23,14 @@ public class EpisodeService {
 
     private final EnvironmentFactory environments;
     private final EpisodeRunner runner;
+    private final MeterRegistry meters;
     private final Map<String, EpisodeHandle> episodes;
 
     @Inject
-    public EpisodeService(EnvironmentFactory environments, EpisodeRunner runner) {
+    public EpisodeService(EnvironmentFactory environments, EpisodeRunner runner, MeterRegistry meters) {
         this.environments = environments;
         this.runner = runner;
+        this.meters = meters;
         this.episodes = Caffeine.newBuilder()
                 .maximumSize(DEFAULT_MAX_ACTIVE)
                 .<String, EpisodeHandle>build()
@@ -38,6 +41,7 @@ public class EpisodeService {
         Environment environment = environments.create(scenarioId, seed);
         EpisodeHandle handle = new EpisodeHandle(UUID.randomUUID().toString(), environment);
         episodes.put(handle.id(), handle);
+        meters.counter("ajentic.episodes.started", "scenario", scenarioId).increment();
         return handle;
     }
 
@@ -49,6 +53,11 @@ public class EpisodeService {
         EpisodeHandle handle = find(id).orElseThrow(() -> new UnknownEpisodeException(id));
         EpisodeResult result = runner.run(id, handle.environment(), policy);
         handle.complete(result);
+        meters.counter("ajentic.episodes.finished",
+                "scenario", result.scenarioId(),
+                "solved", Boolean.toString(result.solved())).increment();
+        meters.summary("ajentic.episode.reward", "scenario", result.scenarioId()).record(result.totalReward());
+        meters.summary("ajentic.episode.steps", "scenario", result.scenarioId()).record(result.steps());
         return result;
     }
 
