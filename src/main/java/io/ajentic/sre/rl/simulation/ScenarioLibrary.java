@@ -2,7 +2,6 @@ package io.ajentic.sre.rl.simulation;
 
 import io.ajentic.sre.rl.simulation.pack.ScenarioPack;
 import io.quarkus.arc.DefaultBean;
-import io.quarkus.cache.CacheResult;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.inject.Provider;
@@ -61,7 +60,6 @@ public class ScenarioLibrary implements ScenarioRepository {
     }
 
     @Override
-    @CacheResult(cacheName = "scenario-library")
     public Optional<Scenario> byId(String id) {
         return Optional.ofNullable(scenarios.get(id));
     }

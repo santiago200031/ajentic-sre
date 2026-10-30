@@ -1,6 +1,5 @@
 package io.ajentic.sre.agent.tool;
 
-import io.quarkus.cache.CacheResult;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Any;
 import jakarta.enterprise.inject.Instance;
@@ -48,7 +47,6 @@ public class CdiToolRegistry implements ToolRegistry {
     }
 
     @Override
-    @CacheResult(cacheName = "tool-registry")
     public Optional<Tool> find(String name) {
         return Optional.ofNullable(byName.get(name));
     }

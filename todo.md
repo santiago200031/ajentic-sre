@@ -454,9 +454,16 @@ endpoints so investigations and simulations can be exercised straight from Swagg
 - [x] Test: `GET /` → 303 to `/q/swagger-ui`; `/q/swagger-ui` and `/q/openapi` return 200 with the right title;
       one-shot ask answers and one-shot simulate returns `solved=true`; `mvn test` offline.
 
+- [x] Streamline OpenAPI documentation: mark `RootRedirectResource` with `@Operation(hidden = true)` and remove misplaced `@Tag(name = "Agent")` so internal 303 redirect does not pollute the OpenAPI spec or Swagger UI.
+- [x] Over-engineering optimization: eliminate redundant `@CacheResult` Arc proxy caching over immutable in-memory maps in `ScenarioLibrary.byId` and `CdiToolRegistry.find`.
+- [x] Architectural evaluation against Quarkus 4.x built-ins:
+  - *Dynamic Scheduler*: Quarkus 4.x provides programmatic dynamic scheduling via `io.quarkus.scheduler.Scheduler.newJob()`. The custom virtual-time `Scheduler` is deliberately retained to ensure deterministic offline RL simulation and virtual-time ticking during tests.
+  - *MCP Server*: Quarkiverse provides `quarkus-mcp-server`; the custom zero-dependency JSON-RPC handler is retained for tight coupling with `CdiToolRegistry` and lightweight stdio bridge isolation.
+  - *CDI Standards*: Quarkus 4.0 deprecates `@DefaultBean` in favor of standard `@Reserve` with `@Priority`.
+
 **Files.** `application.properties`, `api/openapi/OpenApiConfiguration.java`, `api/resource/RootRedirectResource.java`,
 `api/payload/AskRequest.java`, `api/payload/SimulateRequest.java`, the six `api/resource/*.java`, the
-`api/payload/*.java` DTOs, and `cli/*` (drop the headless commands, add `SwaggerCommand`).
+`api/payload/*.java` DTOs, `cli/*`, `rl/simulation/ScenarioLibrary.java`, `agent/tool/CdiToolRegistry.java`.
 
 ---
 
