@@ -205,6 +205,7 @@ and `prompts/get`. `POST` takes one request or a batch array, and malformed JSON
 `GET` returns discovery metadata; `DELETE` clears the active episode.
 
 - Lifecycle tools: `list_scenarios`, `start_episode`, `run_incident_drill`.
+- GitHub code tools: `github_list_files`, `github_read_file`, `github_get_ci_status` (READ) and `github_create_branch`, `github_commit_file`, `github_create_pull_request` (MUTATE).
 - Resources: `sre://scenarios/{scenarioId}` and `sre://runbooks/{scenarioId}/{runbookId}`.
 - Prompts: `investigate-incident` and `summarize-postmortem`.
 - A `tools/call` can pass `_scenarioId` to start an episode, or `_episodeId` to reuse one.
@@ -287,6 +288,10 @@ sends `Authorization: Bearer <key>`, unless `ajentic.llm.api-key-header` says ot
 | `ajentic.agent.stagnation.escalate-after` | `3`                               | Repeated identical tool call count that stops the loop with a diagnostic answer |
 | `ajentic.scenarios.dir`                   |                                   | External YAML/JSON scenario packs; empty disables loading                       |
 | `ajentic.mcp.default-scenario`            | `checkout-latency-db-pool`        | Episode bootstrap                                                               |
+| `ajentic.github.base-url`                 | `https://api.github.com`          | GitHub REST API base URL                                                        |
+| `ajentic.github.token`                    |                                   | Optional PAT for code-remediation mutations; empty restricts to analysis-only  |
+| `ajentic.github.default-repo`             |                                   | Default repository (`owner/name`)                                               |
+| `ajentic.github.timeout`                  | `30s`                             | HTTP client timeout for GitHub requests                                         |
 
 </details>
 
@@ -298,6 +303,8 @@ sends `Authorization: Bearer <key>`, unless `ajentic.llm.api-key-header` says ot
 | ------------------------------ | ------------------------------------------------------------ |
 | `IncidentResponseEndToEndTest` | Heuristic baseline solves every scenario                     |
 | `AgentSessionEndToEndTest`     | ReAct loop over the real HTTP client against WireMock        |
+| `GitHubCodeToolsTest`          | Zero-clone GitHub REST operations over WireMock              |
+| `GitHubTokenMaskingTest`       | PAT masking (classic `ghp_`, fine-grained `github_pat_`, app `ghs_`) |
 | `LlmConsumerPactContractTest`  | OpenAI-compatible and Azure wire contracts (`target/pacts/`) |
 | `SchedulerEndToEndTest`        | Cron correctness, versioning, concurrency, recovery          |
 | `ApiEndToEndTest`              | REST surface, including the MCP HTTP transport               |

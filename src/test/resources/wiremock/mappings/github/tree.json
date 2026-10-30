@@ -1,0 +1,17 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/repos/acme/checkout-service/git/trees/main"
+  },
+  "response": {
+    "status": 200,
+    "jsonBody": {
+      "sha": "tree123",
+      "tree": [
+        { "path": "README.md", "type": "blob", "sha": "blob3" },
+        { "path": "src/main/java/App.java", "type": "blob", "sha": "blob1" },
+        { "path": "src/test/java/AppTest.java", "type": "blob", "sha": "blob2" }
+      ]
+    }
+  }
+}

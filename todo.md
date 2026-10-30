@@ -27,162 +27,12 @@ suite offline (`mvn test`, WireMock stubs, no model, no network), and targets Ja
 | 18 | `feat/sse-chat-stream` | 3 | `/chat/stream` SSE | 13 | ⬜ todo |
 | 19 | `feat/alert-webhooks` | 3 | Alertmanager/PagerDuty/SNS intake | 16, 18 | ⬜ todo |
 | 20 | `feat/llm-fallback-router` | 3 | Local-first composite LLM client | 13 | ⬜ todo |
-| 21 | `feat/multicloud-identifier-masking` | 3 | GCP/Azure/K8s/Bearer categories |# Implementation Plan: Cloud Error Alert → Zero-Clone Code Fix, CI & PR Workflow
-
-## Goal Description
-Extend `ajentic-sre` beyond simulated infrastructure incidents so it can also act as an **autonomous code-fixing SRE agent** for external repositories:
-1. Receive error/warning alerts via a single webhook endpoint (`POST /api/v1/webhooks/alerts`) from AWS CloudWatch/SNS, Azure Monitor, Alertmanager, or direct JSON payloads.
-2. Filter alerts by configurable severity (`ajentic.alerts.min-severity=ERROR` by default, optionally `WARNING`).
-3. Analyze the error stack trace and inspect the target repository **without cloning (`git clone`)**, using the GitHub REST API (`java.net.http.HttpClient`, zero new dependencies) authenticated with an optional Personal Access Token (`ajentic.github.token`).
-4. Create a remediation branch, commit the bug fix and unit test updates, trigger/inspect external CI check runs (GitHub Actions), and open a Pull Request—reusing the existing `AgentSession` ReAct loop, token budgets, stagnation breaker, and `SensitiveDataMaskingInterceptor`.
-
-```mermaid
-sequenceDiagram
-    participant Cloud as AWS / Azure / Alert Webhook
-    participant Webhook as AlertWebhookResource<br/>POST /api/v1/webhooks/alerts
-    participant Session as AgentSession (ReAct Loop)
-    participant GH as GitHubCodeTools (@ToolBox)<br/>JDK HttpClient -> GitHub API
-    participant CI as GitHub Actions CI
-
-    Cloud->>Webhook: Alert Payload (ERROR / WARNING + stack trace + repo)
-    Webhook->>Webhook: Normalize payload & check Severity >= min-severity
-    Webhook->>Session: Start code-remediation turn
-    Session->>GH: github_list_files / github_read_file (READ, parallel)
-    GH-->>Session: File tree & source/test contents
-    Session->>GH: github_create_branch (MUTATE)
-    Session->>GH: github_commit_file (fix + unit test) (MUTATE)
-    GH->>CI: Push triggers GitHub Actions workflow
-    Session->>GH: github_get_ci_status (READ check-runs for commit SHA)
-    CI-->>GH: Check-run status & conclusion
-    Session->>GH: github_create_pull_request (MUTATE)
-    GH-->>Session: PR URL & number
-    Session-->>Webhook: Remediation Report (Root cause + PR link + CI status)
-```
-
----
-
-## User Review Required (Ponytail Ultra Pushbacks & Decisions)
-
-> [!IMPORTANT]
-> **Ponytail Ultra Pushback 1 — Why Zero-Clone Beats `git clone`**:
-> Cloning arbitrary external repositories onto the agent container requires disk cleanup, git binary management, SSH/credential helpers, and installing every target repo's build toolchain (Java, Node, Python, Go, Rust) inside the `ajentic-sre` container just to run tests.
-> - **Decision**: Use **100% stateless GitHub REST API calls** (`GET /git/trees`, `GET /contents`, `POST /git/refs`, `PUT /contents`, `POST /pulls`, `GET /commits/{ref}/check-runs`). Stack traces already point to the exact file/line; the agent reads only the relevant source and test files, commits the fix + test over HTTP, and lets **GitHub Actions** run the test suite in the repository's native CI environment.
-
-> [!IMPORTANT]
-> **Ponytail Ultra Pushback 2 — Single Multi-Cloud Alert Normalizer Instead of 5 Webhook Endpoints**:
-> Instead of separate controllers and 20 DTO classes for AWS CloudWatch, Azure Monitor, Datadog, and Alertmanager, a single `POST /api/v1/webhooks/alerts` endpoint accepts a generic JSON object (`Map<String, Object>`) and extracts `(severity, service, repository, title, message, stackTrace)` across:
-> - **Direct JSON**: `{ "severity": "ERROR", "repository": "owner/repo", "message": "...", "stackTrace": "..." }`
-> - **AWS CloudWatch / SNS**: `AlarmName`, `NewStateReason`, `AlarmDescription`
-> - **Azure Monitor Common Alert Schema**: `data.essentials.severity` (`Sev0`–`Sev2` → `ERROR`, `Sev3` → `WARNING`), `data.essentials.description`, `data.alertContext`
-> - **Prometheus Alertmanager**: `alerts[0].labels.severity`, `alerts[0].annotations.summary`
-
-> [!WARNING]
-> **Safety & Optionality**:
-> - GitHub integration is **100% optional**: if `ajentic.github.token` is blank (the default), the agent still analyzes the stack trace and returns a root-cause + proposed patch in the response, while GitHub tools report that no token is configured.
-> - Mutating GitHub tools (`github_create_branch`, `github_commit_file`, `github_create_pull_request`) are marked `Capability.MUTATE`, so `ajentic.tools.allow-mutations=false` automatically restricts the agent to read-only repo inspection.
-
----
-
-## Open Questions
-
-> [!NOTE]
-> 1. **CI Polling vs. Immediate PR Creation**: When the agent commits a fix and test to a new branch, GitHub Actions usually takes 30s–5m to finish. Should the agent open the PR immediately and query `github_get_ci_status` (or trigger `github_trigger_workflow`) to report the initial check state, rather than blocking the HTTP thread for 5 minutes? *(Recommended: Open PR + check/trigger CI asynchronously without blocking the HTTP turn).*
-> 2. **Default Target Repository**: Should `ajentic.github.default-repo` (e.g., `owner/repo`) be configurable in `application.properties` as a fallback when an AWS/Azure alert payload doesn't include a `repository` tag/label? *(Recommended: Yes).*
-
----
-
-## Proposed Changes
-
-### Component 1: Configuration & Secret Masking
-
-#### [MODIFY] [`src/main/resources/application.properties`](file:///home/amd-omarchy/Documents/github/ajentic-sre/src/main/resources/application.properties)
-Add optional GitHub API and alert webhook settings (with `%test` offline defaults):
-```properties
-# Optional GitHub code-remediation integration (leave token empty to disable live repo mutations)
-ajentic.github.base-url=https://api.github.com
-ajentic.github.token=
-ajentic.github.default-repo=
-ajentic.github.timeout=30s
-
-# Alert webhook minimum severity filter: ERROR or WARNING
-ajentic.alerts.min-severity=ERROR
-```
-
-#### [MODIFY] [`src/main/java/io/ajentic/sre/agent/masking/SensitiveDataCategory.java`](file:///home/amd-omarchy/Documents/github/ajentic-sre/src/main/java/io/ajentic/sre/agent/masking/SensitiveDataCategory.java)
-Broaden `API_KEY` (or add `GITHUB_TOKEN`) to mask `ghp_*`, `github_pat_*`, and `gho_*` tokens so GitHub PATs can never leak to an LLM provider:
-```java
-API_KEY(Pattern.compile("\\b(?:sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})\\b"), "api_key");
-```
-
----
-
-### Component 2: Zero-Clone GitHub Client & `@ToolBox` Code Tools
-
-#### [NEW] `src/main/java/io/ajentic/sre/agent/github/GitHubClient.java`
-A lightweight `@ApplicationScoped` client using JDK `java.net.http.HttpClient` and Jackson `ObjectMapper` (zero external dependencies) supporting:
-- `listFiles(String repo, String ref, String pathPrefix)` → `GET /repos/{repo}/git/trees/{ref}?recursive=1`
-- `readFile(String repo, String path, String ref)` → `GET /repos/{repo}/contents/{path}?ref={ref}` (decodes Base64 content + returns file `sha`)
-- `createBranch(String repo, String newBranch, String fromBranch)` → `GET /repos/{repo}/git/ref/heads/{fromBranch}` + `POST /repos/{repo}/git/refs`
-- `commitFile(String repo, String branch, String path, String content, String message, String existingSha)` → `PUT /repos/{repo}/contents/{path}`
-- `getCiStatus(String repo, String ref)` → `GET /repos/{repo}/commits/{ref}/check-runs`
-- `createPullRequest(String repo, String title, String body, String head, String base)` → `POST /repos/{repo}/pulls`
-
-#### [NEW] `src/main/java/io/ajentic/sre/agent/tool/builtin/GitHubCodeTools.java`
-A `@ToolBox @Unremovable` bean automatically discovered by [`CdiToolRegistry`](file:///home/amd-omarchy/Documents/github/ajentic-sre/src/main/java/io/ajentic/sre/agent/tool/CdiToolRegistry.java):
-- `@AgentTool(name = "github_list_files", capability = Capability.READ)`
-- `@AgentTool(name = "github_read_file", capability = Capability.READ)`
-- `@AgentTool(name = "github_get_ci_status", capability = Capability.READ)`
-- `@AgentTool(name = "github_create_branch", capability = Capability.MUTATE)`
-- `@AgentTool(name = "github_commit_file", capability = Capability.MUTATE)`
-- `@AgentTool(name = "github_create_pull_request", capability = Capability.MUTATE)`
-
----
-
-### Component 3: Multi-Cloud Alert Webhook & Code-Fix Session Entrypoint
-
-#### [NEW] `src/main/java/io/ajentic/sre/api/payload/AlertWebhookResponse.java`
-Response DTO with `@Schema` annotations for Swagger UI:
-- `status` (`PROCESSED` or `IGNORED`)
-- `severity` (`ERROR` or `WARNING`)
-- `repository`
-- `sessionId`
-- `answer` (Root cause analysis, committed files, CI check status, and PR URL)
-- `toolCalls`
-- `usage`
-
-#### [NEW] `src/main/java/io/ajentic/sre/api/resource/AlertWebhookResource.java`
-- `POST /api/v1/webhooks/alerts` under `@Tag(name = "Agent")` (or `@Tag(name = "Webhooks")`).
-- Normalizes incoming JSON payloads from AWS CloudWatch/SNS, Azure Monitor (`data.essentials`), Prometheus Alertmanager (`alerts[]`), or direct JSON (`severity`, `repository`, `branch`, `message`, `stackTrace`).
-- Compares alert severity against `ajentic.alerts.min-severity` (`ERROR` vs `WARNING`); returns `202 Accepted` with `status = "IGNORED"` if below threshold.
-- Starts an `AgentSession` with a code-remediation prompt instructing the agent to:
-  1. Inspect the stack trace / error message and locate the faulty source and test files via `github_list_files` and `github_read_file`.
-  2. Create a fix branch (`github_create_branch`), commit the code fix and regression unit test (`github_commit_file`), check CI status (`github_get_ci_status`), and open a Pull Request (`github_create_pull_request`).
-
----
-
-## Verification Plan
-
-### Automated Tests
-1. **Offline WireMock End-to-End Test**:
-   - Extend `WireMockLlmTestResource` (or add stubs in `src/test/resources/wiremock/`) to stub both the GitHub REST API (`/repos/acme/checkout-service/...`) and the scripted/WireMock LLM tool calls.
-   - Verify in `ApiEndToEndTest`:
-     - Sending a `WARNING` alert when `min-severity=ERROR` returns `202 Accepted` (`IGNORED`) without calling the LLM.
-     - Sending an AWS CloudWatch / Azure Monitor / direct `ERROR` alert with a stack trace triggers `github_read_file` → `github_create_branch` → `github_commit_file` (fix + test) → `github_get_ci_status` → `github_create_pull_request` and returns `200 OK` with the created PR URL.
-     - Verify `ghp_...` and `github_pat_...` tokens are redacted by `SensitiveDataMasker`.
-2. **Command**:
-   ```bash
-   mvn test
-   ```
-
-### Manual Verification
-1. Start the server (`mvn quarkus:dev`) and open `http://localhost:8080/q/swagger-ui`.
-2. Configure `AJENTIC_GITHUB_TOKEN=ghp_...` and test `POST /api/v1/webhooks/alerts` directly from Swagger UI with a sample error stack trace and repository name.
- 1 | ⬜ todo |
+| 21 | `feat/multicloud-identifier-masking` | 3 | GCP/Azure/K8s/Bearer categories | 1 | ⬜ todo |
 | 22 | `feat/approval-gates` | 3 | `ALLOW \| DENY \| REQUIRE_APPROVAL` | 18 | ⬜ todo |
 | 23 | `feat/episodic-memory` | 3 | `search_past_incidents` + `.ajentic/incidents.jsonl` | 6, 22 | ⬜ todo |
 | 24 | `feat/file-state-store` | 3 | Durable schedules/drills/episodes | 6 | ⬜ todo |
 | 25 | `feat/swagger-openapi-first` | 3 | Always-on Swagger UI + OpenAPI annotations + one-shot ask/simulate; CLI narrowed to open Swagger | — | ✅ done |
-| 26 | `feat/github-code-tools` | 4 | Zero-clone GitHub REST client + `@ToolBox` code tools + PAT masking | 25 | ⬜ todo |
+| 26 | `feat/github-code-tools` | 4 | Zero-clone GitHub REST client + `@ToolBox` code tools + PAT masking | 25 | ✅ done |
 | 27 | `feat/alert-webhook-code-fix` | 4 | Multi-cloud alert normalizer + `POST /webhooks/alerts` code-fix turn | 26 | ⬜ todo |
 | 28 | `feat/ci-feedback-loop` | 4 | Non-blocking CI status/PR follow-up + remediation report | 27 | ⬜ todo |
 | 29 | `feat/chatops-channels` | 5 | Slack/Teams/Google Chat/Discord/Telegram + OpenAI-compatible chat API | 19, 22 | ⬜ todo |
@@ -678,38 +528,67 @@ Decisions already taken (do not re-litigate in review):
 - **Optional integration.** Blank `ajentic.github.token` (the default) degrades to analysis-only: the turn still
   returns root cause + proposed patch, and GitHub tools answer "token not configured" instead of throwing.
 - **Mutations are opt-in twice.** All write tools are `Capability.MUTATE`, so `ajentic.tools.allow-mutations=false`
-  restricts the agent to read-only repo inspection, and a blank token disables writes entirely.
+### Architecture & Sequence: Cloud Error Alert → Zero-Clone Code Fix, CI & PR Workflow
+
+Extend `ajentic-sre` beyond simulated infrastructure incidents so it can also act as an **autonomous code-fixing SRE agent** for external repositories:
+1. Receive error/warning alerts via a single webhook endpoint (`POST /api/v1/webhooks/alerts`) from AWS CloudWatch/SNS, Azure Monitor, Alertmanager, or direct JSON payloads.
+2. Filter alerts by configurable severity (`ajentic.alerts.min-severity=ERROR` by default, optionally `WARNING`).
+3. Analyze the error stack trace and inspect the target repository **without cloning (`git clone`)**, using the GitHub REST API (`java.net.http.HttpClient`, zero new dependencies) authenticated with an optional Personal Access Token (`ajentic.github.token`).
+4. Create a remediation branch, commit the bug fix and unit test updates, trigger/inspect external CI check runs (GitHub Actions), and open a Pull Request—reusing the existing `AgentSession` ReAct loop, token budgets, stagnation breaker, and `SensitiveDataMaskingInterceptor`.
+
+```mermaid
+sequenceDiagram
+    participant Cloud as AWS / Azure / Alert Webhook
+    participant Webhook as AlertWebhookResource<br/>POST /api/v1/webhooks/alerts
+    participant Session as AgentSession (ReAct Loop)
+    participant GH as GitHubCodeTools (@ToolBox)<br/>JDK HttpClient -> GitHub API
+    participant CI as GitHub Actions CI
+
+    Cloud->>Webhook: Alert Payload (ERROR / WARNING + stack trace + repo)
+    Webhook->>Webhook: Normalize payload & check Severity >= min-severity
+    Webhook->>Session: Start code-remediation turn
+    Session->>GH: github_list_files / github_read_file (READ, parallel)
+    GH-->>Session: File tree & source/test contents
+    Session->>GH: github_create_branch (MUTATE)
+    Session->>GH: github_commit_file (fix + unit test) (MUTATE)
+    GH->>CI: Push triggers GitHub Actions workflow
+    Session->>GH: github_get_ci_status (READ check-runs for commit SHA)
+    CI-->>GH: Check-run status & conclusion
+    Session->>GH: github_create_pull_request (MUTATE)
+    GH-->>Session: PR URL & number
+    Session-->>Webhook: Remediation Report (Root cause + PR link + CI status)
+```
 
 ### 26. `feat/github-code-tools`
 
-- [ ] New `agent/github/GitHubClient` (`@ApplicationScoped`, JDK `HttpClient`, Jackson 3
+- [x] New `agent/github/GitHubClient` (`@ApplicationScoped`, JDK `HttpClient`, Jackson 3
       `tools.jackson.databind.ObjectMapper`): `listFiles(repo, ref, pathPrefix)` → `GET /repos/{repo}/git/trees/{ref}?recursive=1`;
       `readFile(repo, path, ref)` → `GET /contents/{path}` (Base64 decode + return blob `sha`);
       `createBranch(repo, newBranch, fromRef)` → `GET /git/ref/heads/{from}` + `POST /git/refs` (tolerate an existing ref);
       `commitFile(repo, branch, path, content, message, existingSha)` → `PUT /contents/{path}`;
       `getCiStatus(repo, ref)` → `GET /commits/{ref}/check-runs`; `createPullRequest(repo, title, body, head, base)` →
       `POST /pulls` (return existing open PR for the same head instead of failing).
-- [ ] Send `Authorization: Bearer <token>` only when configured, plus mandatory `User-Agent`,
+- [x] Send `Authorization: Bearer <token>` only when configured, plus mandatory `User-Agent`,
       `Accept: application/vnd.github+json`, `X-GitHub-Api-Version: 2022-11-28`; honour `ajentic.github.timeout`
       (default `30s`) via `HttpRequest.timeout`; map non-2xx to a tool-visible message that never echoes the token or
       response headers.
-- [ ] New `agent/tool/builtin/GitHubCodeTools` (`@ToolBox @Unremovable`, discovered by `CdiToolRegistry`):
+- [x] New `agent/tool/builtin/GitHubCodeTools` (`@ToolBox @Unremovable`, discovered by `CdiToolRegistry`):
       `github_list_files`, `github_read_file`, `github_get_ci_status` (READ) and `github_create_branch`,
       `github_commit_file`, `github_create_pull_request` (MUTATE). Return `ToolText`-style plain text (file tree,
       numbered source excerpt, PR URL/number) so the ReAct loop needs no new response schema.
-- [ ] Config in `application.properties` with `%test` overrides: `ajentic.github.base-url=https://api.github.com`,
+- [x] Config in `application.properties` with `%test` overrides: `ajentic.github.base-url=https://api.github.com`,
       `ajentic.github.token=`, `ajentic.github.default-repo=`, `ajentic.github.timeout=30s`.
-- [ ] Mask PATs: widen `SensitiveDataCategory.API_KEY` to
+- [x] Mask PATs: widen `SensitiveDataCategory.API_KEY` to
       `\b(?:sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})\b` so a token pasted
       into an alert body, a diff, or a tool result can never reach the model.
-- [ ] Guard rails in the client: reject a repo that is not `owner/name`, reject paths that escape the repo root
+- [x] Guard rails in the client: reject a repo that is not `owner/name`, reject paths that escape the repo root
       (`..`), cap file reads (size + line count) so a generated file cannot blow the prompt budget, allow only
       branches prefixed `ajentic/`.
-- [ ] Tests (`src/test/resources/wiremock/github/*.json`, `WireMockLlmTestResource` gains GitHub stubs): Base64
+- [x] Tests (`src/test/resources/wiremock/github/*.json`, `WireMockLlmTestResource` gains GitHub stubs): Base64
       decode, tree filtering by prefix, `createBranch` on an existing ref, commit without `sha` (create) vs with
       `sha` (update), `check-runs` parsing, PR reuse; every tool call with no token returns a clean error result;
       `allow-mutations=false` rejects the three MUTATE tools; `ghp_…` never appears in an outbound LLM body.
-- [ ] `README.md`: new config block, tool table, and "zero-clone" rationale.
+- [x] `README.md`: new config block, tool table, and "zero-clone" rationale.
 
 **Files.** new `agent/github/GitHubClient.java`, new `agent/tool/builtin/GitHubCodeTools.java`,
 `agent/masking/SensitiveDataCategory.java`, `application.properties`, `src/test/resources/wiremock/github/*`,

@@ -14,7 +14,7 @@ public enum SensitiveDataCategory {
     POD(Pattern.compile("\\b[a-z][a-z0-9-]{2,}-[0-9a-f]{6,10}-[a-z0-9]{4,5}\\b"), "pod"),
     IP(Pattern.compile("\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b"), "ip"),
     ACCOUNT(Pattern.compile("\\b\\d{12}\\b"), "account"),
-    API_KEY(Pattern.compile("\\bsk-[A-Za-z0-9_-]{12,}\\b"), "api_key");
+    API_KEY(Pattern.compile("\\b(?:sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})\\b"), "api_key");
 
     private final Pattern pattern;
     private final String placeholderPrefix;

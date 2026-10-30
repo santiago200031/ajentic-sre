@@ -1,0 +1,15 @@
+{
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/repos/acme/checkout-service/git/refs"
+  },
+  "response": {
+    "status": 201,
+    "jsonBody": {
+      "ref": "refs/heads/ajentic/fix-1234",
+      "node_id": "REF1",
+      "urlPathPattern": "https://api.github.com/repos/acme/checkout-service/refs/heads/ajentic/fix-1234",
+      "object": { "type": "commit", "sha": "newsha789" }
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/repos/acme/checkout-service/git/ref/heads/main"
+  },
+  "response": {
+    "status": 200,
+    "jsonBody": { "ref": "refs/heads/main", "sha": "base456" }
+  }
+}

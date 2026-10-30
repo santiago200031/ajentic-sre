@@ -1,0 +1,16 @@
+{
+  "request": {
+    "method": "PUT",
+    "urlPathPattern": "/repos/acme/checkout-service/contents/src/test/java/AppTest.java"
+  },
+  "response": {
+    "status": 200,
+    "jsonBody": {
+      "content": { "type": "file", "sha": "newblob123" },
+      "commit": {
+        "sha": "commit789",
+        "urlPathPattern": "https://github.com/acme/checkout-service/commit/commit789"
+      }
+    }
+  }
+}

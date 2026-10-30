@@ -1,0 +1,15 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/repos/acme/checkout-service/contents/src/main/java/App.java"
+  },
+  "response": {
+    "status": 200,
+    "jsonBody": {
+      "type": "file",
+      "encoding": "base64",
+      "content": "cHVibGljIGNsYXNzIEFwcCB7CiAgICBwdWJsaWMgc3RhdGljIHZvaWQgbWFpbihTdHJpbmdbXSBhcmdzKSB7CiAgICAgICAgU3lzdGVtLm91dC5wcmludGxuKCJoZWxsbyIpOwogICAgfQp9Cg==",
+      "sha": "blob1"
+    }
+  }
+}

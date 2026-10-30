@@ -1,0 +1,16 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/repos/acme/checkout-service/commits/def456/check-runs"
+  },
+  "response": {
+    "status": 200,
+    "jsonBody": {
+      "total_count": 2,
+      "check_runs": [
+        { "name": "build", "status": "completed", "conclusion": "success", "html_url": "https://github.com/acme/checkout-service/check_runs/1" },
+        { "name": "test", "status": "completed", "conclusion": "failure", "html_url": "https://github.com/acme/checkout-service/check_runs/2" }
+      ]
+    }
+  }
+}

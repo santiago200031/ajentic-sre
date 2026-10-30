@@ -1,0 +1,14 @@
+{
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/repos/acme/checkout-service/pulls"
+  },
+  "response": {
+    "status": 201,
+    "jsonBody": {
+      "number": 42,
+      "state": "open",
+      "html_url": "https://github.com/acme/checkout-service/pull/42"
+    }
+  }
+}
