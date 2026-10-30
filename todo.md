@@ -1,0 +1,456 @@
+# ajentic-sre implementation plan
+
+Branch-per-workstream plan for the three tracks. Every branch is independently mergeable, keeps the default test
+suite offline (`mvn test`, WireMock stubs, no model, no network), and targets Java 25 / Quarkus 4.0.0.Beta1.
+
+## Branch map and merge order
+
+| # | Branch | Track | Scope | Depends on |
+|---|--------|-------|-------|------------|
+| 1 | `fix/masking-multiturn-toolcalls` | 1 | Mask prior-turn `toolCalls`; scope masking per session | — |
+| 2 | `fix/tool-step-terminal-semantics` | 1 | Read tools through `Environment.step`; terminal only when solved | — |
+| 3 | `feat/symptom-first-alerts` | 1 | Unspoiled initial observation | 2 |
+| 4 | `fix/cli-mcp-stdio-isolation` | 1 | No `:8080` bind for CLI/MCP; clean stdout | — |
+| 5 | `fix/episode-cursor-scoping` | 1 | Per-session/request episode targeting | 4 |
+| 6 | `refactor/schedule-scenario-reference` | 1 | Store `scenarioId`, not a lambda; race-free `run` | — |
+| 7 | `feat/prometheus-episode-metrics` | 1 | Micrometer counters/timers for episodes, tools, tokens | 2 |
+| 8 | `feat/local-docker-stack` | 1 | `docker-compose.yml`: app + Prometheus + Grafana (+ LocalStack) | 7 |
+| 9 | `feat/scenario-packs` | 2 | External YAML/JSON scenario loading | 3 |
+| 10 | `feat/topology-cascading-failures` | 2 | Service DAG + downstream→upstream degradation | 3, 9 |
+| 11 | `feat/investigation-tools` | 2 | `inspect_recent_changes`, `correlate_anomalies`, topology tool | 10 |
+| 12 | `feat/stagnation-breaker` | 2 | Duplicate tool-call detection with synthetic hint | 2 |
+| 13 | `feat/token-usage-budget` | 2 | Cumulative usage in `Conversation`/`ChatResponse` | — |
+| 14 | `feat/llm-policy-adapter` | 2 | `@PolicyModel(LLM)` ReAct policy | 2, 13 |
+| 15 | `feat/benchmark-cli` | 2 | `benchmark` subcommand + scorecard | 14 |
+| 16 | `feat/environment-backends` | 3 | `ajentic.environment.backend` strategy | 6, 10 |
+| 17 | `feat/live-telemetry-adapters` | 3 | `local-container` / `cloud-live` read-only adapters | 16 |
+| 18 | `feat/sse-chat-stream` | 3 | `/chat/stream` SSE | 13 |
+| 19 | `feat/alert-webhooks` | 3 | Alertmanager/PagerDuty/SNS intake | 16, 18 |
+| 20 | `feat/llm-fallback-router` | 3 | Local-first composite LLM client | 13 |
+| 21 | `feat/multicloud-identifier-masking` | 3 | GCP/Azure/K8s/Bearer categories | 1 |
+| 22 | `feat/approval-gates` | 3 | `ALLOW \| DENY \| REQUIRE_APPROVAL` | 18 |
+| 23 | `feat/episodic-memory` | 3 | `search_past_incidents` + `.ajentic/incidents.jsonl` | 6, 22 |
+| 24 | `feat/file-state-store` | 3 | Durable schedules/drills/episodes | 6 |
+
+Recommended landing order: 1 → 2 → 4 → 5 → 6 → 3 → 13 → 12 → 21 → 7 → 8 → 9 → 10 → 11 → 14 → 15 → 16 → 17 → 18 →
+19 → 20 → 22 → 23 → 24. Branches 1, 2, 4, 6, 13 are independent and can be opened in parallel.
+
+Conventions for every branch:
+- `git switch -c <branch> main`; conventional commits (`fix:`, `feat:`, `refactor:`, `test:`, `docs:`).
+- New config keys go in `src/main/resources/application.properties` with a `%test` override where needed.
+- Every behavior change gets an `@QuarkusTest` or plain JUnit test; live-LLM paths stay behind `-Plive-llm`.
+- Update `README.md` command/API tables when a command, endpoint, or config key is added.
+- `mvn verify` (offline) must pass before merge.
+
+---
+
+## Track 1 — Local-first polish and core fixes
+
+### 1. `fix/masking-multiturn-toolcalls`
+
+**Problem.** `SensitiveDataMaskingInterceptor.maskRequest` masks `content()` but passes `message.toolCalls()`
+through untouched. The assistant message stored in `Conversation` has real identifiers inside tool-call arguments
+because `unmaskResponse` restores them. On turn N+1 those arguments are replayed to the provider in the clear.
+A fresh `MaskingSession` per LLM call also means placeholders are not stable across one agent loop.
+
+- [ ] Mask `ToolCall.arguments()` in `maskRequest` (recursively for nested maps/lists, not only top-level strings).
+- [ ] Mask nested values and non-String scalars' string forms consistently; add a depth guard.
+- [ ] Scope one `MaskingSession` per `AgentSession`: create it in `AgentSession` (or `AgentSessionFactory`), bind it
+      via `AgentExecutionContext.MASKING_SESSION`, and have the interceptor reuse the bound session instead of
+      creating a new one per call. Keep the per-call fallback for direct `LlmClient` use.
+- [ ] Ensure `unmaskResponse` covers `content()`, `toolCalls().arguments()`, and (defensively) tool-call ids only if
+      they can carry data — ids must stay verbatim for protocol correlation.
+- [ ] Test: 3-turn session where turn 1 tool arguments contain an IPv4, an AWS ARN, and an email; assert the
+      WireMock request bodies for turns 2 and 3 contain no originals and that placeholders are consistent.
+- [ ] Test: streaming/fallback-safe `MaskingSession` null handling; no `NPE` when `originalsByPlaceholder` is empty.
+- [ ] Test: parallel read-only tool execution under ScopedValue does not cross-contaminate sessions.
+
+**Files.** `agent/masking/SensitiveDataMaskingInterceptor.java`, `agent/masking/MaskingSession.java`,
+`agent/session/AgentSession.java`, `agent/session/AgentSessionFactory.java`, `agent/llm/MaskingLlmClient.java`,
+`src/test/resources/wiremock/*`.
+
+**Done when.** A grep of recorded outbound requests for a known secret returns zero hits across all turns, and the
+masking tests fail on `main` but pass on the branch.
+
+### 2. `fix/tool-step-terminal-semantics`
+
+**Problem.** `query_telemetry`, `read_runbook`, and `list_remediations` call `environment.signals(...)` /
+scenario data directly, so read actions never advance `system.tick()` and never incur the step penalty in
+`IncidentRewardFunction` (`STEP_COST = -0.02` in the current code, not `-0.05`). Separately
+`SimulatedProductionEnvironment.step` sets terminal `RESOLVED` as soon as
+`allFaultsResolved()`, even when `diagnosed == false`, so remediation-before-diagnosis ends the episode unsolved.
+
+- [ ] Route read tools through `context.environment().step(new QueryTelemetry(...))`, `new ReadRunbook(...)`,
+      `new ListRemediations()`; return `result.observation()` content rather than re-querying the environment.
+- [ ] Add a tool-level signal query helper in `BuiltInSreTools` that maps the requested `TelemetrySignal` to the
+      signal list carried by the resulting `Observation` (extend `Observation`/`StepResult` if signals are dropped
+      for read actions).
+- [ ] Change terminal logic: `allFaultsResolved()` alone is not `RESOLVED`; require `diagnosed && allFaultsResolved()`.
+      Keep `CATASTROPHIC` and `MAX_STEPS` unchanged.
+- [ ] Decide and document the semantics for "remediated but not diagnosed": keep the episode open, and make
+      `AgentSession.chat`'s terminal break only fire on a genuinely terminal state.
+- [ ] Test: read tools increment `step`, tick the system, and produce the step penalty.
+- [ ] Test: `apply_remediation` before `declare_diagnosis` leaves the episode non-terminal; a later
+      `declare_diagnosis` yields `RESOLVED` with `solved=true`.
+- [ ] Test: heuristic policy still reaches `RESOLVED` for every bundled scenario.
+
+**Files.** `agent/tool/builtin/BuiltInSreTools.java`, `rl/simulation/SimulatedProductionEnvironment.java`,
+`rl/Observation.java` (if needed), `rl/policy/HeuristicPolicy.java` (if ordering changes),
+`src/test/java/io/ajentic/sre/rl/IncidentResponseEndToEndTest.java`.
+
+### 3. `feat/symptom-first-alerts`
+
+**Problem.** `reset(...)` seeds `"Incident detected on " + scenario.culpritService()` and pre-populates signals for
+the culprit, so `HeuristicPolicy.resolveTarget` and the LLM are handed the answer.
+
+- [ ] Change the initial observation to a symptom on the entry/edge service (e.g. `edge-gateway` or
+      `checkout-api` 5xx spike), with no mention of the culprit.
+- [ ] Seed initial signals for the alarming service only; all other services return "no samples" until queried.
+- [ ] Update `HeuristicPolicy.resolveTarget` to start from the alerting service and walk the topology (see branch 10)
+      or fall back to a breadth-first scan over `Scenario.services()`.
+- [ ] Add `Scenario.alertingService()` (defaulting to the first edge-kind service) so scenarios can declare it.
+- [ ] Test: initial observation text never contains `culpritService()`; a "lazy" policy that reads only the alert
+      service cannot solve without further queries.
+- [ ] Test: heuristic solve rate on bundled scenarios stays at 100% with more steps than before (record baseline).
+
+**Files.** `rl/simulation/SimulatedProductionEnvironment.java`, `rl/simulation/Scenario.java`,
+`rl/simulation/ScenarioLibrary.java`, `rl/policy/HeuristicPolicy.java`.
+
+### 4. `fix/cli-mcp-stdio-isolation`
+
+**Problem.** `java -jar .../quarkus-run.jar mcp` (and `ask`, `scenarios`, `simulate`) boots the full HTTP stack and
+collides with `serve` on `:8080`; Quarkus logs/banner on stdout corrupt the MCP JSON-RPC stream.
+
+- [ ] Add a dedicated CLI profile/startup mode (`ajentic.cli.mode=true` via `@CommandLine.Command` +
+      `QuarkusApplication`/`PicocliRunner`, or a `cli` profile) that disables the HTTP listener
+      (`quarkus.http.host-enabled=false` in the CLI profile) and scheduler unless `serve` is the command.
+- [ ] Force `quarkus.log.console.stderr=true` and `quarkus.banner.enabled=false` for CLI/MCP processes; verify with
+      `2>/dev/null` that stdout is a pure JSON-RPC stream.
+- [ ] Make `mcp` share one `McpProtocolHandler` with the HTTP transport; no duplicate registries.
+- [ ] Keep `mvn quarkus:dev` and the Docker container on `:8080` while a CLI/MCP process runs concurrently.
+- [ ] Test (`CliEndToEndTest`): start `serve` on 8080, then run `ask`/`scenarios`/`mcp` and assert no bind error.
+- [ ] Test: pipe a `initialize` + `tools/list` sequence into `mcp`; assert every stdout line parses as JSON-RPC and
+      nothing else is printed.
+- [ ] Document the two-process workflow in `README.md`.
+
+**Files.** `cli/AjenticCommand.java`, `cli/McpStdioCommand.java`, `cli/ServeCommand.java`,
+`src/main/resources/application.properties`, `src/main/docker/Dockerfile.jvm`.
+
+### 5. `fix/episode-cursor-scoping`
+
+**Problem.** `EpisodeCursor` is one `@ApplicationScoped AtomicReference<String>`; concurrent MCP/HTTP clients
+overwrite each other's active episode unless every call passes `_episodeId`.
+
+- [ ] Replace the global cursor with a per-caller resolution strategy: explicit `_episodeId` wins, else a
+      session/transport-scoped cursor keyed by `AgentExecutionContext.SESSION_ID` or MCP connection id.
+- [ ] Keep a bounded `ConcurrentHashMap` with eviction (or reuse the existing session registry) to avoid leaks.
+- [ ] Default behavior for a brand-new connection without an episode: start one from
+      `ajentic.mcp.default-scenario`, or return a clear "no active episode" tool error.
+- [ ] Test: two interleaved MCP connections each start an episode; subsequent calls without `_episodeId` hit their
+      own episode.
+- [ ] Test: HTTP sessions remain isolated under concurrent `chat` calls.
+
+**Files.** `rl/episode/EpisodeCursor.java`, `agent/mcp/McpProtocolHandler.java`, `agent/tool/builtin/BuiltInSreTools.java`,
+`agent/session/*`.
+
+### 6. `refactor/schedule-scenario-reference`
+
+**Problem.** `ScheduleDefinition` holds an in-memory `ScheduledJob` closure and `ScheduleResource.run` reads
+`drills.recent().getLast()` after `runNow(id)`, which is racy under concurrent drills.
+
+- [ ] Replace `ScheduledJob job` with `String scenarioId` in `ScheduleDefinition`; rebuild the job in
+      `Scheduler`/`IncidentDrillRunner` from the stored id.
+- [ ] Make `Scheduler.runNow(id)` return the produced `EpisodeResult` (or a run id) instead of void so the resource
+      does not read global `recent()`.
+- [ ] Keep the store serializable: only ids, cron, flags, zone, version, group.
+- [ ] Preserve version/optimistic-lock behavior in `InMemoryScheduleStore`.
+- [ ] Test: schedule create → run → result belongs to that schedule even with two concurrent `run` calls.
+- [ ] Test: schedule JSON round-trips with no closure fields (ready for branch 24).
+
+**Files.** `schedule/store/ScheduleDefinition.java`, `schedule/store/InMemoryScheduleStore.java`,
+`schedule/engine/Scheduler.java`, `schedule/drill/IncidentDrillRunner.java`,
+`api/resource/ScheduleResource.java`, `api/payload/ScheduleView.java`.
+
+### 7. `feat/prometheus-episode-metrics`
+
+- [ ] Add Micrometer counters/timers (registry already on the classpath): `ajentic.episodes.started`,
+      `ajentic.episodes.solved`, `ajentic.episode.reward` (distribution), `ajentic.episode.steps`,
+      `ajentic.tool.invocations{tool,capability}`, `ajentic.tool.latency{tool}`, `ajentic.llm.tokens{kind}`.
+- [ ] Instrument `EpisodeService`, `ToolRegistry`/`AgentSession.invoke`, and the LLM client; tag by scenario id and
+      provider/model, with bounded tag cardinality.
+- [ ] Expose `/q/metrics`; assert names exist in a test and document the scrape config.
+- [ ] Update `src/main/docker/Dockerfile.jvm` only if extra config is required (metrics endpoint is already served).
+
+**Files.** new `metrics/` package (or `health/`), `rl/episode/EpisodeService.java`, `agent/session/AgentSession.java`,
+`agent/llm/OpenAiCompatibleLlmClient.java`.
+
+### 8. `feat/local-docker-stack`
+
+- [ ] Add `docker-compose.yml`: `ajentic-sre` (port 8080, `AJENTIC_LLM_BASE_URL=http://host.docker.internal:9931/v1`),
+      optional `ollama`, `prometheus` scraping `/q/metrics`, `grafana` with a provisioned dashboard, optional
+      `localstack` for AWS scenarios.
+- [ ] Use `extra_hosts: host.docker.internal:host-gateway` for Linux; document Apple/Windows differences.
+- [ ] Add a Grafana dashboard JSON (solve rate, reward, tool p95, tokens) and Prometheus scrape config.
+- [ ] Add `make lab-up` / `make lab-down`; keep `make test` offline.
+- [ ] Smoke-document: `docker compose up`, open Grafana, run a drill, see panels move.
+- [ ] Do not add cloud SDKs to `pom.xml` for LocalStack; use JDK `HttpClient` + LocalStack endpoints.
+
+**Files.** `docker-compose.yml`, `src/main/docker/` (prometheus, grafana), `Makefile`, `README.md`.
+
+---
+
+## Track 2 — Deeper SRE simulation and model benchmarking
+
+### 9. `feat/scenario-packs`
+
+- [ ] Add `ajentic.scenarios.dir` (default `./scenarios`, empty = disabled) to `ScenarioLibrary`; load `*.yaml`,
+      `*.yml`, `*.json` at startup and on demand.
+- [ ] Define a stable external schema mirroring `Scenario`, `ServiceSpec`, `Fault`, `Runbook`; validate on load and
+      fail fast with file+line context.
+- [ ] Merge external packs with built-ins; external ids may not shadow built-ins (or must opt in explicitly).
+- [ ] Include JSON Schema + 2 sample packs (a DB pool exhaustion and a cascading gateway incident).
+- [ ] Test: load a temp directory, list scenarios, run an episode; bad file yields a clear startup error.
+- [ ] Document authoring in `README.md`.
+
+**Files.** `rl/simulation/ScenarioLibrary.java`, new `rl/simulation/pack/*`, `application.properties`,
+`src/test/resources/scenarios/`.
+
+### 10. `feat/topology-cascading-failures`
+
+- [ ] Add `List<String> dependencies` to `ServiceSpec` and a validated `ServiceTopology` DAG (no cycles, all refs
+      resolve).
+- [ ] Propagate downstream latency/error-rate degradation upstream in `SimulatedSystem.applyFaultEffects`, with
+      depth-decayed severity and a `cascadeFactor` per edge.
+- [ ] Extend `Scenario.services()` construction helpers so built-ins declare realistic graphs
+      (edge-gateway → checkout-api → orders-db / redis-cache).
+- [ ] Add `@AgentTool(name = "get_service_topology")` and MCP resource `sre://topology/{scenarioId}`.
+- [ ] Test: fault on a leaf degrades all ancestors; cycles rejected at load; topology tool output matches the DAG.
+- [ ] Test: symptom-first alert appears on the edge service while the culprit is a leaf.
+
+**Files.** `rl/simulation/ServiceSpec.java`, `Scenario.java`, `SimulatedSystem.java`,
+`agent/tool/builtin/BuiltInSreTools.java`, `agent/mcp/McpProtocolHandler.java`.
+
+### 11. `feat/investigation-tools`
+
+- [ ] Add `inspect_recent_changes(service, window)` backed by `DeployRecord` plus new config/flag/quota change
+      records; return git-style diffs, feature-flag flips, and quota changes.
+- [ ] Add `correlate_anomalies(services[], window)` ranking metric shifts across dependent services (z-score or
+      relative delta) using the topology from branch 10.
+- [ ] Make both READ-capability, step-counted (branch 2), and deterministic per seed.
+- [ ] Test: a deploy-correlated scenario where the right change is discoverable; correlation ranks the culprit
+      service first.
+- [ ] Test: tools respect `maxSteps` and reward penalties.
+
+**Files.** `rl/simulation/DeployRecord.java`, `rl/simulation/SimulatedSystem.java`,
+`agent/tool/builtin/BuiltInSreTools.java`, `rl/TelemetrySignal.java` (if a new signal type is warranted).
+
+### 12. `feat/stagnation-breaker`
+
+- [ ] In `AgentSession.chat`, keep a per-turn `(toolName, canonicalizedArguments)` multiset; on the 2nd identical
+      call return a synthetic observation hint ("You already called X with Y; try Z") without re-executing.
+- [ ] On the 3rd identical call, escalate: suggest unused tools and, after a configurable threshold, stop the loop
+      with a diagnostic answer rather than burning `maxIterations`.
+- [ ] Config: `ajentic.agent.stagnation.threshold` (default 2), `ajentic.agent.stagnation.escalate-after` (3).
+- [ ] Ensure synthetic results are still appended as `tool` messages so the transcript stays protocol-valid.
+- [ ] Test: a scripted LLM that repeats the same call 5 times terminates early with a hint, not `maxIterations`.
+- [ ] Test: legitimately repeated reads across turns are not flagged.
+
+**Files.** `agent/session/AgentSession.java`, `agent/session/Conversation.java`,
+`agent/session/AgentSessionConfig.java`, `application.properties`.
+
+### 13. `feat/token-usage-budget`
+
+- [ ] Accumulate `TokenUsage` (prompt/completion/total) in `Conversation`; expose `Conversation.usage()`.
+- [ ] Add usage to `ChatTurnResult` and `ChatResponse` (backward-compatible field addition).
+- [ ] Enforce an optional budget (`ajentic.agent.max-tokens`): soft warning to the model, hard stop before the next
+      LLM call when exceeded, with a clear finish reason.
+- [ ] Feed the token metrics from branch 7.
+- [ ] Test: scripted two-call turn reports summed usage; exceeding the budget stops the loop.
+- [ ] Test: `/api/v1/.../chat` JSON includes usage.
+
+**Files.** `agent/session/Conversation.java`, `AgentSession.java`, `ChatTurnResult.java`,
+`api/payload/ChatResponse.java`, `api/resource/AgentResource.java`.
+
+### 14. `feat/llm-policy-adapter`
+
+- [ ] Add `LLM` to `PolicyKind` (and `RANDOM` for the benchmark baseline) and register the new policy with the
+      existing `@PolicyModel` qualifier / `PolicyFactory` lookup.
+- [ ] Add `@PolicyModel(PolicyKind.LLM) LlmPolicy implements Policy`, bridging the `Policy` contract to the ReAct
+      loop (one `AgentSession` per episode, `chat`/`chatUntilGoal`).
+- [ ] Map `Observation` → prompt, tool calls → `AgentAction`, terminal → episode end; reuse masking and tools.
+- [ ] Guard against infinite loops (`maxIterations`, stagnation from branch 12) and surface usage.
+- [ ] Test with `ScriptedLlmClient`: a scripted policy solves a scenario; unknown/scenario mismatch yields a clean
+      failure, not an exception.
+- [ ] Test: masking is active for LLM policies (no raw identifiers in stub requests).
+
+**Files.** new `rl/policy/LlmPolicy.java`, `rl/policy/PolicyModel.java`/registry, `agent/session/*`,
+`rl/episode/EpisodeService.java`.
+
+### 15. `feat/benchmark-cli`
+
+- [ ] Add `benchmark` subcommand: `--scenarios all|<ids> --seeds N --model <id> --policy HEURISTIC|RANDOM|LLM`.
+- [ ] Run every (scenario, seed) pair, collect solve rate, diagnosis accuracy, steps to resolution, prompt/completion
+      tokens, and p95 latency; emit a table plus `--json` output.
+- [ ] Compare HEURISTIC, RANDOM, and one or more LLMs side by side; write results to `.ajentic/benchmarks/<ts>.json`.
+- [ ] Keep it offline by default against `scripted`; `-Plive-llm` or `--model` opts into a live endpoint.
+- [ ] Test: a 2-scenario × 2-seed run produces a deterministic scorecard for HEURISTIC/RANDOM.
+- [ ] Document sample invocations in `README.md` and `AGENTS.md` command table.
+
+**Files.** new `cli/BenchmarkCommand.java`, `cli/AjenticCommand.java`, new `benchmark/` package.
+
+---
+
+## Track 3 — Live observability and multi-cloud adapters
+
+### 16. `feat/environment-backends`
+
+- [ ] Add `ajentic.environment.backend = simulated | local-container | cloud-live` and make `EnvironmentFactory`
+      select an implementation (`@ConfigProperty` + CDI alternatives or a small strategy map).
+- [ ] Keep `simulated` the default and the only backend used by tests/CI.
+- [ ] Define a backend SPI around `Environment` (`signals`, `step`, `observe`, `spec`) so adapters do not leak into
+      the simulator.
+- [ ] Fail fast on unknown backend values; log the active backend at startup.
+- [ ] Test: config selects each backend; simulated remains byte-for-byte deterministic.
+- [ ] Document backend matrix in `README.md`.
+
+**Files.** `rl/simulation/EnvironmentFactory.java`, `rl/Environment.java` (if the SPI needs widening),
+`application.properties`.
+
+### 17. `feat/live-telemetry-adapters`
+
+- [ ] `local-container`: `query_telemetry` queries local Prometheus (`/api/v1/query_range`) and Loki
+      (`/loki/api/v1/query_range`) via JDK `HttpClient`; `apply_remediation` restarts/scales local containers or
+      LocalStack resources (ECS/Lambda/SSM).
+- [ ] `cloud-live` (read-only): map telemetry to Prometheus/Grafana Tempo/Loki or native cloud REST APIs (AWS AMP,
+      GCP GMP, Azure Monitor) — no heavy cloud SDK BOMs.
+- [ ] Enforce read-only in `cloud-live` regardless of `ajentic.tools.allow-mutations`; `apply_remediation` returns a
+      "shadow mode" result.
+- [ ] Add timeouts, bounded retries, and a circuit breaker; never block a virtual thread indefinitely.
+- [ ] Tests: WireMock/local HTTP stubs for Prometheus/Loki responses; a mutation attempt in `cloud-live` is rejected;
+      upstream 5xx surfaces as a tool error, not a crash.
+- [ ] Document required endpoints/env vars per environment.
+
+**Files.** new `rl/environment/local/*`, `rl/environment/cloud/*`, `agent/tool/builtin/BuiltInSreTools.java`
+(delegate through `Environment` only), `application.properties`.
+
+### 18. `feat/sse-chat-stream`
+
+- [ ] Add `POST /api/v1/agent/sessions/{id}/chat/stream` returning `text/event-stream`.
+- [ ] Emit typed events: `thought`, `tool_call`, `tool_result`/`observation`, `usage`, `done`, `error` — one per
+      ReAct step, flushed as produced.
+- [ ] Push events from `AgentSession` via a listener/callback so the non-streaming path is unchanged.
+- [ ] Handle client disconnect (cancel the turn, release the session), heartbeats for long local-model calls, and
+      correct `Content-Type`/`Cache-Control`.
+- [ ] Test with REST Assured streaming: a scripted 2-iteration turn yields events in order and a terminal `done`.
+- [ ] Document `curl -N` usage.
+
+**Files.** `api/resource/AgentResource.java` (or new `AgentStreamResource`), `agent/session/AgentSession.java`,
+new `agent/session/TurnListener.java`.
+
+### 19. `feat/alert-webhooks`
+
+- [ ] Add `POST /api/v1/webhooks/alertmanager`, `/pagerduty`, `/cloudwatch-sns` with signature/secret verification
+      and payload normalization to an internal `Alert`.
+- [ ] On intake: create/lookup an `AgentSession`, start or reuse an episode, run investigation (sync or async with
+      SSE/polling), and post the root-cause report through `NotificationChannel` (log/Slack/webhook).
+- [ ] Deduplicate by alert fingerprint; enforce a concurrency limit and a timeout for runaway investigations.
+- [ ] Persist the intake → session → report linkage for postmortems (feeds branch 23).
+- [ ] Test: an Alertmanager payload creates a session and posts a report via a capturing channel; duplicate
+      fingerprint is coalesced; bad signature → 401.
+- [ ] Document payloads and required config.
+
+**Files.** new `api/resource/WebhookResource.java`, `api/payload/AlertPayload.java`,
+`agent/integration/*`, `agent/session/SessionService.java`.
+
+### 20. `feat/llm-fallback-router`
+
+- [ ] Extend `LlmClientProducer` with a composite client: local llama.cpp/Ollama (`127.0.0.1:9931`) primary, ordered
+      OpenAI-compatible fallbacks (Bedrock/Vertex/Azure OpenAI/OpenRouter) on connect/timeout/5xx.
+- [ ] Add optional escalation for complex turns (tool-call parse failure or context overflow) rather than failover
+      only on transport errors.
+- [ ] Config: `ajentic.llm.fallback.enabled`, `ajentic.llm.fallback.endpoints[]`, per-endpoint model/key env refs;
+      never log secrets.
+- [ ] Keep masking applied once around the composite so failover cannot bypass redaction.
+- [ ] Test with two WireMock endpoints: primary 500 → fallback used and response returned; both down → single clear
+      `LlmException`.
+- [ ] Test: masking intercepts requests to both endpoints.
+
+**Files.** new `agent/llm/CompositeLlmClient.java`, `LlmClientProducer.java`, `LlmProperties.java`,
+`application.properties`.
+
+### 21. `feat/multicloud-identifier-masking`
+
+- [ ] Extend `SensitiveDataCategory` with GCP resource paths (`//*.googleapis.com/projects/...`), Azure resource
+      ids (`/subscriptions/.../resourceGroups/...`), Kubernetes pod/secret names+uid patterns, and
+      `Bearer <token>` / common API-key shapes.
+- [ ] Order patterns longest-first and add negative tests to avoid over-masking (e.g. plain paths, UUIDs).
+- [ ] Verify masking works inside nested tool-call arguments (branch 1) and SSE payloads (branch 18).
+- [ ] Test per category: placeholder round-trip, id stability, and no leakage in outbound WireMock bodies.
+- [ ] Document the category table in `README.md`.
+
+**Files.** `agent/masking/SensitiveDataCategory.java`, `SensitiveDataMasker.java`, tests.
+
+### 22. `feat/approval-gates`
+
+- [ ] Replace boolean `allow-mutations` with `ALLOW | DENY | REQUIRE_APPROVAL` in `DefaultToolAuthorization` while
+      keeping `ajentic.tools.allow-mutations` as a backward-compatible alias.
+- [ ] Model a pending approval: `invoke` returns a `PENDING_APPROVAL` tool result containing an approval id; the
+      agent may continue with READ tools.
+- [ ] Add `POST /api/v1/agent/sessions/{id}/approve` (approve/deny, optional note, expiry, single-use) and a
+      `GET .../pending` listing.
+- [ ] On approval, execute the deferred mutating call and append the real tool result to `Conversation`;
+      on denial/expiry, append a denied result.
+- [ ] Test: `REQUIRE_APPROVAL` blocks `apply_remediation`, READ tools still work, approve executes exactly once,
+      deny/expiry never executes.
+- [ ] Test: concurrent approvals are idempotent.
+
+**Files.** `agent/tool/DefaultToolAuthorization.java`, `agent/tool/ToolAuthorization.java`,
+`agent/session/AgentSession.java`, `api/resource/AgentResource.java`, new `agent/approval/*`.
+
+### 23. `feat/episodic-memory`
+
+- [ ] Persist completed `EpisodeResult` + postmortem to `.ajentic/incidents.jsonl` (append-only, fsync-batched,
+      rotation by size); debounce/serialize writes.
+- [ ] Add `@AgentTool(name = "search_past_incidents")` searching by symptom text, service, and fault kind; return the
+      top-k prior resolutions with reward/solved outcome.
+- [ ] Inject a short "similar past incidents" summary into the system prompt when available (bounded token budget).
+- [ ] Ensure PII/identifiers are masked before persistence.
+- [ ] Test: run → persist → new session searches and finds it; corrupt line is skipped, not fatal; masking verified
+      on disk.
+- [ ] Add `.ajentic/` to `.gitignore`; document the store location and opt-out config.
+
+**Files.** new `agent/memory/IncidentMemoryStore.java`, `agent/tool/builtin/BuiltInSreTools.java`,
+`rl/episode/EpisodeService.java`, `application.properties`.
+
+### 24. `feat/file-state-store`
+
+- [ ] Add a file-backed `ScheduleStore` (`.ajentic/state.json`) and durable drill/episode history; atomic
+      write-temp-then-rename, file lock for concurrent processes, schema version field.
+- [ ] Keep `InMemoryScheduleStore` for tests; select via `ajentic.state.store = memory | file | jdbc`.
+- [ ] Persist only serializable fields — enabled by branch 6 (`scenarioId`, not a lambda).
+- [ ] Define the `jdbc`/Redis seam now (interface + config), implement later.
+- [ ] Test: create schedules → restart the app context → schedules and versions survive; crash-safety (partial temp
+      file is ignored).
+- [ ] Add `.ajentic/` to `.gitignore`; document backup/inspect commands.
+
+**Files.** new `schedule/store/FileScheduleStore.java`, new `state/` package, `application.properties`,
+`schedule/drill/IncidentDrillRunner.java`.
+
+---
+
+## Cross-cutting definition of done
+
+- [ ] `mvn verify` passes offline; no new network calls in the default profile.
+- [ ] Test count grows with each branch; no `@Disabled` left behind without a linked follow-up.
+- [ ] `README.md` updated for new commands, endpoints, config keys, and backend matrix.
+- [ ] No secrets or real infrastructure identifiers in logs, fixtures, or `.ajentic/` artifacts.
+- [ ] New public types carry Javadoc consistent with the existing style; 4-space indent, LF, final newline.
+- [ ] `AGENTS.md` command table updated when a CLI subcommand or profile is added.
+
+## Suggested first sprint
+
+1. `fix/masking-multiturn-toolcalls` — security bug, small diff, high value.
+2. `fix/tool-step-terminal-semantics` — unblocks honest RL/benchmark numbers.
+3. `fix/cli-mcp-stdio-isolation` — makes daily local use pleasant.
+4. `refactor/schedule-scenario-reference` — prerequisite for all persistence work.
+5. `feat/symptom-first-alerts` — makes the benchmark meaningful.
