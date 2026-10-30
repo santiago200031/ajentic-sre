@@ -120,6 +120,9 @@ example `AJENTIC_LLM_BASE_URL`, `AJENTIC_LLM_MODEL`, or `QUARKUS_HTTP_PORT`.
 ajentic-sre <command> [options]
 ```
 
+Commands other than `serve` start without the HTTP listener, so they can run while a server owns `:8080`. Logs go
+to stderr; stdout carries only command output (and the MCP JSON-RPC stream for `mcp`).
+
 | Command | Purpose |
 | --- | --- |
 | `scenarios` | List the scenario library |

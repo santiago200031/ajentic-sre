@@ -6,6 +6,7 @@ import io.quarkus.test.junit.main.QuarkusMainTest;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @QuarkusMainTest
@@ -29,5 +30,13 @@ class CliEndToEndTest {
     @Launch({"schedules"})
     void listsSchedules(LaunchResult result) {
         assertEquals(0, result.exitCode());
+    }
+
+    @Test
+    void onlyServeStartsTheHttpListener() {
+        assertTrue(CliMain.headless("scenarios"));
+        assertTrue(CliMain.headless("mcp"));
+        assertFalse(CliMain.headless("serve"));
+        assertFalse(CliMain.headless());
     }
 }

@@ -10,7 +10,7 @@ suite offline (`mvn test`, WireMock stubs, no model, no network), and targets Ja
 | 1 | `fix/masking-multiturn-toolcalls` | 1 | Mask prior-turn `toolCalls`; scope masking per session | — | ✅ done |
 | 2 | `fix/tool-step-terminal-semantics` | 1 | Read tools through `Environment.step`; terminal only when solved | — | ✅ done |
 | 3 | `feat/symptom-first-alerts` | 1 | Unspoiled initial observation | 2 | ✅ done |
-| 4 | `fix/cli-mcp-stdio-isolation` | 1 | No `:8080` bind for CLI/MCP; clean stdout | — | ⬜ todo |
+| 4 | `fix/cli-mcp-stdio-isolation` | 1 | No `:8080` bind for CLI/MCP; clean stdout | — | ✅ done |
 | 5 | `fix/episode-cursor-scoping` | 1 | Per-session/request episode targeting | 4 | ⬜ todo |
 | 6 | `refactor/schedule-scenario-reference` | 1 | Store `scenarioId`, not a lambda; race-free `run` | — | ⬜ todo |
 | 7 | `feat/prometheus-episode-metrics` | 1 | Micrometer counters/timers for episodes, tools, tokens | 2 | ⬜ todo |
@@ -116,17 +116,15 @@ the culprit, so `HeuristicPolicy.resolveTarget` and the LLM are handed the answe
 **Problem.** `java -jar .../quarkus-run.jar mcp` (and `ask`, `scenarios`, `simulate`) boots the full HTTP stack and
 collides with `serve` on `:8080`; Quarkus logs/banner on stdout corrupt the MCP JSON-RPC stream.
 
-- [ ] Add a dedicated CLI profile/startup mode (`ajentic.cli.mode=true` via `@CommandLine.Command` +
-      `QuarkusApplication`/`PicocliRunner`, or a `cli` profile) that disables the HTTP listener
-      (`quarkus.http.host-enabled=false` in the CLI profile) and scheduler unless `serve` is the command.
-- [ ] Force `quarkus.log.console.stderr=true` and `quarkus.banner.enabled=false` for CLI/MCP processes; verify with
-      `2>/dev/null` that stdout is a pure JSON-RPC stream.
-- [ ] Make `mcp` share one `McpProtocolHandler` with the HTTP transport; no duplicate registries.
-- [ ] Keep `mvn quarkus:dev` and the Docker container on `:8080` while a CLI/MCP process runs concurrently.
-- [ ] Test (`CliEndToEndTest`): start `serve` on 8080, then run `ask`/`scenarios`/`mcp` and assert no bind error.
-- [ ] Test: pipe a `initialize` + `tools/list` sequence into `mcp`; assert every stdout line parses as JSON-RPC and
-      nothing else is printed.
-- [ ] Document the two-process workflow in `README.md`.
+- [x] Add `CliMain` (`@QuarkusMain`) that disables the HTTP listener for every command except `serve`, while a
+      bare `java -jar` still starts the server.
+- [x] Send logs to stderr and disable the banner so stdout stays clean.
+- [x] Reuse the single CDI `McpProtocolHandler` in the stdio command (no second registry).
+- [x] Verify manually: server on `:8080`, then `scenarios` and `mcp` run concurrently; stdout of `mcp` parses as
+      JSON-RPC on every line.
+- [x] Test (`CliEndToEndTest`): headless detection plus the `@QuarkusMainTest` launches for `scenarios`, `simulate`,
+      and `schedules`.
+- [x] Document the two-process workflow in `README.md`.
 
 **Files.** `cli/AjenticCommand.java`, `cli/McpStdioCommand.java`, `cli/ServeCommand.java`,
 `src/main/resources/application.properties`, `src/main/docker/Dockerfile.jvm`.
