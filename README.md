@@ -17,20 +17,20 @@ mvn test              # offline end-to-end suite
 
 ## Contents
 
-| Topic | What you'll find |
-| --- | --- |
-| [How it works](#how-it-works) | The incident loop, the agent, and the scenarios |
-| [Install](#install) | Requirements and build |
-| [Run](#run) | Dev mode, packaged jar, CLI |
-| [Deploy](#deploy) | Container image and configuration |
-| [Use the CLI](#use-the-cli) | `scenarios`, `simulate`, `ask`, `schedules`, `serve`, `mcp` |
-| [Use the REST API](#use-the-rest-api) | Episodes, sessions, schedules, OpenAPI |
-| [Use MCP](#use-mcp) | stdio and streamable HTTP transports |
-| [Scheduled drills](#scheduled-drills) | Cron-backed recurring incidents |
-| [Configure the LLM](#configure-the-llm) | Providers, local llama.cpp, Azure |
-| [Test](#test) | End-to-end, WireMock, Pact, live mode |
-| [Project layout](#project-layout) | Packages and responsibilities |
-| [JDK support](#jdk-support) | Java 25 default, Java 27 preview |
+| Topic                                   | What you'll find                                            |
+| --------------------------------------- | ----------------------------------------------------------- |
+| [How it works](#how-it-works)           | The incident loop, the agent, and the scenarios             |
+| [Install](#install)                     | Requirements and build                                      |
+| [Run](#run)                             | Dev mode, packaged jar, CLI                                 |
+| [Deploy](#deploy)                       | Container image and configuration                           |
+| [Use the CLI](#use-the-cli)             | `scenarios`, `simulate`, `ask`, `schedules`, `serve`, `mcp` |
+| [Use the REST API](#use-the-rest-api)   | Episodes, sessions, schedules, OpenAPI                      |
+| [Use MCP](#use-mcp)                     | stdio and streamable HTTP transports                        |
+| [Scheduled drills](#scheduled-drills)   | Cron-backed recurring incidents                             |
+| [Configure the LLM](#configure-the-llm) | Providers, local llama.cpp, Azure                           |
+| [Test](#test)                           | End-to-end, WireMock, Pact, live mode                       |
+| [Project layout](#project-layout)       | Packages and responsibilities                               |
+| [JDK support](#jdk-support)             | Java 25 default, Java 27 preview                            |
 
 ## How it works
 
@@ -51,15 +51,15 @@ stops asking for tools or the episode ends. You can also leave the model out and
 <details>
 <summary><strong>RL interface</strong></summary>
 
-| Type | Responsibility |
-| --- | --- |
-| `Environment` | `reset`, `step`, `observe`, `spec`, terminal flags |
-| `Observation` | incident, telemetry, service health, available actions, cumulative reward |
-| `AgentAction` | sealed action model: telemetry, runbook, remediations, diagnosis, idle |
-| `StepResult` | next observation, reward, termination reason |
-| `RewardFunction` | maps a `Transition` to a scalar reward |
-| `Policy` | chooses the next action from an observation |
-| `EpisodeRunner` | rolls out a policy and collects an `EpisodeResult` |
+| Type             | Responsibility                                                            |
+| ---------------- | ------------------------------------------------------------------------- |
+| `Environment`    | `reset`, `step`, `observe`, `spec`, terminal flags                        |
+| `Observation`    | incident, telemetry, service health, available actions, cumulative reward |
+| `AgentAction`    | sealed action model: telemetry, runbook, remediations, diagnosis, idle    |
+| `StepResult`     | next observation, reward, termination reason                              |
+| `RewardFunction` | maps a `Transition` to a scalar reward                                    |
+| `Policy`         | chooses the next action from an observation                               |
+| `EpisodeRunner`  | rolls out a policy and collects an `EpisodeResult`                        |
 
 Rewards credit a correct diagnosis and remediation, charge a small cost per step, and penalise mistakes.
 Repeated wrong remediations turn catastrophic and end the episode.
@@ -69,14 +69,14 @@ Repeated wrong remediations turn catastrophic and end the episode.
 <details>
 <summary><strong>Scenarios</strong></summary>
 
-| Scenario | Root cause | Correct remediation |
-| --- | --- | --- |
-| `checkout-latency-db-pool` | database connection pool exhaustion | `SCALE_UP` |
-| `payments-memory-leak` | application memory leak | `RESTART` |
-| `auth-certificate-expiry` | expired TLS certificate | `FIX_CONFIG` |
-| `search-dns-failure` | cluster DNS resolution failure | `FAILOVER` |
-| `orders-bad-deployment` | bad application deployment | `ROLLBACK_DEPLOY` |
-| `storage-disk-pressure` | node disk pressure | `EXPAND_DISK` |
+| Scenario                   | Root cause                          | Correct remediation |
+| -------------------------- | ----------------------------------- | ------------------- |
+| `checkout-latency-db-pool` | database connection pool exhaustion | `SCALE_UP`          |
+| `payments-memory-leak`     | application memory leak             | `RESTART`           |
+| `auth-certificate-expiry`  | expired TLS certificate             | `FIX_CONFIG`        |
+| `search-dns-failure`       | cluster DNS resolution failure      | `FAILOVER`          |
+| `orders-bad-deployment`    | bad application deployment          | `ROLLBACK_DEPLOY`   |
+| `storage-disk-pressure`    | node disk pressure                  | `EXPAND_DISK`       |
 
 Each scenario defines services, injected faults, runbooks, and a step budget. Telemetry comes from the
 simulated service state, so metrics, logs, traces, and deploys stay consistent with one another.
@@ -135,14 +135,14 @@ ajentic-sre <command> [options]
 Commands other than `serve` start without the HTTP listener, so they can run while a server owns `:8080`. Logs go
 to stderr; stdout carries only command output (and the MCP JSON-RPC stream for `mcp`).
 
-| Command | Purpose |
-| --- | --- |
-| `scenarios` | List the scenario library |
-| `simulate --scenario <id> [--policy heuristic\|idle] [--seed 42]` | Run a scenario with a baseline policy |
-| `ask "<question>" [--scenario <id>]` | Ask the LLM agent one question |
-| `schedules [--add <name> --cron '<cron>' --scenario <id>] [--tick] [--run <name>]` | Manage drills |
-| `serve` | Start the HTTP API and block |
-| `mcp` | Serve tools over MCP on stdin/stdout |
+| Command                                                                            | Purpose                               |
+| ---------------------------------------------------------------------------------- | ------------------------------------- |
+| `scenarios`                                                                        | List the scenario library             |
+| `simulate --scenario <id> [--policy heuristic\|idle] [--seed 42]`                  | Run a scenario with a baseline policy |
+| `ask "<question>" [--scenario <id>]`                                               | Ask the LLM agent one question        |
+| `schedules [--add <name> --cron '<cron>' --scenario <id>] [--tick] [--run <name>]` | Manage drills                         |
+| `serve`                                                                            | Start the HTTP API and block          |
+| `mcp`                                                                              | Serve tools over MCP on stdin/stdout  |
 
 ## Use the REST API
 
@@ -165,21 +165,21 @@ curl -s -X POST localhost:8080/api/v1/episodes/$EPISODE/run \
 <details>
 <summary><strong>Endpoint reference</strong></summary>
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `GET` | `/scenarios`, `/scenarios/{id}` | Scenario library |
-| `GET` | `/tools` | Tool catalog |
-| `POST` | `/episodes` | Start an episode |
-| `GET` | `/episodes/{id}` | Episode state |
-| `POST` | `/episodes/{id}/actions` | Apply one action |
-| `POST` | `/episodes/{id}/run` | Run a policy to completion |
-| `DELETE` | `/episodes/{id}` | Forget an episode |
-| `POST` | `/agent/sessions` | Start an LLM session |
-| `GET` | `/agent/sessions/{id}` | Session state |
-| `POST` | `/agent/sessions/{id}/chat` | One ReAct turn |
-| `DELETE` | `/agent/sessions/{id}` | End a session |
-| `GET` / `POST` / `DELETE` | `/schedules` … | See [scheduled drills](#scheduled-drills) |
-| `GET` / `POST` / `DELETE` | `/mcp` | See [MCP](#use-mcp) |
+| Method                    | Path                            | Purpose                                   |
+| ------------------------- | ------------------------------- | ----------------------------------------- |
+| `GET`                     | `/scenarios`, `/scenarios/{id}` | Scenario library                          |
+| `GET`                     | `/tools`                        | Tool catalog                              |
+| `POST`                    | `/episodes`                     | Start an episode                          |
+| `GET`                     | `/episodes/{id}`                | Episode state                             |
+| `POST`                    | `/episodes/{id}/actions`        | Apply one action                          |
+| `POST`                    | `/episodes/{id}/run`            | Run a policy to completion                |
+| `DELETE`                  | `/episodes/{id}`                | Forget an episode                         |
+| `POST`                    | `/agent/sessions`               | Start an LLM session                      |
+| `GET`                     | `/agent/sessions/{id}`          | Session state                             |
+| `POST`                    | `/agent/sessions/{id}/chat`     | One ReAct turn                            |
+| `DELETE`                  | `/agent/sessions/{id}`          | End a session                             |
+| `GET` / `POST` / `DELETE` | `/schedules` …                  | See [scheduled drills](#scheduled-drills) |
+| `GET` / `POST` / `DELETE` | `/mcp`                          | See [MCP](#use-mcp)                       |
 
 </details>
 
@@ -225,16 +225,40 @@ In server mode `QuarkusScheduleTicker` drives `tick()` on a virtual thread. The 
 themselves, which keeps them deterministic. Dispatch is capped by a concurrency limit, and failed or
 deferred runs go to a recovery lane.
 
+## External scenario packs
+
+Set `ajentic.scenarios.dir` to a directory of YAML or JSON packs to add scenarios beyond the built-ins.
+Each file is one scenario mirroring the built-in shape; external ids that collide with a built-in are ignored
+(built-ins win). A missing directory disables loading, and a malformed pack fails fast at startup with the
+offending file. Authoring schema lives at `examples/scenarios/scenario-pack.schema.json`, with two sample packs
+next to it.
+
+```yaml
+# examples/scenarios/db-pool-exhaustion-sample.yaml
+id: db-pool-exhaustion-sample
+title: Database connection pool saturation (sample)
+summary: Checkout latency climbs as the checkout API starves for connections.
+services:
+  - {name: edge-gateway, kind: GATEWAY, replicas: 3}
+  - {name: checkout-api, kind: API, replicas: 4}
+  - {name: samples-db, kind: DATABASE, replicas: 1}
+faults:
+  - {kind: DB_POOL_EXHAUSTION, service: checkout-api, severity: 0.8}
+runbooks:
+  - {id: rb-db-pool, title: Database connection pool saturation, body: Raise the pool limit and confirm connections recover.}
+maxSteps: 12
+```
+
 ## Configure the LLM
 
 `ajentic.llm.provider` picks the client. The shipped default points at a local llama.cpp router on
 `http://127.0.0.1:9931/v1`.
 
-| Provider | Behaviour |
-| --- | --- |
-| `openai-compatible` *(default)* | Any OpenAI `/chat/completions` endpoint |
-| `openai`, `azure`, `aws`, `llamacpp`, `ollama`, `vllm`, `wiremock` | Aliases for the same wire contract |
-| `scripted` | Fully offline client, used by the `%test` profile |
+| Provider                                                           | Behaviour                                         |
+| ------------------------------------------------------------------ | ------------------------------------------------- |
+| `openai-compatible` *(default)*                                    | Any OpenAI `/chat/completions` endpoint           |
+| `openai`, `azure`, `aws`, `llamacpp`, `ollama`, `vllm`, `wiremock` | Aliases for the same wire contract                |
+| `scripted`                                                         | Fully offline client, used by the `%test` profile |
 
 Azure appends `ajentic.llm.api-version` and authenticates with the `api-key` header. Every other provider
 sends `Authorization: Bearer <key>`, unless `ajentic.llm.api-key-header` says otherwise.
@@ -242,22 +266,23 @@ sends `Authorization: Bearer <key>`, unless `ajentic.llm.api-key-header` says ot
 <details>
 <summary><strong>Common properties</strong></summary>
 
-| Property | Default | Notes |
-| --- | --- | --- |
-| `ajentic.llm.provider` | `openai-compatible` | Client selection |
-| `ajentic.llm.base-url` | `http://127.0.0.1:9931/v1` | Endpoint root |
-| `ajentic.llm.api-key` | `local` | Left out of the request when empty |
-| `ajentic.llm.model` | `Qwen3.8-27B-GSQ-RCO-IQ3_XXS-mtp` | Model name |
-| `ajentic.llm.timeout` | `300s` | Local models can be slow to load |
-| `ajentic.llm.temperature` | `0.0` | Deterministic sampling |
-| `ajentic.llm.chat-completions-path` | `/chat/completions` | For gateways with a custom path |
-| `ajentic.llm.api-version` | | Azure only |
-| `ajentic.llm.api-key-header` | | Override the auth header |
-| `ajentic.tools.allow-mutations` | `true` | Gate for mutating tools |
-| `ajentic.agent.max-tokens` | `0` | Cumulative session token budget; `0` disables the hard stop |
-| `ajentic.agent.stagnation.threshold` | `2` | Repeated identical tool call count that yields a "try something else" hint |
-| `ajentic.agent.stagnation.escalate-after` | `3` | Repeated identical tool call count that stops the loop with a diagnostic answer |
-| `ajentic.mcp.default-scenario` | `checkout-latency-db-pool` | Episode bootstrap |
+| Property                                  | Default                           | Notes                                                                           |
+| ----------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------- |
+| `ajentic.llm.provider`                    | `openai-compatible`               | Client selection                                                                |
+| `ajentic.llm.base-url`                    | `http://127.0.0.1:9931/v1`        | Endpoint root                                                                   |
+| `ajentic.llm.api-key`                     | `local`                           | Left out of the request when empty                                              |
+| `ajentic.llm.model`                       | `Qwen3.8-27B-GSQ-RCO-IQ3_XXS-mtp` | Model name                                                                      |
+| `ajentic.llm.timeout`                     | `300s`                            | Local models can be slow to load                                                |
+| `ajentic.llm.temperature`                 | `0.0`                             | Deterministic sampling                                                          |
+| `ajentic.llm.chat-completions-path`       | `/chat/completions`               | For gateways with a custom path                                                 |
+| `ajentic.llm.api-version`                 |                                   | Azure only                                                                      |
+| `ajentic.llm.api-key-header`              |                                   | Override the auth header                                                        |
+| `ajentic.tools.allow-mutations`           | `true`                            | Gate for mutating tools                                                         |
+| `ajentic.agent.max-tokens`                | `0`                               | Cumulative session token budget; `0` disables the hard stop                     |
+| `ajentic.agent.stagnation.threshold`      | `2`                               | Repeated identical tool call count that yields a "try something else" hint      |
+| `ajentic.agent.stagnation.escalate-after` | `3`                               | Repeated identical tool call count that stops the loop with a diagnostic answer |
+| `ajentic.scenarios.dir`                   |                                   | External YAML/JSON scenario packs; empty disables loading                       |
+| `ajentic.mcp.default-scenario`            | `checkout-latency-db-pool`        | Episode bootstrap                                                               |
 
 </details>
 
@@ -265,15 +290,15 @@ sends `Authorization: Bearer <key>`, unless `ajentic.llm.api-key-header` says ot
 
 `mvn test` needs no model and no network.
 
-| Test | Covers |
-| --- | --- |
-| `IncidentResponseEndToEndTest` | Heuristic baseline solves every scenario |
-| `AgentSessionEndToEndTest` | ReAct loop over the real HTTP client against WireMock |
-| `LlmConsumerPactContractTest` | OpenAI-compatible and Azure wire contracts (`target/pacts/`) |
-| `SchedulerEndToEndTest` | Cron correctness, versioning, concurrency, recovery |
-| `ApiEndToEndTest` | REST surface, including the MCP HTTP transport |
-| `McpProtocolEndToEndTest` | The JSON-RPC handler the stdio command uses |
-| `CliEndToEndTest` | Picocli commands |
+| Test                           | Covers                                                       |
+| ------------------------------ | ------------------------------------------------------------ |
+| `IncidentResponseEndToEndTest` | Heuristic baseline solves every scenario                     |
+| `AgentSessionEndToEndTest`     | ReAct loop over the real HTTP client against WireMock        |
+| `LlmConsumerPactContractTest`  | OpenAI-compatible and Azure wire contracts (`target/pacts/`) |
+| `SchedulerEndToEndTest`        | Cron correctness, versioning, concurrency, recovery          |
+| `ApiEndToEndTest`              | REST surface, including the MCP HTTP transport               |
+| `McpProtocolEndToEndTest`      | The JSON-RPC handler the stdio command uses                  |
+| `CliEndToEndTest`              | Picocli commands                                             |
 
 Stubs live in `src/test/resources/wiremock/`, started by `WireMockLlmTestResource`. To point the suite at a
 live endpoint instead, run `mvn test -Plive-llm` and override with `AJENTIC_LLM_BASE_URL` or

@@ -1,0 +1,16 @@
+id: db-pool-exhaustion-sample
+title: Database connection pool saturation (sample)
+summary: Checkout latency climbs as the checkout API starves for database connections.
+incidentSummary: >-
+  Sudden latency regression on the checkout path with database connection
+  wait time spiking and a saturated pool.
+services:
+  - {name: edge-gateway, kind: GATEWAY, replicas: 3}
+  - {name: checkout-api, kind: API, replicas: 4}
+  - {name: samples-db, kind: DATABASE, replicas: 1}
+faults:
+  - {kind: DB_POOL_EXHAUSTION, service: checkout-api, severity: 0.8}
+runbooks:
+  - {id: rb-db-pool, title: Database connection pool saturation,
+     body: Confirm pool saturation in the metrics, then scale out checkout-api or raise the pool limit, and verify connections return to baseline.}
+maxSteps: 12

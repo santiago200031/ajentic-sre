@@ -1,27 +1,58 @@
 package io.ajentic.sre.rl.simulation;
 
+import io.ajentic.sre.rl.simulation.pack.ScenarioPack;
 import io.quarkus.arc.DefaultBean;
 import io.quarkus.cache.CacheResult;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.inject.Provider;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.dataformat.yaml.YAMLMapper;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.SequencedMap;
+import java.util.TreeSet;
+import java.util.stream.Stream;
 
 @DefaultBean
 @ApplicationScoped
 public class ScenarioLibrary implements ScenarioRepository {
 
+    private static final List<String> EXTENSIONS = List.of("yaml", "yml", "json");
+
     private final SequencedMap<String, Scenario> scenarios;
     private final List<Scenario> ordered;
 
-    public ScenarioLibrary() {
+    @Inject
+    public ScenarioLibrary(
+            @ConfigProperty(name = "ajentic.scenarios.dir", defaultValue = "") Optional<String> scenariosDir,
+            Provider<ObjectMapper> json) {
         LinkedHashMap<String, Scenario> index = new LinkedHashMap<>();
         build().forEach(scenario -> index.put(scenario.id(), scenario));
+        loadPacks(Path.of(scenariosDir.orElse("")), json.get()).forEach(scenario -> index.putIfAbsent(scenario.id(), scenario));
         this.scenarios = Collections.unmodifiableSequencedMap(index);
         this.ordered = List.copyOf(index.values());
+    }
+
+    /** Test/non-CDI convenience: built-ins only, external packs disabled. */
+    public ScenarioLibrary() {
+        this(Optional.of(""), () -> new tools.jackson.databind.ObjectMapper());
+    }
+
+    /** Test seam: built-ins plus packs from {@code dir}, throwing on any invalid pack. */
+    public List<Scenario> loadForTest(Path dir) {
+        LinkedHashMap<String, Scenario> index = new LinkedHashMap<>();
+        build().forEach(scenario -> index.put(scenario.id(), scenario));
+        loadPacks(dir, new tools.jackson.databind.ObjectMapper()).forEach(scenario -> index.putIfAbsent(scenario.id(), scenario));
+        return new ArrayList<>(index.values());
     }
 
     @Override
@@ -127,5 +158,63 @@ public class ScenarioLibrary implements ScenarioRepository {
                                 "Confirm the volume utilization, expand the persistent volume, and verify that "
                                         + "evictions stop.")),
                         12));
+    }
+
+    /** Loads packs from {@code dir} (empty or absent disables loading); built-ins win on id conflict. */
+    private List<Scenario> loadPacks(Path dir, ObjectMapper json) {
+        if (dir == null || dir.toString().isBlank() || !Files.isDirectory(dir)) {
+            return List.of();
+        }
+        List<Scenario> packs = new ArrayList<>();
+        try (Stream<Path> files = Files.list(dir)) {
+            files.filter(ScenarioLibrary::isPack).forEach(file -> packs.add(parse(file, json)));
+        } catch (IOException exception) {
+            throw new IllegalStateException("Failed to read scenario packs from " + dir + ": " + exception.getMessage(), exception);
+        }
+        TreeSet<String> seen = new TreeSet<>();
+        packs.forEach(scenario -> {
+            if (!seen.add(scenario.id())) {
+                throw new IllegalStateException("Duplicate scenario id '" + scenario.id() + "' in " + dir);
+            }
+        });
+        return new ArrayList<>(packs);
+    }
+
+    private static boolean isPack(Path path) {
+        String name = path.getFileName().toString().toLowerCase();
+        return EXTENSIONS.stream().anyMatch(name::endsWith);
+    }
+
+    private static Scenario parse(Path file, ObjectMapper json) {
+        ObjectMapper mapper = isYaml(file) ? new YAMLMapper() : json;
+        try {
+            ScenarioPack pack = mapper.readValue(file.toFile(), ScenarioPack.class);
+            validate(file, pack);
+            return pack.toScenario();
+        } catch (tools.jackson.core.JacksonException exception) {
+            throw new IllegalStateException("Invalid scenario pack " + file + ": " + exception.getMessage(), exception);
+        }
+    }
+
+    private static boolean isYaml(Path file) {
+        String name = file.getFileName().toString().toLowerCase();
+        return name.endsWith(".yaml") || name.endsWith(".yml");
+    }
+
+    private static void validate(Path file, ScenarioPack pack) {
+        if (pack.id() == null || pack.id().isBlank()) {
+            throw new IllegalStateException("Scenario pack " + file + " is missing an id");
+        }
+        if (pack.services() == null || pack.services().isEmpty()) {
+            throw new IllegalStateException("Scenario pack '" + pack.id() + "' from " + file + " has no services");
+        }
+        TreeSet<String> names = new TreeSet<>();
+        pack.services().forEach(service -> names.add(service.name()));
+        for (ScenarioPack.FaultPack fault : pack.faults()) {
+            if (!names.contains(fault.service())) {
+                throw new IllegalStateException("Scenario pack '" + pack.id() + "' from " + file
+                        + " references unknown service '" + fault.service() + "'");
+            }
+        }
     }
 }

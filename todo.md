@@ -15,7 +15,7 @@ suite offline (`mvn test`, WireMock stubs, no model, no network), and targets Ja
 | 6 | `refactor/schedule-scenario-reference` | 1 | Store `scenarioId`, not a lambda; race-free `run` | — | ✅ done |
 | 7 | `feat/prometheus-episode-metrics` | 1 | Micrometer counters/timers for episodes, tools, tokens | 2 | ✅ done |
 | 8 | `feat/local-docker-stack` | 1 | `docker-compose.yml`: app + Prometheus + Grafana | 7 | ✅ done |
-| 9 | `feat/scenario-packs` | 2 | External YAML/JSON scenario loading | 3 | ⬜ todo |
+| 9 | `feat/scenario-packs` | 2 | External YAML/JSON scenario loading | 3 | ✅ done |
 | 10 | `feat/topology-cascading-failures` | 2 | Service DAG + downstream→upstream degradation | 3, 9 | ⬜ todo |
 | 11 | `feat/investigation-tools` | 2 | `inspect_recent_changes`, `correlate_anomalies`, topology tool | 10 | ⬜ todo |
 | 12 | `feat/stagnation-breaker` | 2 | Duplicate tool-call detection with synthetic hint | 2 | ⬜ todo |
@@ -195,14 +195,13 @@ overwrite each other's active episode unless every call passes `_episodeId`.
 
 ### 9. `feat/scenario-packs`
 
-- [ ] Add `ajentic.scenarios.dir` (default `./scenarios`, empty = disabled) to `ScenarioLibrary`; load `*.yaml`,
-      `*.yml`, `*.json` at startup and on demand.
-- [ ] Define a stable external schema mirroring `Scenario`, `ServiceSpec`, `Fault`, `Runbook`; validate on load and
-      fail fast with file+line context.
-- [ ] Merge external packs with built-ins; external ids may not shadow built-ins (or must opt in explicitly).
-- [ ] Include JSON Schema + 2 sample packs (a DB pool exhaustion and a cascading gateway incident).
-- [ ] Test: load a temp directory, list scenarios, run an episode; bad file yields a clear startup error.
-- [ ] Document authoring in `README.md`.
+- [x] Add `ajentic.scenarios.dir` (empty = disabled) to `ScenarioLibrary`; load `*.yaml`, `*.yml`, `*.json`.
+- [x] Define a stable external schema mirroring `Scenario`, `ServiceSpec`, `Fault`, `Runbook`; validate on load and
+      fail fast with file context.
+- [x] Merge external packs with built-ins; external ids may not shadow built-ins (built-ins win).
+- [x] Include JSON Schema + 2 sample packs (a DB pool exhaustion and a cascading gateway incident).
+- [x] Test: load a temp directory, list scenarios, run an episode; bad file yields a clear startup error.
+- [x] Document authoring in `README.md`.
 
 **Files.** `rl/simulation/ScenarioLibrary.java`, new `rl/simulation/pack/*`, `application.properties`,
 `src/test/resources/scenarios/`.

@@ -1,0 +1,16 @@
+id: cascading-gateway-failure-sample
+title: Cascading failure through the edge gateway (sample)
+summary: The edge gateway degrades downstream services until the whole checkout path fails.
+incidentSummary: >-
+  The edge gateway begins returning 5xx errors that cascade into the API and
+  database layers, degrading the entire checkout path.
+services:
+  - {name: edge-gateway, kind: GATEWAY, replicas: 3}
+  - {name: gateway-api, kind: API, replicas: 4}
+  - {name: gateway-db, kind: DATABASE, replicas: 1}
+faults:
+  - {kind: BAD_DEPLOYMENT, service: gateway-api, severity: 0.8}
+runbooks:
+  - {id: rb-cascade, title: Cascading gateway failure,
+     body: Correlate the gateway 5xx spike with the last deploy, roll back the gateway-api, and confirm downstream error rates recover.}
+maxSteps: 12

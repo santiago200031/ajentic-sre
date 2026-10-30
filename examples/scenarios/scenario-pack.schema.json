@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ajentic-sre.example/scenario-pack.schema.json",
+  "title": "Ajentic scenario pack",
+  "description": "External scenario pack loaded from ajentic.scenarios.dir.",
+  "type": "object",
+  "required": ["id", "title", "services", "faults", "runbooks", "maxSteps"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "minLength": 1, "description": "Unique scenario id." },
+    "title": { "type": "string" },
+    "summary": { "type": "string" },
+    "incidentSummary": { "type": "string" },
+    "services": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "kind", "replicas"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "kind": {
+            "type": "string",
+            "enum": ["API", "DATABASE", "CACHE", "GATEWAY", "WORKER"]
+          },
+          "replicas": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "faults": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind", "service"],
+        "additionalProperties": false,
+        "properties": {
+          "kind": { "type": "string", "minLength": 1 },
+          "service": { "type": "string", "minLength": 1 },
+          "severity": { "type": "number", "minimum": 0, "maximum": 1 }
+        }
+      }
+    },
+    "runbooks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "body"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "body": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "maxSteps": { "type": "integer", "minimum": 1 }
+  }
+}
