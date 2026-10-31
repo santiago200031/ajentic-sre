@@ -37,7 +37,7 @@ suite offline (`mvn test`, WireMock stubs, no model, no network), and targets Ja
 | 28 | `feat/ci-feedback-loop` | 4 | Non-blocking CI status/PR follow-up + remediation report | 27 | ✅ done |
 | 29 | `feat/chatops-channels` | 5 | Slack/Teams/Google Chat/Discord/Telegram + OpenAI-compatible chat API | 19, 22 | ✅ done |
 | 30 | `feat/cloud-provider-adapters` | 5 | AWS / Azure / GCP read-only adapters (SigV4, OAuth2, SA-JWT), zero SDK | 17, 21 | ✅ done |
-| 31 | `feat/local-cloud-emulation` | 5 | LocalStack + Azurite + fake-gcs/PubSub + monitor stubs in compose | 30 | ⬜ todo |
+| 31 | `feat/local-cloud-emulation` | 5 | LocalStack + Azurite + fake-gcs/PubSub + monitor stubs in compose | 30 | ✅ done |
 | 32 | `feat/sidecar-connectors` | 5 | Connectors as a least-privilege sidecar next to the agent | 29, 31 | ⬜ todo |
 | 33 | `refactor/http-only-surface` | 5 | Drop picocli entirely; Swagger/HTTP only (+ MCP stdio shim) | 25, 32 | ⬜ todo |
 | 34 | `feat/langchain4j-mcp-migration` | 6 | Replace custom MCP/LLM/tool-schema with quarkus-mcp-server + quarkus-langchain4j | 25 | ✅ done |
@@ -731,19 +731,19 @@ mutations when not explicitly enabled, and never exposes credentials in logs or 
 
 ### 31. `feat/local-cloud-emulation`
 
-- [ ] `docker-compose.yml` gains a `cloud` profile: `localstack` (SNS/SQS/Lambda/CloudWatch Logs + basic metrics,
+- [x] `docker-compose.yml` gains a `cloud` profile: `localstack` (SNS/SQS/Lambda/CloudWatch Logs + basic metrics,
       CloudTrail where available), `azurite` + `azure-monitor-stub`, `fake-gcs-server` + `pubsub-emulator` +
       `gcp-monitor-stub`. Stubs are the same WireMock fixture files the tests use, served as containers, so local and
       CI behaviour cannot drift.
-- [ ] Seed scripts (`src/main/docker/seed/`): a small `checkout-api` fleet with a healthy baseline, one injected
+- [x] Seed scripts (`src/main/docker/seed/`): a small `checkout-api` fleet with a healthy baseline, one injected
       latency fault, one error-rate fault, and a deploy event — enough for a real investigation to succeed locally.
-- [ ] Compose wiring: agent points at `http://localstack:4566`, `http://azurite:10000`, `http://fake-gcs:4443` with
+- [x] Compose wiring: agent points at `http://localstack:4566`, `http://azurite:10000`, `http://fake-gcs:4443` with
       dummy credentials; `host.docker.internal` still used for the local model endpoint. Nothing outside `localhost`.
-- [ ] `make cloud-up` / `make cloud-down` / `make cloud-seed`; `docker compose --profile cloud config` validated in CI
+- [x] `make cloud-up` / `make cloud-down` / `make cloud-seed`; `docker compose --profile cloud config` validated in CI
       docs; the default `make lab-up` stays the current small stack.
-- [ ] Be explicit about fidelity: a `README.md` table listing which API each emulator really implements, which are
+- [x] Be explicit about fidelity: a `README.md` table listing which API each emulator really implements, which are
       stubs, and what therefore cannot be verified locally (e.g. SIGV4 auth against LocalStack is best-effort).
-- [ ] Test: a documented manual flow (alert → adapter queries emulator → diagnosis → remediation in `local-container`)
+- [x] Test: a documented manual flow (alert → adapter queries emulator → diagnosis → remediation in `local-container`)
       passes against the emulator stack; the offline suite still needs no containers.
 
 **Files.** `docker-compose.yml`, `src/main/docker/seed/*`, `src/main/docker/*-stub/*`, `Makefile`, `README.md`.
