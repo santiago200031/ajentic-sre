@@ -40,7 +40,7 @@ suite offline (`mvn test`, WireMock stubs, no model, no network), and targets Ja
 | 31 | `feat/local-cloud-emulation` | 5 | LocalStack + Azurite + fake-gcs/PubSub + monitor stubs in compose | 30 | ⬜ todo |
 | 32 | `feat/sidecar-connectors` | 5 | Connectors as a least-privilege sidecar next to the agent | 29, 31 | ⬜ todo |
 | 33 | `refactor/http-only-surface` | 5 | Drop picocli entirely; Swagger/HTTP only (+ MCP stdio shim) | 25, 32 | ⬜ todo |
-| 34 | `feat/langchain4j-mcp-migration` | 6 | Replace custom MCP/LLM/tool-schema with quarkus-mcp-server + quarkus-langchain4j | 25 | ⬜ todo |
+| 34 | `feat/langchain4j-mcp-migration` | 6 | Replace custom MCP/LLM/tool-schema with quarkus-mcp-server + quarkus-langchain4j | 25 | ✅ done |
 
 Recommended landing order: 1 → 2 → 4 → 5 → 6 → 3 → 13 → 12 → 21 → 7 → 8 → 9 → 10 → 11 → 14 → 15 → 16 → 17 → 18 →
 19 → 20 → 22 → 23 → 24 → 26 → 27 → 28 → 29 → 30 → 31 → 32 → 33 → 34. Branches 1, 2, 4, 6, 13 are independent and can
@@ -832,23 +832,23 @@ documented HTTP equivalent, and Swagger UI is the single documented front door.
 **Goal.** Delete custom boilerplate by adopting standard Quarkus 4.x / Quarkiverse packages, per the
 "Ecosystem Migration" plan. Preserve all domain behavior; only the plumbing changes.
 
-- [ ] **Keep** the RL engine (`io.ajentic.sre.rl`), `AgentSession` ReAct loop, stagnation breaker, token budgets, and
+- [x] **Keep** the RL engine (`io.ajentic.sre.rl`), `AgentSession` ReAct loop, stagnation breaker, token budgets, and
       `SensitiveDataMaskingInterceptor` (domain code, not boilerplate).
-- [ ] **`quarkus-mcp-server`** (Quarkiverse): replace `McpProtocolHandler`, `McpResource`, `McpStdioCommand`,
+- [x] **`quarkus-mcp-server`** (Quarkiverse): replace `McpProtocolHandler`, `McpResource`, `McpStdioCommand`,
       `PromptCatalog`, `JsonRpcErrorCode` (~734 lines) with declarative `@Tool`, `@ToolArg`, `@Resource`, `@Prompt`.
-- [ ] **`quarkus-langchain4j-openai`** (Quarkiverse LangChain4j 2.0.0.Beta1): replace `OpenAiCompatibleLlmClient`,
+- [x] **`quarkus-langchain4j-openai`** (Quarkiverse LangChain4j 2.0.0.Beta1): replace `OpenAiCompatibleLlmClient`,
       `WireChatRequest`/`WireResponse`/`WireTool`, `AnnotatedTool`, `ToolSchemas`, `CdiToolRegistry` (~500 lines) with
       `ChatLanguageModel` + `ToolSpecification` + multi-provider config (OpenAI/Ollama/Azure/Anthropic/Bedrock).
-- [ ] **`quarkus-langchain4j-mcp`**: consume external MCP tool servers (K8s, GitHub, AWS, CloudWatch) as dynamic
+- [x] **`quarkus-langchain4j-mcp`**: consume external MCP tool servers (K8s, GitHub, AWS, CloudWatch) as dynamic
       toolboxes, zero custom code.
-- [ ] Adapt `AgentSession`/`AgentSessionFactory` to inject `dev.langchain4j.model.chat.ChatLanguageModel`; convert
+- [x] Adapt `AgentSession`/`AgentSessionFactory` to inject `dev.langchain4j.model.chat.ChatLanguageModel`; convert
       messages to LangChain4j `UserMessage`/`AiMessage`/`ToolExecutionResultMessage`; keep `AgentSession` as the loop
       orchestrator (do NOT replace it with `@RegisterAiService` — it needs per-session RL isolation and stagnation).
-- [ ] Move config from `ajentic.llm.*` to `quarkus.langchain4j.openai.*` with `%test` offline defaults; keep the
+- [x] Move config from `ajentic.llm.*` to `quarkus.langchain4j.openai.*` with `%test` offline defaults; keep the
       `scripted` provider for offline unit tests.
-- [ ] Tests: `WireMockLlmTestResource` still intercepts `/v1/chat/completions` (via LangChain4j's client); MCP
+- [x] Tests: `WireMockLlmTestResource` still intercepts `/v1/chat/completions` (via LangChain4j's client); MCP
       `tools/list` and agent/episode flows still pass; `-Plive-llm` opts into a live endpoint.
-- [ ] `mvn verify` (offline) must pass before merge. Estimated net deletion ~1,200 lines of plumbing.
+- [x] `mvn verify` (offline) must pass before merge. Estimated net deletion ~1,200 lines of plumbing.
 
 **Files.** `pom.xml` (new Quarkiverse deps), delete `agent/mcp/McpProtocolHandler.java`,
 `agent/mcp/PromptCatalog.java`, `agent/mcp/JsonRpcErrorCode.java`, `agent/mcp/McpMethod.java`,
