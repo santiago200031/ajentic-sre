@@ -130,6 +130,10 @@ public final class AgentSession {
         return id;
     }
 
+    public AgentSessionConfig config() {
+        return config;
+    }
+
     public Environment environment() {
         return environment;
     }

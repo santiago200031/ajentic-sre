@@ -27,6 +27,7 @@ mvn test              # offline end-to-end suite
 | [Use the REST API](#use-the-rest-api)   | Episodes, sessions, schedules, OpenAPI                      |
 | [Use MCP](#use-mcp)                     | stdio and streamable HTTP transports                        |
 | [Scheduled drills](#scheduled-drills)   | Cron-backed recurring incidents                             |
+| [ChatOps & OpenAI facade](#chatops--openai-facade) | Channels fan-out, inbound chat commands, OpenAI API facade |
 | [Configure the LLM](#configure-the-llm) | Providers, local llama.cpp, Azure                           |
 | [Test](#test)                           | End-to-end, WireMock, Pact, live mode                       |
 | [Project layout](#project-layout)       | Packages and responsibilities                               |
@@ -395,6 +396,98 @@ and checked for a target repository.
 ```
 
 </details>
+
+## ChatOps & OpenAI facade
+
+ajentic-sre provides multi-channel ChatOps notification fan-out, inbound chat command webhooks with provider
+signature verification and event deduplication, and an OpenAI-compatible API facade (`/v1/chat/completions` + `/v1/models`).
+
+### Outbound notification channels
+
+Outbound notifications fan out concurrently across channels configured via `ajentic.notifications.channel` (comma-separated: `log,slack,teams,google-chat,discord,telegram,mattermost,webhook`). Outbound calls are executed asynchronously on virtual threads, bounded by per-channel timeouts, exponential backoff retries with jitter, circuit breakers, and token-bucket rate limiters. If a channel configuration is blank, it is safely disabled without errors.
+
+A unified `ChatFormat` strategy handles differences between Markdown, Slack mrkdwn, Google Chat, Telegram, and Microsoft Teams Adaptive Cards so incident summaries (root cause, PR link, CI status, episode id) are formatted consistently.
+
+| Provider | Configuration Key(s) | Required Scopes / Permissions | Payload Format |
+|---|---|---|---|
+| **Slack** | `ajentic.notifications.slack.webhook-url`<br>`ajentic.notifications.slack.token`<br>`ajentic.notifications.slack.channel` | Incoming Webhook or Bot Token (`chat:write`) | mrkdwn / JSON |
+| **Microsoft Teams** | `ajentic.notifications.teams.webhook-url` | Incoming Webhook connector or Workflows webhook | Adaptive Card 1.4 JSON |
+| **Google Chat** | `ajentic.notifications.google-chat.webhook-url` | Webhook URL (`chat.googleapis.com`) | JSON (`text` / card) |
+| **Discord** | `ajentic.notifications.discord.webhook-url` | Webhook URL (`discord.com/api/webhooks/...`) | Markdown JSON (`content`) |
+| **Telegram** | `ajentic.notifications.telegram.bot-token`<br>`ajentic.notifications.telegram.chat-id` | Bot Token from `@BotFather` | Markdown (`sendMessage`) |
+| **Mattermost** | `ajentic.notifications.mattermost.webhook-url` | Incoming Webhook | Markdown JSON (`text`) |
+| **Generic Webhook** | `ajentic.notifications.webhook.url`<br>`ajentic.notifications.webhook.secret` | Webhook URL receiving signed JSON | JSON (`X-Ajentic-Signature: sha256=...`) |
+
+### Inbound ChatOps commands
+
+Inbound chat commands are ingested at `POST /api/v1/webhooks/chat/{provider}` (`slack`, `teams`, `google-chat`, `discord`, `telegram`, `generic`).
+
+- **Signatures:** Slack HMAC verification via `X-Slack-Signature` and timestamp freshness (< 300s) against `ajentic.chat.slack.signing-secret`, Twilio signature check via `X-Twilio-Signature` against `ajentic.chat.twilio.auth-token`, and Google JWT bearer token verification against `ajentic.chat.google.jwt-secret`. Unsigned, invalid, or expired requests are rejected with `401`.
+- **Deduplication:** Events are deduplicated by provider event ID (`event_id`, `trigger_id`, `update_id`, or header `X-Slack-Request-Id`) using an in-memory cache, ensuring a duplicate event never triggers a duplicate agent turn.
+- **Commands:**
+  - `ask <question>`: Runs an autonomous ReAct investigation turn against the default scenario and returns the agent's answer.
+  - `status <episode|repo>`: Returns session status or code remediation PR/CI status.
+  - `fix <repo> <trace>`: Triggers automated code remediation, opens a branch, commits a fix, and opens a PR.
+  - `approve <id>` / `deny <id>`: Approves or denies a pending mutating tool call gated by operator approval gates.
+
+```bash
+# Example: Slack slash-command payload
+curl -s -X POST localhost:8080/api/v1/webhooks/chat/slack \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'command=/ask&text=why+is+checkout+latency+spiking%3F' | jq
+```
+
+### OpenAI-compatible facade
+
+Any standard OpenAI client or web interface can interact directly with the agent through `/v1`.
+The facade maps incoming messages to `AgentSession` turns and returns standard OpenAI completion objects or Server-Sent Events (SSE).
+
+- `GET /v1/models`: Lists the active configured SRE model.
+- `POST /v1/chat/completions`: Supports both non-streaming (`stream: false`) and streaming (`stream: true`). Unknown model requests return `404`.
+- **Authorization:** Optional API key enforcement via `ajentic.chat.api-key` (Bearer token header).
+
+#### cURL examples
+
+```bash
+# List models
+curl -s http://localhost:8080/v1/models \
+  -H 'Authorization: Bearer test-key' | jq
+
+# One-shot chat completion (non-streaming)
+curl -s -X POST http://localhost:8080/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer test-key' \
+  -d '{
+    "model": "Cyber-Tiel-Coder-35B-A3B-UD-Q4_K_XL",
+    "messages": [
+      {"role": "user", "content": "What is wrong with the orders service?"}
+    ],
+    "stream": false
+  }' | jq
+
+# Streaming chat completion (SSE)
+curl -N -X POST http://localhost:8080/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: text/event-stream' \
+  -H 'Authorization: Bearer test-key' \
+  -d '{
+    "model": "Cyber-Tiel-Coder-35B-A3B-UD-Q4_K_XL",
+    "messages": [
+      {"role": "user", "content": "Investigate database connection pool exhaustion"}
+    ],
+    "stream": true
+  }'
+```
+
+#### Point Open WebUI at it
+
+To use Open WebUI (or LibreChat / ChatGPT-Next-Web / Continue.dev) with ajentic-sre:
+
+1. Open Open WebUI Settings -> **Connections** -> **OpenAI API**.
+2. Set **OpenAI API URL** to `http://localhost:8080/v1` (or your ajentic-sre host).
+3. Set **OpenAI API Key** to the value of `ajentic.chat.api-key` (leave blank if disabled).
+4. Save and select the model (`Cyber-Tiel-Coder-35B-A3B-UD-Q4_K_XL` or your configured model name).
+5. Start a chat. Your prompts will trigger autonomous ReAct investigation turns against the incident range, with thoughts and answers streamed directly into the WebUI chat interface.
 
 ## Scheduled drills
 
