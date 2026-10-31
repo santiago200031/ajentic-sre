@@ -1,0 +1,5 @@
+*Incident:* orders-bad-deployment-42 [*RESOLVED*]
+• *Root Cause:* Hikari pool starvation under load
+• *PR:* <https://github.com/my-org/orders-api/pull/42|PR #42>
+• *CI Status:* SUCCESS
+• *Summary:* Connection pool saturated on orders-db

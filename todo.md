@@ -665,29 +665,29 @@ Four decisions up front, so the branches stay small:
 
 ### 29. `feat/chatops-channels`
 
-- [ ] Generalize `agent/integration/*`: `NotificationChannel` gains implementations
+- [x] Generalize `agent/integration/*`: `NotificationChannel` gains implementations
       `SlackChannel` (incoming webhook or `chat.postMessage`), `TeamsChannel` (workflow/connector webhook),
       `GoogleChatChannel` (chat.googleapis.com webhook), `DiscordChannel` (webhook), `TelegramChannel`
       (`sendMessage`), `MattermostChannel`, and `GenericWebhookChannel` (signed JSON POST). Selected by
       `ajentic.notifications.channel = log | slack | teams | google-chat | discord | telegram | mattermost | webhook`
       (comma-separated fan-out allowed), each with its own URL/token config key; blank config = disabled, never a crash.
-- [ ] One formatter: Markdown-vs-mrkdwn-vs-Card differences live in a tiny per-channel `ChatFormat` strategy, so the
+- [x] One formatter: Markdown-vs-mrkdwn-vs-Card differences live in a tiny per-channel `ChatFormat` strategy, so the
       incident summary (root cause, PR link, CI status, episode id) is written once.
-- [ ] Inbound chat commands: `POST /api/v1/webhooks/chat/{provider}` accepting Slack slash-command body, Teams
+- [x] Inbound chat commands: `POST /api/v1/webhooks/chat/{provider}` accepting Slack slash-command body, Teams
       activity, Google Chat event, Discord/Telegram update; commands `ask <question>`, `status <episode|repo>`, `fix
       <repo> <trace>`, `approve <id>` / `deny <id>` (wired to branch 22 approval gates). Verify the provider signature
       (`X-Slack-Signature` HMAC, `X-Twilio-Signature`, Google JWT bearer) and reject unsigned/expired requests with
       `401`; deduplicate by provider event id.
-- [ ] OpenAI-compatible facade: `POST /v1/chat/completions` (+ SSE `stream=true`) mapping `messages` → `AgentSession`
+- [x] OpenAI-compatible facade: `POST /v1/chat/completions` (+ SSE `stream=true`) mapping `messages` → `AgentSession`
       turn and back, `GET /v1/models` listing the configured model, optional `Authorization` check via
       `ajentic.chat.api-key`. Keep the existing `/api/v1/...` surface authoritative; the facade is a thin adapter with
       no duplicated session logic.
-- [ ] Bound everything: per-channel timeout, bounded retry with jitter, circuit breaker, token-bucket rate limit per
+- [x] Bound everything: per-channel timeout, bounded retry with jitter, circuit breaker, token-bucket rate limit per
       chat provider, and virtual threads so a slow Slack webhook cannot stall a turn.
-- [ ] Tests: capturing channel asserts the rendered summary per provider (golden text fixtures); bad Slack signature
+- [x] Tests: capturing channel asserts the rendered summary per provider (golden text fixtures); bad Slack signature
       → `401`; duplicate event id → single turn; `/v1/chat/completions` non-stream and stream both answer from a
       scripted LLM; unknown model → `404`; channel config blank → no outbound call.
-- [ ] Docs: chat setup table (webhook URL + scopes per provider), facade curl example, and "point Open WebUI at it".
+- [x] Docs: chat setup table (webhook URL + scopes per provider), facade curl example, and "point Open WebUI at it".
 
 **Files.** `agent/integration/*` (channels + `ChatFormat`), new `api/resource/ChatCompletionsResource.java`,
 new `api/resource/ChatWebhookResource.java`, `api/payload/*`, `application.properties`, `README.md`.

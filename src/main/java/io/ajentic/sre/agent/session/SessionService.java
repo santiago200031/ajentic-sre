@@ -41,4 +41,8 @@ public class SessionService {
     public void delete(String id) {
         active.remove(id);
     }
+
+    public java.util.Collection<AgentSession> activeSessions() {
+        return java.util.Collections.unmodifiableCollection(active.values());
+    }
 }
