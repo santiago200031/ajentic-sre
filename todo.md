@@ -36,7 +36,7 @@ suite offline (`mvn test`, WireMock stubs, no model, no network), and targets Ja
 | 27 | `feat/alert-webhook-code-fix` | 4 | Multi-cloud alert normalizer + `POST /webhooks/alerts` code-fix turn | 26 | ✅ done |
 | 28 | `feat/ci-feedback-loop` | 4 | Non-blocking CI status/PR follow-up + remediation report | 27 | ✅ done |
 | 29 | `feat/chatops-channels` | 5 | Slack/Teams/Google Chat/Discord/Telegram + OpenAI-compatible chat API | 19, 22 | ✅ done |
-| 30 | `feat/cloud-provider-adapters` | 5 | AWS / Azure / GCP read-only adapters (SigV4, OAuth2, SA-JWT), zero SDK | 17, 21 | ⬜ todo |
+| 30 | `feat/cloud-provider-adapters` | 5 | AWS / Azure / GCP read-only adapters (SigV4, OAuth2, SA-JWT), zero SDK | 17, 21 | ✅ done |
 | 31 | `feat/local-cloud-emulation` | 5 | LocalStack + Azurite + fake-gcs/PubSub + monitor stubs in compose | 30 | ⬜ todo |
 | 32 | `feat/sidecar-connectors` | 5 | Connectors as a least-privilege sidecar next to the agent | 29, 31 | ⬜ todo |
 | 33 | `refactor/http-only-surface` | 5 | Drop picocli entirely; Swagger/HTTP only (+ MCP stdio shim) | 25, 32 | ⬜ todo |
@@ -697,30 +697,30 @@ chat client starts a session, and any OpenAI-compatible UI can hold a conversati
 
 ### 30. `feat/cloud-provider-adapters`
 
-- [ ] `aws-live` backend (extends branch 17): `cloudwatch:GetMetricData` + `DescribeAlarms`,
+- [x] `aws-live` backend (extends branch 17): `cloudwatch:GetMetricData` + `DescribeAlarms`,
       `logs:FilterLogEvents`, `cloudtrail:LookupEvents` (recent changes → `DeployRecord`), `ecs:DescribeServices` /
       `lambda:GetFunctionConfiguration` / `elasticloadbalancing:DescribeTargetHealth` for health; MUTATE-capable
       `ecs:UpdateService` (force new deployment / desired count) and `ssm:StartAutomationExecution`, gated behind
       `ajentic.aws.allow-mutations` **and** `ajentic.tools.allow-mutations`.
-- [ ] `azure-live` backend: Azure Monitor metrics (`/providers/microsoft.insights/metrics`), Log Analytics query
+- [x] `azure-live` backend: Azure Monitor metrics (`/providers/microsoft.insights/metrics`), Log Analytics query
       (`POST /v1/workspaces/{id}/query`), Activity Log (deployments/changes), Resource Health, and restart/scale for
       Container Apps, App Service and AKS node pools; auth via `login.microsoftonline.com/{tenant}/oauth2/v2.0/token`
       client credentials, or managed identity from the IMDS endpoint when no secret is configured.
-- [ ] `gcp-live` backend: Cloud Monitoring `timeSeries.list`, Cloud Logging `entries.list`, Cloud Run / GKE revision
+- [x] `gcp-live` backend: Cloud Monitoring `timeSeries.list`, Cloud Logging `entries.list`, Cloud Run / GKE revision
       history (→ `DeployRecord`), and revision rollback / service update; auth via service-account JWT-bearer
       (RS256 through `java.security.Signature`) or the GCE metadata server token endpoint.
-- [ ] Signing helpers stay small and testable: `agent/cloud/aws/AwsSigV4Signer`, `agent/cloud/azure/AzureTokenSource`,
+- [x] Signing helpers stay small and testable: `agent/cloud/aws/AwsSigV4Signer`, `agent/cloud/azure/AzureTokenSource`,
       `agent/cloud/gcp/GcpTokenSource`, each with a known-answer test (AWSSigV4 test vectors, token refresh/expiry
       reuse, clock skew). No SDKs on the default classpath.
-- [ ] Reliability: 5s connect / 15s request timeouts, bounded retries on 429/5xx honouring `Retry-After`, circuit
+- [x] Reliability: 5s connect / 15s request timeouts, bounded retries on 429/5xx honouring `Retry-After`, circuit
       breaker per provider+API, pagination caps, and a hard per-turn API call budget so an agent cannot fan out into a
       billable surprise.
-- [ ] Mapping: provider responses → `TelemetrySignal` / `DeployRecord` / `ServiceHealth`; document which
+- [x] Mapping: provider responses → `TelemetrySignal` / `DeployRecord` / `ServiceHealth`; document which
       `FaultKind` each provider can actually observe (e.g. `cloud-live` sees symptoms but not internal faults).
-- [ ] Tests: WireMock fixtures per provider (metrics, logs, activity events, auth token exchange, 429 then success,
+- [x] Tests: WireMock fixtures per provider (metrics, logs, activity events, auth token exchange, 429 then success,
       5xx → tool error string not exception, expired token → single refresh); a mutation attempt in read-only mode is
       refused; `cloud-live` stays read-only regardless of flags.
-- [ ] Docs: credential matrix (env vars, IAM/managed-identity/SA scopes needed), least-privilege policy examples, and
+- [x] Docs: credential matrix (env vars, IAM/managed-identity/SA scopes needed), least-privilege policy examples, and
       a "start read-only" warning.
 
 **Files.** new `rl/environment/aws/*`, `rl/environment/azure/*`, `rl/environment/gcp/*`, new `agent/cloud/*` (signing),
