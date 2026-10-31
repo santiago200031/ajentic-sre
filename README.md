@@ -333,6 +333,8 @@ sends `Authorization: Bearer <key>`, unless `ajentic.llm.api-key-header` says ot
 | `ajentic.llm.chat-completions-path`       | `/chat/completions`               | For gateways with a custom path                                                 |
 | `ajentic.llm.api-version`                 |                                   | Azure only                                                                      |
 | `ajentic.llm.api-key-header`              |                                   | Override the auth header                                                        |
+| `ajentic.llm.fallback-enabled`            | `false`                           | Enable ordered LLM endpoint failover                                            |
+| `ajentic.llm.fallback-endpoints`          |                                   | Ordered endpoints: `base-url\|model\|api-key\|api-version\|api-key-header`, comma-separated |
 | `ajentic.tools.allow-mutations`           | `true`                            | Gate for mutating tools                                                         |
 | `ajentic.agent.max-tokens`                | `0`                               | Cumulative session token budget; `0` disables the hard stop                     |
 | `ajentic.agent.stagnation.threshold`      | `2`                               | Repeated identical tool call count that yields a "try something else" hint      |
@@ -349,6 +351,22 @@ sends `Authorization: Bearer <key>`, unless `ajentic.llm.api-key-header` says ot
 | `ajentic.webhooks.default-scenario`       | `orders-bad-deployment`           | Fallback scenario when the alert service matches none                          |
 
 </details>
+
+## LLM endpoint failover
+
+When `ajentic.llm.fallback-enabled=true`, every chat completion goes through a composite client: the primary
+endpoint first, then the ordered `ajentic.llm.fallback-endpoints` on transport errors, upstream 4xx/5xx,
+unparseable responses, or context-overflow rejections. Each fallback entry is an OpenAI-compatible
+`/chat/completions` base with its own model and, optionally, its own key:
+
+```
+#ajentic.llm.fallback-enabled=true
+#ajentic.llm.fallback-endpoints=https://openrouter.ai/api/v1|openai/gpt-4o|${OPENROUTER_API_KEY}
+```
+
+Masking is applied once around the whole composite (`MaskingLlmClient`), so failover never bypasses redaction.
+When no endpoint answers, the turn fails with a single `LlmException` ("All LLM endpoints failed"). Keys are
+never logged.
 
 ## Environment backends
 

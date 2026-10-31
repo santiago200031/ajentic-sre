@@ -257,5 +257,15 @@ class LlmConsumerPactContractTest {
         public boolean live() {
             return false;
         }
+
+        @Override
+        public boolean fallbackEnabled() {
+            return false;
+        }
+
+        @Override
+        public java.util.Optional<String> fallbackEndpoints() {
+            return java.util.Optional.empty();
+        }
     }
 }

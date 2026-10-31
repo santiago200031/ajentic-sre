@@ -41,12 +41,95 @@ public interface LlmProperties {
     @WithDefault("false")
     boolean live();
 
+    /**
+     * Enables the ordered failover list below. Disabled by default so the offline suite never talks to extra
+     * endpoints.
+     */
+    @WithDefault("false")
+    boolean fallbackEnabled();
+
+    /**
+     * Ordered fallback endpoints (e.g. Bedrock/Vertex/Azure OpenAI/OpenRouter gateways). Each entry is
+     * pipe-separated: {@code base-url|model|api-key|api-version|api-key-header}; fields after the base URL may
+     * be left empty. Separate multiple endpoints with a comma. Keys are never logged.
+     */
+    Optional<String> fallbackEndpoints();
+
     default LlmProvider providerType() {
         return LlmProvider.fromConfiguration(provider());
     }
 
     default boolean azure() {
         return providerType() == LlmProvider.AZURE;
+    }
+
+    /**
+     * Builds a standalone configuration for an explicit endpoint (used for fallback clients and tests).
+     */
+    static LlmProperties of(String provider, String baseUrl, Optional<String> apiKey, String model, Duration timeout,
+                            double temperature, String chatCompletionsPath, Optional<String> apiVersion,
+                            Optional<String> apiKeyHeader) {
+        return new LlmProperties() {
+            @Override
+            public String provider() {
+                return provider;
+            }
+
+            @Override
+            public String baseUrl() {
+                return baseUrl;
+            }
+
+            @Override
+            public Optional<String> apiKey() {
+                return apiKey;
+            }
+
+            @Override
+            public String model() {
+                return model;
+            }
+
+            @Override
+            public Duration timeout() {
+                return timeout;
+            }
+
+            @Override
+            public double temperature() {
+                return temperature;
+            }
+
+            @Override
+            public String chatCompletionsPath() {
+                return chatCompletionsPath;
+            }
+
+            @Override
+            public Optional<String> apiVersion() {
+                return apiVersion;
+            }
+
+            @Override
+            public Optional<String> apiKeyHeader() {
+                return apiKeyHeader;
+            }
+
+            @Override
+            public boolean live() {
+                return false;
+            }
+
+            @Override
+            public boolean fallbackEnabled() {
+                return false;
+            }
+
+            @Override
+            public Optional<String> fallbackEndpoints() {
+                return Optional.empty();
+            }
+        };
     }
 
     /**

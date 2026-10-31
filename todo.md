@@ -26,7 +26,7 @@ suite offline (`mvn test`, WireMock stubs, no model, no network), and targets Ja
 | 17 | `feat/live-telemetry-adapters` | 3 | `local-container` / `cloud-live` read-only adapters | 16 | ✅ done |
 | 18 | `feat/sse-chat-stream` | 3 | `/chat/stream` SSE | 13 | ✅ done |
 | 19 | `feat/alert-webhooks` | 3 | Alertmanager/PagerDuty/SNS intake | 16, 18 | ✅ done |
-| 20 | `feat/llm-fallback-router` | 3 | Local-first composite LLM client | 13 | ⬜ todo |
+| 20 | `feat/llm-fallback-router` | 3 | Local-first composite LLM client | 13 | ✅ done |
 | 21 | `feat/multicloud-identifier-masking` | 3 | GCP/Azure/K8s/Bearer categories | 1 | ✅ done |
 | 22 | `feat/approval-gates` | 3 | `ALLOW \| DENY \| REQUIRE_APPROVAL` | 18 | ⬜ todo |
 | 23 | `feat/episodic-memory` | 3 | `search_past_incidents` + `.ajentic/incidents.jsonl` | 6, 22 | ⬜ todo |
@@ -403,16 +403,16 @@ new `agent/session/TurnListener.java`.
 
 ### 20. `feat/llm-fallback-router`
 
-- [ ] Extend `LlmClientProducer` with a composite client: local llama.cpp/Ollama (`127.0.0.1:9931`) primary, ordered
+- [x] Extend `LlmClientProducer` with a composite client: local llama.cpp/Ollama (`127.0.0.1:9931`) primary, ordered
       OpenAI-compatible fallbacks (Bedrock/Vertex/Azure OpenAI/OpenRouter) on connect/timeout/5xx.
-- [ ] Add optional escalation for complex turns (tool-call parse failure or context overflow) rather than failover
+- [x] Add optional escalation for complex turns (tool-call parse failure or context overflow) rather than failover
       only on transport errors.
-- [ ] Config: `ajentic.llm.fallback.enabled`, `ajentic.llm.fallback.endpoints[]`, per-endpoint model/key env refs;
-      never log secrets.
-- [ ] Keep masking applied once around the composite so failover cannot bypass redaction.
-- [ ] Test with two WireMock endpoints: primary 500 → fallback used and response returned; both down → single clear
+- [x] Config: `ajentic.llm.fallback-enabled`, `ajentic.llm.fallback-endpoints` (pipe-separated per endpoint,
+      comma-separated across endpoints), per-endpoint model/key env refs; never log secrets.
+- [x] Keep masking applied once around the composite so failover cannot bypass redaction.
+- [x] Test with two WireMock endpoints: primary 500 → fallback used and response returned; both down → single clear
       `LlmException`.
-- [ ] Test: masking intercepts requests to both endpoints.
+- [x] Test: masking intercepts requests to both endpoints.
 
 **Files.** new `agent/llm/CompositeLlmClient.java`, `LlmClientProducer.java`, `LlmProperties.java`,
 `application.properties`.

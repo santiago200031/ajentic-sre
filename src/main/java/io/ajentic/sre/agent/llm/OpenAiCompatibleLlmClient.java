@@ -60,7 +60,11 @@ public final class OpenAiCompatibleLlmClient implements LlmClient {
             if (response.statusCode() >= 300) {
                 throw new LlmException("LLM provider returned " + response.statusCode() + ": " + response.body());
             }
-            return parse(response.body());
+            try {
+                return parse(response.body());
+            } catch (RuntimeException exception) {
+                throw new LlmException("Could not parse the LLM response", exception);
+            }
         } catch (IOException exception) {
             throw new LlmException("LLM request failed", exception);
         } catch (InterruptedException exception) {
