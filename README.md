@@ -190,6 +190,7 @@ curl -s -X POST localhost:8080/api/v1/episodes/$EPISODE/run \
 | `DELETE`                  | `/agent/sessions/{id}`          | End a session                             |
 | `GET` / `POST` / `DELETE` | `/schedules` …                  | See [scheduled drills](#scheduled-drills) |
 | `POST`                    | `/webhooks/alertmanager`, `/webhooks/pagerduty`, `/webhooks/cloudwatch-sns` | Alert intake, see [alert webhooks](#alert-webhooks) |
+| `POST`                    | `/webhooks/alerts`              | Multi-cloud alert normalizer and automated code remediation |
 | `GET`                     | `/webhooks`                     | Stored intake reports (postmortems)       |
 | `GET` / `POST` / `DELETE` | `/mcp`                          | See [MCP](#use-mcp)                       |
 
@@ -304,6 +305,91 @@ curl -s -X POST localhost:8080/api/v1/webhooks/alertmanager \
 "annotations":{"summary":"p95 latency above 800ms on orders-api"}}]}' | jq
 ```
 
+## Multi-cloud alert webhook and automated code remediation
+
+`POST /api/v1/webhooks/alerts` accepts alerts from AWS CloudWatch, Azure Monitor, Alertmanager, or direct JSON.
+Alerts are filtered against `ajentic.alerts.min-severity` (`INFO < WARNING < ERROR < CRITICAL`, default `ERROR`)
+and checked for a target repository.
+
+- **Status `202 Accepted` (`status = "IGNORED"`):** Alert is below the severity threshold or no repository can be resolved (zero LLM calls made).
+- **Status `200 OK` (`status = "PROCESSED"`):** Executes a bounded one-shot ReAct investigation (max 8 iterations) that inspects code via `github_read_file`, creates a branch `ajentic/fix-<fingerprint8>`, commits a fix and regression test via `github_commit_file`, queries CI status via `github_get_ci_status`, and opens a PR via `github_create_pull_request`.
+- **Optional token mode:** When `ajentic.github.token` is blank, mutating tools return clean errors and the agent returns code analysis without failing.
+
+### Payload examples
+
+<details>
+<summary>Direct JSON</summary>
+
+```json
+{
+  "severity": "ERROR",
+  "repository": "acme/checkout-service",
+  "branch": "main",
+  "title": "NullPointerException in OrderProcessor",
+  "message": "NullPointerException: order cannot be null",
+  "stackTrace": "java.lang.NullPointerException at com.acme.OrderProcessor.process(OrderProcessor.java:42)"
+}
+```
+
+</details>
+
+<details>
+<summary>AWS CloudWatch / SNS</summary>
+
+```json
+{
+  "AlarmName": "HighErrorRate-checkout",
+  "NewStateReason": "Threshold Crossed: 5xx rate > 5%",
+  "AlarmDescription": "java.lang.NullPointerException at CheckoutService",
+  "NewStateValue": "ALARM",
+  "repository": "acme/checkout-service"
+}
+```
+
+</details>
+
+<details>
+<summary>Azure Monitor</summary>
+
+```json
+{
+  "data": {
+    "essentials": {
+      "alertRule": "High Latency - checkout",
+      "description": "5xx spike in checkout service",
+      "severity": "Sev1",
+      "repository": "acme/checkout-service"
+    },
+    "alertContext": "java.lang.NullPointerException at CheckoutService.process"
+  }
+}
+```
+
+</details>
+
+<details>
+<summary>Alertmanager</summary>
+
+```json
+{
+  "alerts": [
+    {
+      "labels": {
+        "alertname": "CheckoutLatencyHigh",
+        "severity": "error",
+        "github_repo": "acme/checkout-service"
+      },
+      "annotations": {
+        "summary": "High latency in checkout service",
+        "stackTrace": "java.lang.NullPointerException at CheckoutService"
+      }
+    }
+  ]
+}
+```
+
+</details>
+
 ## Scheduled drills
 
 Recurring incidents run on a five-field cron engine backed by `com.cronutils`. Named ranges accept steps
@@ -399,6 +485,8 @@ sends `Authorization: Bearer <key>`, unless `ajentic.llm.api-key-header` says ot
 | `ajentic.webhooks.notification-url`       |                                   | Optional report fan-out webhook; blank = log channel only                       |
 | `ajentic.webhooks.max-concurrent`         | `4`                               | Concurrent investigations; excess alerts get `429`                              |
 | `ajentic.webhooks.default-scenario`       | `orders-bad-deployment`           | Fallback scenario when the alert service matches none                          |
+| `ajentic.alerts.min-severity`             | `ERROR`                           | Minimum severity threshold: `INFO` < `WARNING` < `ERROR` < `CRITICAL`            |
+| `ajentic.alerts.default-scenario`         | `orders-bad-deployment`           | Fallback scenario for alert code-remediation sessions                           |
 
 </details>
 

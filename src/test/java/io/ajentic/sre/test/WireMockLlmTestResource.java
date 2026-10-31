@@ -48,7 +48,9 @@ public class WireMockLlmTestResource implements QuarkusTestResourceLifecycleMana
                 "ajentic.llm.api-key", "",
                 "ajentic.llm.model", "wm-default",
                 "ajentic.llm.timeout", "30s",
-                "ajentic.llm.temperature", "0.0");
+                "ajentic.llm.temperature", "0.0",
+                "ajentic.github.base-url", "http://localhost:" + server.port(),
+                "ajentic.github.token", "gh_test_token");
     }
 
     @Override

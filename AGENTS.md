@@ -58,10 +58,14 @@ Surefire is configured with `<skipITs>true</skipITs>`, so failsafe integration t
   `schedules`, `serve`, `swagger`, `mcp`.
 - `mvn quarkus:dev -Dquarkus.args="mcp"` runs the MCP stdio bridge.
 - REST surface under `/api/v1`; OpenAPI at `/q/openapi`, Swagger UI at `/q/swagger-ui`, health at `/q/health`.
+  - Alert webhook: `POST /api/v1/webhooks/alerts` accepts CloudWatch, Azure Monitor, Alertmanager, or direct JSON.
+    Normalizes severity (`INFO < WARNING < ERROR < CRITICAL`), ignores below `ajentic.alerts.min-severity` (`202 Accepted`),
+    and executes a bounded code-remediation turn (`200 OK`) opening a branch and PR on GitHub (offline stubbed in tests).
 - Packages under `io.ajentic.sre`:
   - `rl`: environment contracts, rewards, episodes, policies, simulation
-  - `agent/{llm,session,mcp,tool,masking,context}`: ReAct loop, LLM clients, MCP handler, tool registry
+  - `agent/{llm,session,mcp,tool,masking,context,alerts,github}`: ReAct loop, LLM clients, MCP handler, tool registry, alert normalizer, GitHub client
   - `schedule/{cron,drill,engine,store}`: versioned cron scheduler
+  - `state`: file-backed durable state store (`.ajentic/state.json`) with concurrency locks
   - `api`: JAX-RS resources, mappers, payloads
   - `cli`, `health`
 

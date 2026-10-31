@@ -6,6 +6,7 @@ import io.quarkus.test.junit.QuarkusTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -346,5 +347,105 @@ class ApiEndToEndTest {
                 .statusCode(200)
                 .body("scenarioId", is("checkout-latency-db-pool"))
                 .body("solved", is(true));
+    }
+
+    @Test
+    void warningAlertUnderMinSeverityErrorIsIgnoredWith202() {
+        given()
+                .contentType("application/json")
+                .body(Map.of(
+                        "severity", "WARNING",
+                        "repository", "acme/checkout-service",
+                        "message", "Minor latency increase"))
+                .when().post("/api/v1/webhooks/alerts")
+                .then()
+                .statusCode(202)
+                .body("status", is("IGNORED"))
+                .body("severity", is("WARNING"))
+                .body("repository", is("acme/checkout-service"));
+    }
+
+    @Test
+    void missingRepositoryWithoutDefaultIsIgnoredWith202() {
+        given()
+                .contentType("application/json")
+                .body(Map.of(
+                        "severity", "ERROR",
+                        "message", "Database timeout with unknown repo"))
+                .when().post("/api/v1/webhooks/alerts")
+                .then()
+                .statusCode(202)
+                .body("status", is("IGNORED"))
+                .body("severity", is("ERROR"));
+    }
+
+    @Test
+    void fullStubbedAlertRemediationRunReturns200WithPullRequestUrl() {
+        given()
+                .contentType("application/json")
+                .body(Map.of(
+                        "severity", "ERROR",
+                        "repository", "acme/checkout-service",
+                        "title", "NullPointerException in checkout",
+                        "message", "NullPointerException: order cannot be null",
+                        "stackTrace", "java.lang.NullPointerException at com.acme.Checkout.process"))
+                .when().post("/api/v1/webhooks/alerts")
+                .then()
+                .statusCode(200)
+                .body("status", is("PROCESSED"))
+                .body("severity", is("ERROR"))
+                .body("repository", is("acme/checkout-service"))
+                .body("answer", containsString("https://github.com/acme/checkout-service/pull/42"))
+                .body("sessionId", not(blankOrNullString()));
+    }
+
+    @Test
+    void multiCloudAlertShapesAcceptedAtAlertWebhookEndpoint() {
+        // CloudWatch-shaped
+        given()
+                .contentType("application/json")
+                .body(Map.of(
+                        "NewStateValue", "ALARM",
+                        "AlarmName", "HighErrorRate-checkout",
+                        "NewStateReason", "5xx spike",
+                        "AlarmDescription", "java.lang.NullPointerException",
+                        "repository", "acme/checkout-service"))
+                .when().post("/api/v1/webhooks/alerts")
+                .then()
+                .statusCode(200)
+                .body("status", is("PROCESSED"));
+
+        // Azure-shaped
+        given()
+                .contentType("application/json")
+                .body(Map.of(
+                        "data", Map.of(
+                                "essentials", Map.of(
+                                        "alertRule", "High Latency",
+                                        "description", "5xx spike",
+                                        "severity", "Sev1",
+                                        "repo", "acme/checkout-service"),
+                                "alertContext", "trace")))
+                .when().post("/api/v1/webhooks/alerts")
+                .then()
+                .statusCode(200)
+                .body("status", is("PROCESSED"));
+
+        // Alertmanager-shaped
+        given()
+                .contentType("application/json")
+                .body(Map.of(
+                        "alerts", List.of(Map.of(
+                                "labels", Map.of(
+                                        "alertname", "KubePodCrashLooping",
+                                        "severity", "error",
+                                        "github_repo", "acme/checkout-service"),
+                                "annotations", Map.of(
+                                        "summary", "Crash looping",
+                                        "stackTrace", "trace")))))
+                .when().post("/api/v1/webhooks/alerts")
+                .then()
+                .statusCode(200)
+                .body("status", is("PROCESSED"));
     }
 }

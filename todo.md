@@ -33,7 +33,7 @@ suite offline (`mvn test`, WireMock stubs, no model, no network), and targets Ja
 | 24 | `feat/file-state-store` | 3 | Durable schedules/drills/episodes | 6 | ✅ done |
 | 25 | `feat/swagger-openapi-first` | 3 | Always-on Swagger UI + OpenAPI annotations + one-shot ask/simulate; CLI narrowed to open Swagger | — | ✅ done |
 | 26 | `feat/github-code-tools` | 4 | Zero-clone GitHub REST client + `@ToolBox` code tools + PAT masking | 25 | ✅ done |
-| 27 | `feat/alert-webhook-code-fix` | 4 | Multi-cloud alert normalizer + `POST /webhooks/alerts` code-fix turn | 26 | ⬜ todo |
+| 27 | `feat/alert-webhook-code-fix` | 4 | Multi-cloud alert normalizer + `POST /webhooks/alerts` code-fix turn | 26 | ✅ done |
 | 28 | `feat/ci-feedback-loop` | 4 | Non-blocking CI status/PR follow-up + remediation report | 27 | ⬜ todo |
 | 29 | `feat/chatops-channels` | 5 | Slack/Teams/Google Chat/Discord/Telegram + OpenAI-compatible chat API | 19, 22 | ⬜ todo |
 | 30 | `feat/cloud-provider-adapters` | 5 | AWS / Azure / GCP read-only adapters (SigV4, OAuth2, SA-JWT), zero SDK | 17, 21 | ⬜ todo |
@@ -606,7 +606,7 @@ regression test) → read CI status → open a PR, and no token or repo identifi
 
 ### 27. `feat/alert-webhook-code-fix`
 
-- [ ] New `agent/alerts/AlertNormalizer` (pure, unit-testable, no CDI ceremony beyond `@ApplicationScoped`) that
+- [x] New `agent/alerts/AlertNormalizer` (pure, unit-testable, no CDI ceremony beyond `@ApplicationScoped`) that
       reads a `Map<String, Object>` and produces one internal record
       `NormalizedAlert(severity, service, repository, branch, title, message, stackTrace, fingerprint)`:
       direct JSON (`severity`, `repository`, `branch`, `message`, `stackTrace`); AWS CloudWatch/SNS
@@ -615,28 +615,28 @@ regression test) → read CI status → open a PR, and no token or repo identifi
       (`alerts[0].labels.severity`, `alerts[0].annotations.summary`, `alerts[0].labels.repository`). Extract the
       repository from well-known label/tag keys (`repository`, `repo`, `github_repo`, `githubRepo`) and fall back to
       `ajentic.github.default-repo`.
-- [ ] Severity model: `INFO < WARNING < ERROR < CRITICAL`, mapped from `severity`/`level`/`Sev*`/`P1..P5`; compare
+- [x] Severity model: `INFO < WARNING < ERROR < CRITICAL`, mapped from `severity`/`level`/`Sev*`/`P1..P5`; compare
       against `ajentic.alerts.min-severity` (default `ERROR`) and ignore anything below it **before** any LLM call.
-- [ ] New `api/resource/AlertWebhookResource` — `POST /api/v1/webhooks/alerts` (`@Tag(name = "Webhooks")`,
+- [x] New `api/resource/AlertWebhookResource` — `POST /api/v1/webhooks/alerts` (`@Tag(name = "Webhooks")`,
       `@RunOnVirtualThread`, `@Consumes(APPLICATION_JSON)` on a `Map<String, Object>`, `@Schema` on the response):
       `202 Accepted` + `status = IGNORED` below threshold or when no repository can be resolved; `200 OK` +
       `status = PROCESSED` otherwise. Reuse `SessionService`/`AgentResource.ask` semantics (one-shot, session not
       leaked) rather than inventing a second agent entrypoint.
-- [ ] New `api/payload/AlertWebhookResponse` (`status`, `severity`, `repository`, `sessionId`, `answer`,
+- [x] New `api/payload/AlertWebhookResponse` (`status`, `severity`, `repository`, `sessionId`, `answer`,
       `toolCalls`, `usage`) mirroring `ChatResponse` so Swagger UI stays consistent.
-- [ ] Code-remediation prompt (next to `SreAgentPrompts`): (1) read the stack trace, (2) `github_read_file` the named
+- [x] Code-remediation prompt (next to `SreAgentPrompts`): (1) read the stack trace, (2) `github_read_file` the named
       source and its nearest test, (3) state the root cause in one paragraph, (4) `github_create_branch` on
       `ajentic/fix-<fingerprint8>`, (5) `github_commit_file` the minimal fix **and** a regression test,
       (6) `github_get_ci_status` on the new commit, (7) `github_create_pull_request` with root cause, diff summary,
       and CI status. Explicitly forbid touching unrelated files, reformatting, or dependency bumps.
-- [ ] Safety: bound `maxIterations` for this turn (8), keep the stagnation breaker and token budget active, never
+- [x] Safety: bound `maxIterations` for this turn (8), keep the stagnation breaker and token budget active, never
       block the request thread longer than the CI snapshot takes (see 28), and return the analysis even when token
       is blank.
-- [ ] Tests in `ApiEndToEndTest`: `WARNING` under `min-severity=ERROR` → `202`/`IGNORED` and zero LLM calls;
+- [x] Tests in `ApiEndToEndTest`: `WARNING` under `min-severity=ERROR` → `202`/`IGNORED` and zero LLM calls;
       CloudWatch-shaped, Azure-shaped, Alertmanager-shaped and direct `ERROR` payloads all normalize to the same
       remediation prompt; missing `repository` + no default → `202`/`IGNORED`; full stubbed run returns `200` with a
       PR URL. Plus plain JUnit tests for `AlertNormalizer` (one case per provider, unknown severity, empty payload).
-- [ ] `README.md` + `AGENTS.md`: endpoint, payload examples per provider, config keys, and the optional-token mode.
+- [x] `README.md` + `AGENTS.md`: endpoint, payload examples per provider, config keys, and the optional-token mode.
 
 **Files.** new `agent/alerts/AlertNormalizer.java` (+ record), new `api/resource/AlertWebhookResource.java`, new
 `api/payload/AlertWebhookResponse.java`, `agent/mcp/SreAgentPrompts.java`, `application.properties`,

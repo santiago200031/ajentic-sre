@@ -36,6 +36,54 @@ public class SreAgentPrompts {
                 + "cause, remediation, and follow-up actions.").formatted(scenario.id());
     }
 
+    @AgentPrompt(name = "code-remediation", description = "Bootstrap automated code fix and pull request for an alert.")
+    public String codeRemediation(
+            @PromptParam("Repository owner and name.") String repository,
+            @PromptParam("Target branch name.") String branch,
+            @PromptParam("Alert title.") String title,
+            @PromptParam("Alert message.") String message,
+            @PromptParam("Stack trace if available.") String stackTrace,
+            @PromptParam("Alert fingerprint.") String fingerprint) {
+        return buildCodeRemediationPrompt(repository, branch, title, message, stackTrace, fingerprint);
+    }
+
+    public static String buildCodeRemediationPrompt(
+            String repository,
+            String branch,
+            String title,
+            String message,
+            String stackTrace,
+            String fingerprint) {
+        String fp8 = fingerprint != null && fingerprint.length() >= 8 ? fingerprint.substring(0, 8) : "12345678";
+        String fixBranch = "ajentic/fix-" + fp8;
+        String baseBranch = branch != null && !branch.isBlank() ? branch : "main";
+        return """
+                Investigate and remediate the following alert in repository %s:
+                Title: %s
+                Message: %s
+                Stack Trace:
+                %s
+
+                Execute the following remediation steps:
+                1. Read the stack trace carefully to locate the failing file and line.
+                2. Use github_read_file to inspect the named source file and its nearest test file on branch %s.
+                3. State the root cause in one concise paragraph.
+                4. Use github_create_branch to create branch %s from %s.
+                5. Use github_commit_file to commit the minimal fix AND a regression test to %s.
+                6. Use github_get_ci_status to check CI status on the new commit.
+                7. Use github_create_pull_request to open a PR into %s with the root cause, diff summary, and CI status.
+
+                Strict constraints:
+                - Do NOT touch unrelated files.
+                - Do NOT reformat code.
+                - Do NOT bump dependencies.
+                """.formatted(repository,
+                title != null ? title : "(none)",
+                message != null ? message : "(none)",
+                stackTrace != null && !stackTrace.isBlank() ? stackTrace : "(no stack trace provided)",
+                baseBranch, fixBranch, baseBranch, fixBranch, baseBranch);
+    }
+
     private Scenario require(String scenarioId) {
         if (scenarioId == null || scenarioId.isBlank()) {
             throw new IllegalArgumentException("Missing required prompt argument 'scenarioId'");
