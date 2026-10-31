@@ -43,9 +43,11 @@ Surefire is configured with `<skipITs>true</skipITs>`, so failsafe integration t
 ## Test quirks
 
 - Stubs live in `src/test/resources/wiremock/`; `WireMockLlmTestResource` starts WireMock on a dynamic port and
-  points the real `OpenAiCompatibleLlmClient` at it. Set `-Dajentic.llm.live=true` (or `-Plive-llm`) to go live
+  points `LangChain4jLlmClient` at it. Set `-Dajentic.llm.live=true` (or `-Plive-llm`) to go live
   instead.
 - Test HTTP port is 8081 (`quarkus.http.test-port`); dev/prod port is 8080.
+- Dev mode (`mvn quarkus:dev`) runs like local production: connects to your real local LLM router (`127.0.0.1:9931`),
+  real GitHub API, and local telemetry services without starting WireMock.
 - Mutating tools are gated by `ajentic.tools.mutation-policy` (`allow` | `deny` | `require-approval`); the legacy
   `ajentic.tools.allow-mutations` boolean is the fallback alias. With `require-approval`, mutating calls defer to
   operator approval (`ApprovalGateEndToEndTest`, `ApprovalExpiryEndToEndTest`), covered offline by WireMock.
