@@ -29,7 +29,7 @@ suite offline (`mvn test`, WireMock stubs, no model, no network), and targets Ja
 | 20 | `feat/llm-fallback-router` | 3 | Local-first composite LLM client | 13 | ✅ done |
 | 21 | `feat/multicloud-identifier-masking` | 3 | GCP/Azure/K8s/Bearer categories | 1 | ✅ done |
 | 22 | `feat/approval-gates` | 3 | `ALLOW \| DENY \| REQUIRE_APPROVAL` | 18 | ✅ done |
-| 23 | `feat/episodic-memory` | 3 | `search_past_incidents` + `.ajentic/incidents.jsonl` | 6, 22 | ⬜ todo |
+| 23 | `feat/episodic-memory` | 3 | `search_past_incidents` + `.ajentic/incidents.jsonl` | 6, 22 | ✅ done |
 | 24 | `feat/file-state-store` | 3 | Durable schedules/drills/episodes | 6 | ⬜ todo |
 | 25 | `feat/swagger-openapi-first` | 3 | Always-on Swagger UI + OpenAPI annotations + one-shot ask/simulate; CLI narrowed to open Swagger | — | ✅ done |
 | 26 | `feat/github-code-tools` | 4 | Zero-clone GitHub REST client + `@ToolBox` code tools + PAT masking | 25 | ✅ done |
@@ -449,15 +449,15 @@ new `agent/session/TurnListener.java`.
 
 ### 23. `feat/episodic-memory`
 
-- [ ] Persist completed `EpisodeResult` + postmortem to `.ajentic/incidents.jsonl` (append-only, fsync-batched,
+- [x] Persist completed `EpisodeResult` + postmortem to `.ajentic/incidents.jsonl` (append-only, fsync-batched,
       rotation by size); debounce/serialize writes.
-- [ ] Add `@AgentTool(name = "search_past_incidents")` searching by symptom text, service, and fault kind; return the
+- [x] Add `@AgentTool(name = "search_past_incidents")` searching by symptom text, service, and fault kind; return the
       top-k prior resolutions with reward/solved outcome.
-- [ ] Inject a short "similar past incidents" summary into the system prompt when available (bounded token budget).
-- [ ] Ensure PII/identifiers are masked before persistence.
-- [ ] Test: run → persist → new session searches and finds it; corrupt line is skipped, not fatal; masking verified
-      on disk.
-- [ ] Add `.ajentic/` to `.gitignore`; document the store location and opt-out config.
+- [x] Inject a short "similar past incidents" summary into the system prompt when available (bounded token budget).
+- [x] Ensure PII/identifiers are masked before persistence.
+- [x] Test: run → persist → new session searches and finds it; corrupt line is skipped, not fatal; masking verified
+      on disk (`IncidentMemoryEndToEndTest`).
+- [x] Add `.ajentic/` to `.gitignore`; document the store location and opt-out config.
 
 **Files.** new `agent/memory/IncidentMemoryStore.java`, `agent/tool/builtin/BuiltInSreTools.java`,
 `rl/episode/EpisodeService.java`, `application.properties`.
