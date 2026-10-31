@@ -54,7 +54,7 @@ public class SreMcpResources {
                 .setTitle(scenario.title())
                 .setDescription(scenario.summary())
                 .setMimeType("application/json")
-                .setHandler(args -> new ResourceResponse(new TextResourceContents(uri, "application/json", json)))
+                .setHandler(args -> new ResourceResponse(new TextResourceContents(uri, json, "application/json")))
                 .register();
     }
 
@@ -71,7 +71,7 @@ public class SreMcpResources {
                 .setTitle("Service dependency graph for " + scenario.id())
                 .setDescription("Dependency graph and topology for scenario " + scenario.id())
                 .setMimeType("application/json")
-                .setHandler(args -> new ResourceResponse(new TextResourceContents(uri, "application/json", json)))
+                .setHandler(args -> new ResourceResponse(new TextResourceContents(uri, json, "application/json")))
                 .register();
     }
 
@@ -80,12 +80,12 @@ public class SreMcpResources {
             String uri = RUNBOOK_URI_PREFIX + scenario.id() + "/" + runbook.id();
             String content = runbook.title() + "\n\n" + runbook.body();
             resourceManager.newResource(uri)
-                    .setUri(uri)
-                    .setTitle(runbook.title())
-                    .setDescription("Runbook " + runbook.id() + " for " + scenario.id())
-                    .setMimeType("text/plain")
-                    .setHandler(args -> new ResourceResponse(new TextResourceContents(uri, "text/plain", content)))
-                    .register();
+                .setUri(uri)
+                .setTitle(runbook.title())
+                .setDescription("Runbook " + runbook.id() + " for " + scenario.id())
+                .setMimeType("text/plain")
+                .setHandler(args -> new ResourceResponse(new TextResourceContents(uri, content, "text/plain")))
+                .register();
         }
     }
 

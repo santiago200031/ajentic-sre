@@ -206,6 +206,77 @@ class ApiEndToEndTest {
     }
 
     @Test
+    void listsAndCallsMcpToolsOverHttp() {
+        String sessionId = given()
+                .contentType("application/json")
+                .header("Accept", "application/json, text/event-stream")
+                .body(Map.of("jsonrpc", "2.0", "id", 1, "method", "initialize", "params", Map.of(
+                        "protocolVersion", "2024-11-05",
+                        "capabilities", Map.of(),
+                        "clientInfo", Map.of("name", "test-client", "version", "1.0"))))
+                .when().post("/mcp")
+                .then()
+                .statusCode(200)
+                .extract().header("Mcp-Session-Id");
+
+        given()
+                .contentType("application/json")
+                .header("Accept", "application/json, text/event-stream")
+                .header("Mcp-Session-Id", sessionId)
+                .body(Map.of("jsonrpc", "2.0", "id", 2, "method", "tools/list", "params", Map.of()))
+                .when().post("/mcp")
+                .then()
+                .statusCode(200)
+                .body("result.tools.size()", greaterThanOrEqualTo(6));
+
+        given()
+                .contentType("application/json")
+                .header("Accept", "application/json, text/event-stream")
+                .header("Mcp-Session-Id", sessionId)
+                .body(Map.of(
+                        "jsonrpc", "2.0",
+                        "id", 3,
+                        "method", "tools/call",
+                        "params", Map.of(
+                                "name", "list_scenarios",
+                                "arguments", Map.of())))
+                .when().post("/mcp")
+                .then()
+                .statusCode(200)
+                .body("result.content[0].text", containsString("checkout-latency-db-pool"));
+    }
+
+    @Test
+    void readsMcpResourcesOverHttp() {
+        String sessionId = given()
+                .contentType("application/json")
+                .header("Accept", "application/json, text/event-stream")
+                .body(Map.of("jsonrpc", "2.0", "id", 1, "method", "initialize", "params", Map.of(
+                        "protocolVersion", "2024-11-05",
+                        "capabilities", Map.of(),
+                        "clientInfo", Map.of("name", "test-client", "version", "1.0"))))
+                .when().post("/mcp")
+                .then()
+                .statusCode(200)
+                .extract().header("Mcp-Session-Id");
+
+        given()
+                .contentType("application/json")
+                .header("Accept", "application/json, text/event-stream")
+                .header("Mcp-Session-Id", sessionId)
+                .body(Map.of(
+                        "jsonrpc", "2.0",
+                        "id", 9,
+                        "method", "resources/read",
+                        "params", Map.of("uri", "sre://scenarios/checkout-latency-db-pool")))
+                .when().post("/mcp")
+                .then()
+                .statusCode(200)
+                .body("result.contents[0].mimeType", is("application/json"))
+                .body("result.contents[0].text", containsString("checkout-latency-db-pool"));
+    }
+
+    @Test
     void recoversFromMalformedMcpJson() {
         given()
                 .contentType("application/json")

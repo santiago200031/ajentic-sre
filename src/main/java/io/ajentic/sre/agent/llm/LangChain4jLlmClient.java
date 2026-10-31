@@ -66,12 +66,6 @@ public final class LangChain4jLlmClient implements LlmClient {
             builder.customHeaders(headers);
         }
 
-        properties.apiVersion().ifPresent(version -> {
-            if (!version.isBlank()) {
-                builder.customQueryParams(Map.of("api-version", version));
-            }
-        });
-
         return builder.build();
     }
 

@@ -79,6 +79,100 @@ class McpProtocolEndToEndTest {
     }
 
     @Test
+    void listsAndCallsToolsOverHttp() {
+        String sessionId = initSession();
+
+        given()
+                .contentType("application/json")
+                .header("Accept", "application/json, text/event-stream")
+                .header("Mcp-Session-Id", sessionId)
+                .body("""
+                        {
+                          "jsonrpc": "2.0",
+                          "id": 2,
+                          "method": "tools/list",
+                          "params": {}
+                        }
+                        """)
+                .when().post("/mcp")
+                .then()
+                .statusCode(200)
+                .body("result.tools.size()", org.hamcrest.Matchers.greaterThanOrEqualTo(9));
+
+        given()
+                .contentType("application/json")
+                .header("Accept", "application/json, text/event-stream")
+                .header("Mcp-Session-Id", sessionId)
+                .body("""
+                        {
+                          "jsonrpc": "2.0",
+                          "id": 3,
+                          "method": "tools/call",
+                          "params": {
+                            "name": "list_scenarios",
+                            "arguments": {}
+                          }
+                        }
+                        """)
+                .when().post("/mcp")
+                .then()
+                .statusCode(200)
+                .body("result.content[0].text", org.hamcrest.Matchers.containsString("checkout-latency-db-pool"));
+    }
+
+    @Test
+    void readsResourcesOverHttp() {
+        String sessionId = initSession();
+
+        given()
+                .contentType("application/json")
+                .header("Accept", "application/json, text/event-stream")
+                .header("Mcp-Session-Id", sessionId)
+                .body("""
+                        {
+                          "jsonrpc": "2.0",
+                          "id": 2,
+                          "method": "resources/read",
+                          "params": {
+                            "uri": "sre://scenarios/checkout-latency-db-pool"
+                          }
+                        }
+                        """)
+                .when().post("/mcp")
+                .then()
+                .statusCode(200)
+                .body("result.contents[0].mimeType", is("application/json"))
+                .body("result.contents[0].text", org.hamcrest.Matchers.containsString("checkout-latency-db-pool"));
+    }
+
+    @Test
+    void getsPromptsOverHttp() {
+        String sessionId = initSession();
+
+        given()
+                .contentType("application/json")
+                .header("Accept", "application/json, text/event-stream")
+                .header("Mcp-Session-Id", sessionId)
+                .body("""
+                        {
+                          "jsonrpc": "2.0",
+                          "id": 2,
+                          "method": "prompts/get",
+                          "params": {
+                            "name": "investigate-incident",
+                            "arguments": {
+                              "scenarioId": "checkout-latency-db-pool"
+                            }
+                          }
+                        }
+                        """)
+                .when().post("/mcp")
+                .then()
+                .statusCode(200)
+                .body("result.messages[0].content.text", org.hamcrest.Matchers.containsString("Investigate the 'checkout-latency-db-pool' incident"));
+    }
+
+    @Test
     void recoversFromMalformedJsonWithParseError() {
         given()
                 .contentType("application/json")
@@ -88,5 +182,27 @@ class McpProtocolEndToEndTest {
                 .then()
                 .statusCode(200)
                 .body("error.code", is(-32700));
+    }
+
+    private String initSession() {
+        return given()
+                .contentType("application/json")
+                .header("Accept", "application/json, text/event-stream")
+                .body("""
+                        {
+                          "jsonrpc": "2.0",
+                          "id": 1,
+                          "method": "initialize",
+                          "params": {
+                            "protocolVersion": "2024-11-05",
+                            "capabilities": {},
+                            "clientInfo": {"name": "test-client", "version": "1.0"}
+                          }
+                        }
+                        """)
+                .when().post("/mcp")
+                .then()
+                .statusCode(200)
+                .extract().header("Mcp-Session-Id");
     }
 }
