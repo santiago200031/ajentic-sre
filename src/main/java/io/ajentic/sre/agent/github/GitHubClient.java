@@ -168,6 +168,13 @@ public class GitHubClient {
         return new CiStatus(intChild(root, "total_count"), runs);
     }
 
+    /** Triggers a workflow dispatch event on {@code ref} for {@code workflowId}. */
+    public void triggerWorkflow(String repo, String workflowId, String ref) {
+        requireRepo(repo);
+        String payload = "{\"ref\":\"" + json(ref) + "\"}";
+        post("/repos/" + repo + "/actions/workflows/" + encode(workflowId) + "/dispatches", payload);
+    }
+
     /** Opens a pull request, returning an existing open PR for the same head instead of failing on a 422. */
     public PullRequest createPullRequest(String repo, String title, String body, String head, String base) {
         requireRepo(repo);

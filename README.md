@@ -215,7 +215,7 @@ and `prompts/get`. `POST` takes one request or a batch array, and malformed JSON
 
 - Lifecycle tools: `list_scenarios`, `start_episode`, `run_incident_drill`.
 - Investigation tools: `query_telemetry`, `inspect_recent_changes`, `correlate_anomalies`, `get_service_topology`, `read_runbook`, `list_remediations`, `search_past_incidents` (READ) and `apply_remediation`, `declare_diagnosis`, `post_incident_summary` (MUTATE).
-- GitHub code tools: `github_list_files`, `github_read_file`, `github_get_ci_status` (READ) and `github_create_branch`, `github_commit_file`, `github_create_pull_request` (MUTATE).
+- GitHub code tools: `github_list_files`, `github_read_file`, `github_get_ci_status` (READ) and `github_create_branch`, `github_commit_file`, `github_create_pull_request`, `github_trigger_workflow` (MUTATE).
 - Resources: `sre://scenarios/{scenarioId}`, `sre://topology/{scenarioId}`, and `sre://runbooks/{scenarioId}/{runbookId}`.
 - Prompts: `investigate-incident` and `summarize-postmortem`.
 - A `tools/call` can pass `_scenarioId` to start an episode, or `_episodeId` to reuse one.
@@ -314,6 +314,12 @@ and checked for a target repository.
 - **Status `202 Accepted` (`status = "IGNORED"`):** Alert is below the severity threshold or no repository can be resolved (zero LLM calls made).
 - **Status `200 OK` (`status = "PROCESSED"`):** Executes a bounded one-shot ReAct investigation (max 8 iterations) that inspects code via `github_read_file`, creates a branch `ajentic/fix-<fingerprint8>`, commits a fix and regression test via `github_commit_file`, queries CI status via `github_get_ci_status`, and opens a PR via `github_create_pull_request`.
 - **Optional token mode:** When `ajentic.github.token` is blank, mutating tools return clean errors and the agent returns code analysis without failing.
+
+### CI feedback loop and contract
+
+- **CI Contract:** Continuous integration workflows in target repositories must either trigger automatically on `push` to branches matching `ajentic/**`, or workflow dispatch must be enabled by setting `ajentic.github.ci.trigger-workflows=true` so the agent can invoke `github_trigger_workflow`.
+- **Non-blocking PR turn:** The alert remediation turn opens the pull request immediately and snapshots the initial CI check-run status (reporting `ciStatus: "PENDING"` when checks have not started yet), returning in seconds without holding the HTTP thread.
+- **Asynchronous follow-up:** When `ajentic.github.ci.poll-attempts` is set to greater than `0`, an asynchronous scheduled worker polls pending checks using `ajentic.github.ci.poll-interval`, updates the remediation record in `RemediationStore`, and posts the final verdict (`SUCCESS` or `FAILURE`) to `NotificationChannel`.
 
 ### Payload examples
 
@@ -481,6 +487,9 @@ sends `Authorization: Bearer <key>`, unless `ajentic.llm.api-key-header` says ot
 | `ajentic.github.token`                    |                                   | Optional PAT for code-remediation mutations; empty restricts to analysis-only  |
 | `ajentic.github.default-repo`             |                                   | Default repository (`owner/name`)                                               |
 | `ajentic.github.timeout`                  | `30s`                             | HTTP client timeout for GitHub requests                                         |
+| `ajentic.github.ci.poll-attempts`         | `0`                               | Number of background CI check-run polls (`0` = snapshot only, no polling)       |
+| `ajentic.github.ci.poll-interval`         | `5s`                              | Interval between background CI check-run polls                                  |
+| `ajentic.github.ci.trigger-workflows`     | `false`                           | Enable manual workflow dispatch via `github_trigger_workflow`                   |
 | `ajentic.webhooks.secret`                 |                                   | Shared intake secret; `401` on header mismatch when set                          |
 | `ajentic.webhooks.notification-url`       |                                   | Optional report fan-out webhook; blank = log channel only                       |
 | `ajentic.webhooks.max-concurrent`         | `4`                               | Concurrent investigations; excess alerts get `429`                              |
