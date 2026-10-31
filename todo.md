@@ -48,33 +48,6 @@ be opened in parallel. Track 5 lands after Track 4 and ends by deleting the CLI 
 picocli subcommand. Track 6 (34) lands last: it rewrites the MCP, LLM, and tool-schema plumbing that every other
 branch builds on, so it is done after the feature branches so their tests stay stable until the migration rewrites them.
 
-### 34. `feat/langchain4j-mcp-migration`
-
-**Goal.** Delete custom boilerplate by adopting standard Quarkus 4.x / Quarkiverse packages, per the
-"Ecosystem Migration" plan. Preserve all domain behavior; only the plumbing changes.
-
-- [ ] **Keep** the RL engine (`io.ajentic.sre.rl`), `AgentSession` ReAct loop, stagnation breaker, token budgets, and
-      `SensitiveDataMaskingInterceptor` (domain code, not boilerplate).
-- [ ] **`quarkus-mcp-server`** (Quarkiverse): replace `McpProtocolHandler`, `McpResource`, `McpStdioCommand`,
-      `PromptCatalog`, `JsonRpcErrorCode` (~734 lines) with declarative `@Tool`, `@ToolArg`, `@Resource`, `@Prompt`.
-- [ ] **`quarkus-langchain4j-openai`** (Quarkiverse LangChain4j 2.0.0.Beta1): replace `OpenAiCompatibleLlmClient`,
-      `WireChatRequest`/`WireResponse`/`WireTool`, `AnnotatedTool`, `ToolSchemas`, `CdiToolRegistry` (~500 lines) with
-      `ChatLanguageModel` + `ToolSpecification` + multi-provider config (OpenAI/Ollama/Azure/Anthropic/Bedrock).
-- [ ] **`quarkus-langchain4j-mcp`**: consume external MCP tool servers (K8s, GitHub, AWS, CloudWatch) as dynamic
-      toolboxes, zero custom code.
-- [ ] Adapt `AgentSession`/`AgentSessionFactory` to inject `dev.langchain4j.model.chat.ChatLanguageModel`; convert
-      messages to LangChain4j `UserMessage`/`AiMessage`/`ToolExecutionResultMessage`; keep `AgentSession` as the loop
-      orchestrator (do NOT replace it with `@RegisterAiService` — it needs per-session RL isolation and stagnation).
-- [ ] Move config from `ajentic.llm.*` to `quarkus.langchain4j.openai.*` with `%test` offline defaults; keep the
-      `scripted` provider for offline unit tests.
-- [ ] Tests: `WireMockLlmTestResource` still intercepts `/v1/chat/completions` (via LangChain4j's client); MCP
-      `tools/list` and agent/episode flows still pass; `-Plive-llm` opts into a live endpoint.
-- [ ] `mvn verify` (offline) must pass before merge. Estimated net deletion ~1,200 lines of plumbing.
-
-**Files.** `pom.xml` (new Quarkiverse deps), delete `agent/mcp/McpProtocolHandler.java`,
-`agent/mcp/PromptCatalog.java`, `agent/mcp/JsonRpcErrorCode.java`, `agent/mcp/McpMethod.java`,
-`api/resource/McpResource.java`, `cli/McpStdioCommand.java`, `agent/llm/OpenAiCompatibleLlmClient.java`,
-`agent/tool/AnnotatedTool.java`, `agent/tool/ToolSchemas.java`; adapt `AgentSession`, `LlmProperties`,
 Conventions for every branch:
 - `git switch -c <branch> main`; conventional commits (`fix:`, `feat:`, `refactor:`, `test:`, `docs:`).
 - New config keys go in `src/main/resources/application.properties` with a `%test` override where needed.
@@ -840,14 +813,14 @@ documented HTTP equivalent, and Swagger UI is the single documented front door.
 
 ## Cross-cutting definition of done
 
-- [ ] `mvn verify` passes offline; no new network calls in the default profile.
-- [ ] Test count grows with each branch; no `@Disabled` left behind without a linked follow-up.
-- [ ] `README.md` updated for new commands, endpoints, config keys, and backend matrix.
-- [ ] No secrets or real infrastructure identifiers in logs, fixtures, or `.ajentic/` artifacts.
-- [ ] New public types carry Javadoc consistent with the existing style; 4-space indent, LF, final newline.
+- [x] `mvn verify` passes offline; no new network calls in the default profile.
+- [x] Test count grows with each branch; no `@Disabled` left behind without a linked follow-up.
+- [x] `README.md` updated for new commands, endpoints, config keys, and backend matrix.
+- [x] No secrets or real infrastructure identifiers in logs, fixtures, or `.ajentic/` artifacts.
+- [x] New public types carry Javadoc consistent with the existing style; 4-space indent, LF, final newline.
 - [ ] `AGENTS.md` command table rewritten HTTP-first once branch 33 lands (no picocli subcommands survive; the table
       lists `mvn` targets, HTTP endpoints, and the one jar entrypoint).
-- [ ] Track 4 extra: no GitHub token, repo name, or file content leaves the process except to GitHub itself; every
+- [x] Track 4 extra: no GitHub token, repo name, or file content leaves the process except to GitHub itself; every
       write path is behind both a token and `ajentic.tools.allow-mutations`.
 - [ ] Track 5 extra: agent containers hold no cloud or chat credentials (they live in the sidecar), every provider
       adapter is offline-testable, and no branch adds a new CLI command.
