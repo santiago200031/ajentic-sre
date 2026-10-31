@@ -338,14 +338,14 @@ overwrite each other's active episode unless every call passes `_episodeId`.
 
 ### 16. `feat/environment-backends`
 
-- [ ] Add `ajentic.environment.backend = simulated | local-container | cloud-live` and make `EnvironmentFactory`
+- [x] Add `ajentic.environment.backend = simulated | local-container | cloud-live` and make `EnvironmentFactory`
       select an implementation (`@ConfigProperty` + CDI alternatives or a small strategy map).
-- [ ] Keep `simulated` the default and the only backend used by tests/CI.
-- [ ] Define a backend SPI around `Environment` (`signals`, `step`, `observe`, `spec`) so adapters do not leak into
+- [x] Keep `simulated` the default and the only backend used by tests/CI.
+- [x] Define a backend SPI around `Environment` (`signals`, `step`, `observe`, `spec`) so adapters do not leak into
       the simulator.
-- [ ] Fail fast on unknown backend values; log the active backend at startup.
-- [ ] Test: config selects each backend; simulated remains byte-for-byte deterministic.
-- [ ] Document backend matrix in `README.md`.
+- [x] Fail fast on unknown backend values; log the active backend at startup.
+- [x] Test: config selects each backend; simulated remains byte-for-byte deterministic.
+- [x] Document backend matrix in `README.md`.
 
 **Files.** `rl/simulation/EnvironmentFactory.java`, `rl/Environment.java` (if the SPI needs widening),
 `application.properties`.

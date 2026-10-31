@@ -301,6 +301,18 @@ sends `Authorization: Bearer <key>`, unless `ajentic.llm.api-key-header` says ot
 
 </details>
 
+## Environment backends
+
+`ajentic.environment.backend` selects the `Environment` implementation that episodes and agent sessions run against.
+
+| Backend                     | Status                                                                                   |
+| --------------------------- | -------------------------------------------------------------------------------------- |
+| `simulated` *(default)*     | Deterministic, offline; the only backend used by tests and CI                            |
+| `local-container`           | Reserved for a live adapter; not implemented yet (fails fast on use)                    |
+| `cloud-live`                | Reserved for a live adapter; not implemented yet (fails fast on use)                    |
+
+Unknown values fail fast at startup, and the active backend is logged when the application boots.
+
 ## Identifier masking
 
 Every LLM request passes through `SensitiveDataMaskingInterceptor`, which replaces sensitive identifiers with
