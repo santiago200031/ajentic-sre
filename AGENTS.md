@@ -20,15 +20,13 @@ mvn -v                # confirm Maven 3.10 + JDK 25+
 | Goal | Command |
 |------|---------|
 | Full offline test suite | `mvn test` |
-| One test class | `mvn test -Dtest=CliEndToEndTest` |
-| Benchmark policies | `java -jar target/quarkus-app/quarkus-run.jar benchmark --scenarios all --seeds 2 --policy all` (offline by default) |
+| One test class | `mvn test -Dtest=ServerStartupTest` |
 | Compile + test + package | `mvn package` |
 | Full validation | `mvn verify` |
 | Dev server (live reload) | `mvn quarkus:dev`  → http://localhost:8080 |
-| Run a CLI command in dev | `mvn quarkus:dev -Dquarkus.args="scenarios"` |
 | Packaged server | `java -jar target/quarkus-app/quarkus-run.jar` (after `mvn package`) |
 | Docker image | `mvn package && docker build -f src/main/docker/Dockerfile.jvm -t ajentic-sre .` |
-| Thin wrappers | `make dev \| test \| verify \| package` |
+| Thin wrappers | `make dev \| test \| verify \| package \| lab-up \| cloud-up` |
 
 `mvn test` needs `-Dtest` to run a single class; without it the whole `@QuarkusTest` suite runs.
 Surefire is configured with `<skipITs>true</skipITs>`, so failsafe integration tests are skipped by default.
@@ -56,20 +54,26 @@ Surefire is configured with `<skipITs>true</skipITs>`, so failsafe integration t
 
 ## Entrypoints & layout
 
-- CLI: `io.ajentic.sre.cli.AjenticCommand` (picocli). Subcommands: `scenarios`, `simulate`, `benchmark`, `ask`,
-  `schedules`, `serve`, `swagger`, `mcp`.
-- `mvn quarkus:dev -Dquarkus.args="mcp"` runs the MCP stdio bridge.
+- Server entrypoint: `java -jar target/quarkus-app/quarkus-run.jar` always serves HTTP on `:8080`.
+- Root redirect: `GET /` redirects (303) directly to Swagger UI at `/q/swagger-ui`.
 - REST surface under `/api/v1`; OpenAPI at `/q/openapi`, Swagger UI at `/q/swagger-ui`, health at `/q/health`.
+  - Scenarios: `GET /api/v1/scenarios`
+  - Simulation: `POST /api/v1/episodes/simulate`
+  - Agent ask: `POST /api/v1/agent/ask`
+  - Benchmarks: `POST /api/v1/benchmarks`
+  - Schedules: `GET /api/v1/schedules`, `POST /api/v1/schedules`, `POST /api/v1/schedules/{id}/run`
   - Alert webhook: `POST /api/v1/webhooks/alerts` accepts CloudWatch, Azure Monitor, Alertmanager, or direct JSON.
     Normalizes severity (`INFO < WARNING < ERROR < CRITICAL`), ignores below `ajentic.alerts.min-severity` (`202 Accepted`),
     and executes a bounded code-remediation turn (`200 OK`) opening a branch and PR on GitHub (offline stubbed in tests).
+- MCP protocol: Quarkiverse MCP Server stdio and HTTP (`/mcp`) transports.
 - Packages under `io.ajentic.sre`:
   - `rl`: environment contracts, rewards, episodes, policies, simulation
-  - `agent/{llm,session,mcp,tool,masking,context,alerts,github}`: ReAct loop, LLM clients, MCP handler, tool registry, alert normalizer, GitHub client
+  - `agent/{llm,session,mcp,tool,masking,context,alerts,github,integration}`: ReAct loop, LLM clients, MCP handler, tool registry, alert normalizer, GitHub client, sidecar client
+  - `connectors`: credential-isolated sidecar security (HMAC-SHA256, anti-replay) and audit logging
   - `schedule/{cron,drill,engine,store}`: versioned cron scheduler
   - `state`: file-backed durable state store (`.ajentic/state.json`) with concurrency locks
   - `api`: JAX-RS resources, mappers, payloads
-  - `cli`, `health`
+  - `health`
 
 ## Conventions
 

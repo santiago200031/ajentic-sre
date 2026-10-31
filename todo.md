@@ -38,8 +38,8 @@ suite offline (`mvn test`, WireMock stubs, no model, no network), and targets Ja
 | 29 | `feat/chatops-channels` | 5 | Slack/Teams/Google Chat/Discord/Telegram + OpenAI-compatible chat API | 19, 22 | ✅ done |
 | 30 | `feat/cloud-provider-adapters` | 5 | AWS / Azure / GCP read-only adapters (SigV4, OAuth2, SA-JWT), zero SDK | 17, 21 | ✅ done |
 | 31 | `feat/local-cloud-emulation` | 5 | LocalStack + Azurite + fake-gcs/PubSub + monitor stubs in compose | 30 | ✅ done |
-| 32 | `feat/sidecar-connectors` | 5 | Connectors as a least-privilege sidecar next to the agent | 29, 31 | ⬜ todo |
-| 33 | `refactor/http-only-surface` | 5 | Drop picocli entirely; Swagger/HTTP only (+ MCP stdio shim) | 25, 32 | ⬜ todo |
+| 32 | `feat/sidecar-connectors` | 5 | Connectors as a least-privilege sidecar next to the agent | 29, 31 | ✅ done |
+| 33 | `refactor/http-only-surface` | 5 | Drop picocli entirely; Swagger/HTTP only (+ MCP stdio shim) | 25, 32 | ✅ done |
 | 34 | `feat/langchain4j-mcp-migration` | 6 | Replace custom MCP/LLM/tool-schema with quarkus-mcp-server + quarkus-langchain4j | 25 | ✅ done |
 
 Recommended landing order: 1 → 2 → 4 → 5 → 6 → 3 → 13 → 12 → 21 → 7 → 8 → 9 → 10 → 11 → 14 → 15 → 16 → 17 → 18 →
@@ -753,24 +753,24 @@ end-to-end against it, and `mvn test` remains container-free.
 
 ### 32. `feat/sidecar-connectors`
 
-- [ ] Split credentials from reasoning: a `connectors` service owns AWS/Azure/GCP secrets and the chat webhooks; the
+- [x] Split credentials from reasoning: a `connectors` service owns AWS/Azure/GCP secrets and the chat webhooks; the
       agent keeps none. Internal contract over HTTP with HMAC-SHA256 request signing (shared secret, timestamp +
       nonce, 5-minute window) and a narrow endpoint set: `POST /internal/v1/{cloud}/{telemetry|changes|remediate}` and
       `POST /internal/v1/chat/{provider}/notify`.
-- [ ] Agent side: an `Environment` implementation (`sidecar`) and a `NotificationChannel` (`sidecar`) that speak only
+- [x] Agent side: an `Environment` implementation (`sidecar`) and a `NotificationChannel` (`sidecar`) that speak only
       this contract; no provider code paths in the agent module. Fail closed when the sidecar is unreachable
       (`503`-style tool error, agent continues with READ tools).
-- [ ] Deployment topologies in `docker-compose.yml`: (a) `agent + connectors`, (b) `agent + connectors + cloud
+- [x] Deployment topologies in `docker-compose.yml`: (a) `agent + connectors`, (b) `agent + connectors + cloud
       emulators`, (c) `agent` alone with `ajentic.environment.backend=simulated`. Health checks, restart policy,
       read-only root FS, non-root user, and a `cap_drop: [ALL]` baseline.
-- [ ] Shipping artifacts: a Helm values sketch and a plain `deploy/*.yaml` (Deployment + Service + NetworkPolicy
+- [x] Shipping artifacts: a Helm values sketch and a plain `deploy/*.yaml` (Deployment + Service + NetworkPolicy
       allowing only agent → connectors) so the "beside the agent" shape is reviewable, not just local compose.
-- [ ] Audit log: every mutating call from the sidecar records (actor, tool, target, result, masking-safe summary) to
+- [x] Audit log: every mutating call from the sidecar records (actor, tool, target, result, masking-safe summary) to
       `.ajentic/audit.jsonl` — the artifact that makes a demo credible.
-- [ ] Tests: signed request accepted / bad signature, stale timestamp and replayed nonce rejected; agent without a
+- [x] Tests: signed request accepted / bad signature, stale timestamp and replayed nonce rejected; agent without a
       sidecar still serves simulated episodes and returns a clear error for `cloud-live`; audit line written once per
       mutation.
-- [ ] Docs: topology diagram, secret placement table (which container holds what), and rotation procedure.
+- [x] Docs: topology diagram, secret placement table (which container holds what), and rotation procedure.
 
 **Files.** new `connectors/` module or package, new `agent/integration/SidecarClient.java`, `docker-compose.yml`,
 new `deploy/*.yaml`, `application.properties`, `README.md`.
@@ -783,24 +783,24 @@ contract, and an unreachable sidecar degrades gracefully instead of failing the 
 Deletes the picocli CLI. This deliberately reverses the "retain headless subcommands" decision recorded in branch 25
 and reduces branch 4 to "keep the MCP stdio bridge on a clean stdout". Land it after 29–32 to avoid churn.
 
-- [ ] Remove `cli/` (`AjenticCommand`, `AskCommand`, `ScenariosCommand`, `SimulateCommand`, `SchedulesCommand`,
+- [x] Remove `cli/` (`AjenticCommand`, `AskCommand`, `ScenariosCommand`, `SimulateCommand`, `SchedulesCommand`,
       `ServeCommand`, `SwaggerCommand`, `McpStdioCommand`, `CliMain`) and the `quarkus-picocli` dependency; a bare
       `java -jar target/quarkus-app/quarkus-run.jar` is the only entrypoint and always serves HTTP.
-- [ ] Preserve MCP: either switch to Quarkiverse `quarkus-mcp-server` (stdio + SSE transport) or keep a ~60-line
+- [x] Preserve MCP: either switch to Quarkiverse `quarkus-mcp-server` (stdio + SSE transport) or keep a ~60-line
       `@QuarkusMain` stdio shim that disables the HTTP listener and reuses `CdiToolRegistry`. Whichever is chosen must
       keep stdout valid JSON-RPC (branch 4 invariant) and must not spawn a second tool registry. Decide with a spike,
       record the outcome here.
-- [ ] Replace every removed command with an HTTP equivalent and a `curl` cookbook in `README.md`:
+- [x] Replace every removed command with an HTTP equivalent and a `curl` cookbook in `README.md`:
       `scenarios` → `GET /api/v1/scenarios`; `simulate` → `POST /api/v1/episodes/simulate`; `ask` →
       `POST /api/v1/agent/ask`; `schedules` → `GET /api/v1/schedules`; `swagger` → open `/q/swagger-ui`; `serve` →
       `java -jar …`. Add matching examples to the Swagger descriptions so the UI is self-documenting.
-- [ ] Rework tests: `CliEndToEndTest` → `ServerStartupTest` (bare jar binds `:8080`, redirects `/` → `/q/swagger-ui`,
+- [x] Rework tests: `CliEndToEndTest` → `ServerStartupTest` (bare jar binds `:8080`, redirects `/` → `/q/swagger-ui`,
       `/q/health` and `/q/openapi` respond) plus `McpStdioEndToEndTest` for whichever MCP path survives. Delete
       `@QuarkusMainTest` CLI launches and the `-Dquarkus.args=` tricks.
-- [ ] Sweep the build and docs: `Makefile` (drop command-based targets, keep `dev/test/verify/package`), `Dockerfile.jvm`
+- [x] Sweep the build and docs: `Makefile` (drop command-based targets, keep `dev/test/verify/package`), `Dockerfile.jvm`
       `CMD` and healthcheck, `AGENTS.md` command table (HTTP-first), `README.md` "Usage" section rewritten around
       Swagger + curl, `docker-compose.yml` comments. Grep for `quarkus.args`, `picocli`, `serve`, `swagger` leftovers.
-- [ ] Keep the operational niceties: `%dev` logging to stderr, banner off, dev-mode live reload, and a documented
+- [x] Keep the operational niceties: `%dev` logging to stderr, banner off, dev-mode live reload, and a documented
       "run a one-off task" recipe (`curl` or a scheduled endpoint) so scriptability is not lost.
 
 **Files.** `cli/*` (deleted), `pom.xml`, `src/test/java/io/ajentic/sre/cli/CliEndToEndTest.java`, `Makefile`,
@@ -818,11 +818,11 @@ documented HTTP equivalent, and Swagger UI is the single documented front door.
 - [x] `README.md` updated for new commands, endpoints, config keys, and backend matrix.
 - [x] No secrets or real infrastructure identifiers in logs, fixtures, or `.ajentic/` artifacts.
 - [x] New public types carry Javadoc consistent with the existing style; 4-space indent, LF, final newline.
-- [ ] `AGENTS.md` command table rewritten HTTP-first once branch 33 lands (no picocli subcommands survive; the table
+- [x] `AGENTS.md` command table rewritten HTTP-first once branch 33 lands (no picocli subcommands survive; the table
       lists `mvn` targets, HTTP endpoints, and the one jar entrypoint).
 - [x] Track 4 extra: no GitHub token, repo name, or file content leaves the process except to GitHub itself; every
       write path is behind both a token and `ajentic.tools.allow-mutations`.
-- [ ] Track 5 extra: agent containers hold no cloud or chat credentials (they live in the sidecar), every provider
+- [x] Track 5 extra: agent containers hold no cloud or chat credentials (they live in the sidecar), every provider
       adapter is offline-testable, and no branch adds a new CLI command.
 
 ## Track 6 — Ecosystem migration to Quarkus extensions

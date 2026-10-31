@@ -21,12 +21,13 @@ mvn test              # offline end-to-end suite
 | --------------------------------------- | ----------------------------------------------------------- |
 | [How it works](#how-it-works)           | The incident loop, the agent, and the scenarios             |
 | [Install](#install)                     | Requirements and build                                      |
-| [Run](#run)                             | Dev mode, packaged jar, CLI                                 |
+| [Run](#run)                             | Dev mode, packaged jar, HTTP server                         |
 | [Deploy](#deploy)                       | Container image and configuration                           |
-| [Use the CLI](#use-the-cli)             | `scenarios`, `simulate`, `ask`, `schedules`, `serve`, `mcp` |
+| [HTTP-First Usage](#http-first-usage)   | HTTP curl cookbook for scenarios, simulate, ask, benchmarks |
 | [Use the REST API](#use-the-rest-api)   | Episodes, sessions, schedules, OpenAPI                      |
 | [Use MCP](#use-mcp)                     | stdio and streamable HTTP transports                        |
 | [Scheduled drills](#scheduled-drills)   | Cron-backed recurring incidents                             |
+| [Sidecar Connectors](#sidecar-connectors) | Credential isolation, HMAC signing, audit logging         |
 | [ChatOps & OpenAI facade](#chatops--openai-facade) | Channels fan-out, inbound chat commands, OpenAI API facade |
 | [Configure the LLM](#configure-the-llm) | Providers, local llama.cpp, Azure                           |
 | [Test](#test)                           | End-to-end, WireMock, Pact, live mode                       |
@@ -103,9 +104,8 @@ mvn verify         # full validation, including packaging
 ## Run
 
 ```bash
-java -jar target/quarkus-app/quarkus-run.jar         # server on :8080
+java -jar target/quarkus-app/quarkus-run.jar         # server on :8080 (sole entrypoint)
 mvn quarkus:dev                                      # dev mode with live reload
-mvn quarkus:dev -Dquarkus.args="scenarios"           # run a CLI command in dev mode
 ```
 
 ## Deploy
@@ -131,25 +131,47 @@ The app is on `:8080`, Prometheus on `:9090`, and Grafana on `:3000` (anonymous 
 `src/main/docker/prometheus.yml` and the Grafana provisioning lives under `src/main/docker/grafana/`.
 `AJENTIC_LLM_BASE_URL` defaults to the host llama.cpp router via `host.docker.internal`.
 
-## Use the CLI
+## HTTP-First Usage
+
+ajentic-sre is an HTTP-first service. Root `/` redirects (303) straight to Swagger UI at `/q/swagger-ui`.
+Every previous CLI subcommand is accessible via standard REST endpoints or Swagger UI:
+
+| Former CLI Command                                                                 | HTTP Equivalent Endpoint                   | Method | Description |
+| ---------------------------------------------------------------------------------- | ------------------------------------------ | ------ | ----------- |
+| `scenarios`                                                                        | `/api/v1/scenarios`                        | `GET`  | List scenario library |
+| `simulate --scenario <id> [--policy heuristic]`                                    | `/api/v1/episodes/simulate`                 | `POST` | One-shot scenario simulation |
+| `ask "<question>" [--scenario <id>]`                                               | `/api/v1/agent/ask`                        | `POST` | Ask the LLM agent an incident question |
+| `benchmark --scenarios <ids> --seeds N --policy <p>`                               | `/api/v1/benchmarks`                       | `POST` | Run benchmark across policies & seeds |
+| `schedules`                                                                        | `/api/v1/schedules`                        | `GET`  | List scheduled drills |
+| `schedules --add <name> --cron '<cron>' --scenario <id>`                           | `/api/v1/schedules`                        | `POST` | Create a drill schedule |
+| `schedules --run <id>`                                                             | `/api/v1/schedules/{id}/run`               | `POST` | Trigger an immediate drill execution |
+| `serve` / `swagger`                                                                | `java -jar …`                              | —      | Starts HTTP server (:8080) & Swagger UI |
+| `mcp`                                                                              | `/mcp` or stdio                            | `POST` | Quarkiverse MCP Server protocol |
+
+### HTTP Curl Cookbook
 
 ```bash
-ajentic-sre <command> [options]
-```
+# 1. List available scenarios
+curl -s http://localhost:8080/api/v1/scenarios | jq
 
-Commands other than `serve` start without the HTTP listener, so they can run while a server owns `:8080`. Logs go
-to stderr; stdout carries only command output (and the MCP JSON-RPC stream for `mcp`).
+# 2. Run a one-shot incident simulation
+curl -s -X POST http://localhost:8080/api/v1/episodes/simulate \
+  -H 'Content-Type: application/json' \
+  -d '{"scenarioId": "orders-bad-deployment", "policy": "heuristic", "seed": 42}' | jq
 
-| Command                                                                            | Purpose                               |
-| ---------------------------------------------------------------------------------- | ------------------------------------- |
-| `scenarios`                                                                        | List the scenario library             |
-| `simulate --scenario <id> [--policy heuristic\|idle\|llm\|random] [--seed 42]`     | Run a scenario with a baseline policy |
-| `benchmark --scenarios all\|<ids> --seeds N [--policy heuristic\|random\|llm\|all] [--model <id>] [--json]` | Compare policies; writes `.ajentic/benchmarks/<ts>.json` |
-| `ask "<question>" [--scenario <id>]`                                               | Ask the LLM agent one question        |
-| `schedules [--add <name> --cron '<cron>' --scenario <id>] [--tick] [--run <name>]` | Manage drills                         |
-| `serve`                                                                            | Start the HTTP API and block          |
-| `swagger`                                                                          | Start the HTTP API and show Swagger UI URL |
-| `mcp`                                                                              | Serve tools over MCP on stdin/stdout  |
+# 3. Ask the agent to investigate an incident
+curl -s -X POST http://localhost:8080/api/v1/agent/ask \
+  -H 'Content-Type: application/json' \
+  -d '{"scenarioId": "checkout-latency-db-pool", "question": "Why is checkout-api latency spiking?", "seed": 42}' | jq
+
+# 4. Run benchmarks across policies and seeds
+curl -s -X POST http://localhost:8080/api/v1/benchmarks \
+  -H 'Content-Type: application/json' \
+  -d '{"scenarios": ["orders-bad-deployment", "checkout-latency-db-pool"], "seeds": 2, "policies": ["HEURISTIC", "RANDOM"]}' | jq
+
+# 5. List and trigger scheduled incident drills
+curl -s http://localhost:8080/api/v1/schedules | jq
+curl -s -X POST http://localhost:8080/api/v1/schedules/<id>/run | jq
 
 ## Use the REST API
 
@@ -188,6 +210,7 @@ curl -s -X POST localhost:8080/api/v1/episodes/$EPISODE/run \
 | `POST`                    | `/agent/sessions/{id}/chat`     | One ReAct turn                            |
 | `POST`                    | `/agent/sessions/{id}/chat/stream` | One ReAct turn as server-sent events (`thought`, `tool_call`, `tool_result`, `usage`, `done`, `error`) |
 | `POST`                    | `/agent/ask`                    | One-shot incident investigation           |
+| `POST`                    | `/benchmarks`                   | Benchmark policies across scenarios/seeds |
 | `DELETE`                  | `/agent/sessions/{id}`          | End a session                             |
 | `GET` / `POST` / `DELETE` | `/schedules` …                  | See [scheduled drills](#scheduled-drills) |
 | `POST`                    | `/webhooks/alertmanager`, `/webhooks/pagerduty`, `/webhooks/cloudwatch-sns` | Alert intake, see [alert webhooks](#alert-webhooks) |
@@ -199,13 +222,12 @@ curl -s -X POST localhost:8080/api/v1/episodes/$EPISODE/run \
 
 ## Use MCP
 
-The tool registry speaks Model Context Protocol over JSON-RPC 2.0. Two transports share one handler, so an
-MCP host and a REST client see the same tools:
+The tool registry speaks Model Context Protocol over JSON-RPC 2.0 via Quarkiverse MCP Server. It provides
+both stdio and HTTP transports:
 
 ```bash
-mvn quarkus:dev -Dquarkus.args="mcp"      # stdio, for local MCP hosts
-
-curl -s localhost:8080/api/v1/mcp \       # streamable HTTP
+# Streamable HTTP MCP endpoint
+curl -s localhost:8080/mcp \
   -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | jq
 ```
@@ -505,9 +527,32 @@ curl -s -X POST localhost:8080/api/v1/schedules/$SCHEDULE/run | jq
 curl -s localhost:8080/api/v1/schedules/drills | jq
 ```
 
-In server mode `QuarkusScheduleTicker` drives `tick()` on a virtual thread. The CLI and tests call `tick()`
+In server mode `QuarkusScheduleTicker` drives `tick()` on a virtual thread. The tests call `tick()`
 themselves, which keeps them deterministic. Dispatch is capped by a concurrency limit, and failed or
 deferred runs go to a recovery lane.
+
+## Sidecar Connectors
+
+ajentic-sre decouples sensitive cloud credentials and chat webhooks from the core reasoning agent via a
+credential-isolated sidecar connector architecture:
+
+- **Security Isolation:** The agent container has no cloud secrets, AWS access keys, or Slack webhooks.
+- **HMAC-SHA256 Signing:** All calls between agent and sidecar are signed with HMAC-SHA256, checking a 5-minute timestamp window and an anti-replay nonce cache.
+- **Fail-Closed Resilience:** If the sidecar is unreachable, the agent fails closed (`503` tool error) rather than crashing, continuing with read-only in-memory tools.
+- **Mutating Audit Log:** Every mutating remediation call records actor, action, target, result, and timestamp to `.ajentic/audit.jsonl`.
+
+### Secret Placement Matrix
+
+| Secret / Credential | Held by Agent? | Held by Sidecar Connectors? |
+| ------------------- | :------------: | :-------------------------: |
+| `AJENTIC_AWS_*` (Access Key / Secret) | ❌ No | ✅ Yes |
+| `AJENTIC_AZURE_*` (Client Secret / OAuth) | ❌ No | ✅ Yes |
+| `AJENTIC_GCP_*` (Service Account Key) | ❌ No | ✅ Yes |
+| Chat Webhooks (Slack, Discord, Teams) | ❌ No | ✅ Yes |
+| Sidecar Shared Secret (`ajentic.sidecar.shared-secret`) | ✅ Yes | ✅ Yes |
+| Local LLM / WireMock config | ✅ Yes | ❌ No |
+
+Manifests for Kubernetes sidecar deployment live under `deploy/` (`deployment.yaml`, `service.yaml`, `networkpolicy.yaml`, `helm-values.yaml`).
 
 ## External scenario packs
 
@@ -656,12 +701,14 @@ specific) first, so compound identifiers are redacted whole before generic patte
 | `AgentSessionEndToEndTest`     | ReAct loop over the real HTTP client against WireMock        |
 | `GitHubCodeToolsTest`          | Zero-clone GitHub REST operations over WireMock              |
 | `GitHubTokenMaskingTest`       | PAT masking (classic `ghp_`, fine-grained `github_pat_`, app `ghs_`) |
-| `MulticloudMaskingTest`          | GCP/Azure/K8s/Bearer/AWS categories: round-trip, stability, no over-masking |
+| `MulticloudMaskingTest`        | GCP/Azure/K8s/Bearer/AWS categories: round-trip, stability, no over-masking |
 | `LlmConsumerPactContractTest`  | OpenAI-compatible and Azure wire contracts (`target/pacts/`) |
 | `SchedulerEndToEndTest`        | Cron correctness, versioning, concurrency, recovery          |
 | `ApiEndToEndTest`              | REST surface, including the MCP HTTP transport               |
-| `McpProtocolEndToEndTest`      | The JSON-RPC handler the stdio command uses                  |
-| `CliEndToEndTest`              | Picocli commands                                             |
+| `McpProtocolEndToEndTest`      | Quarkiverse MCP tools, resources, prompts and HTTP transport |
+| `ServerStartupTest`            | Bare jar startup, Swagger UI redirect, health, OpenAPI       |
+| `SidecarConnectorsEndToEndTest`| Sidecar HMAC auth, replay defense, credential isolation      |
+| `CloudProviderAdaptersTest`    | AWS, Azure, GCP signing, token sources, resilient HTTP client |
 
 Stubs live in `src/test/resources/wiremock/`, started by `WireMockLlmTestResource`. To point the suite at a
 live endpoint instead, run `mvn test -Plive-llm` and override with `AJENTIC_LLM_BASE_URL` or
@@ -677,15 +724,18 @@ test. The default run stays offline.
 io.ajentic.sre
 ├── rl                  environment contracts, rewards, episodes, policies, simulation
 ├── agent
+│   ├── alerts          cloud alert normalizer and automated remediation
 │   ├── context         ScopedValue execution context for virtual threads
-│   ├── llm             Jackson 3 client, scripted and OpenAI-compatible
+│   ├── github          type-safe GitHub REST client
+│   ├── integration     chat channels (Slack, Discord, Teams) and sidecar client
+│   ├── llm             LangChain4j chat model integration
 │   ├── masking         per-request identifier masking and unmasking
-│   ├── mcp             transport-agnostic MCP JSON-RPC handler
+│   ├── mcp             Quarkiverse MCP resources and prompts
 │   ├── session         ReAct session, conversation, goals, session registry
-│   └── tool            tool contract, CDI registry, built-in tools
+│   └── tool            tool contract, CDI toolboxes, built-in tools
+├── connectors          credential-isolated sidecar security (HMAC-SHA256) and audit logging
 ├── schedule            cron, versioned store, bounded engine, drill runner
 ├── api                 JAX-RS resources, mappers, typed payloads
-├── cli                 Picocli commands, including the MCP stdio bridge
 └── health              liveness and readiness checks
 ```
 
