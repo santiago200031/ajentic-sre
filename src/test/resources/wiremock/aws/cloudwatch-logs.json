@@ -1,0 +1,13 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "/logs/filter-log-events"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{\"events\": [{\"message\": \"2026-01-01T00:00:00Z ECS task failed: connection refused to orders-db\"}]}"
+  }
+}

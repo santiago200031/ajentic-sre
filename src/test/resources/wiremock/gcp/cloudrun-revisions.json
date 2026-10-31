@@ -1,0 +1,13 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPattern": "/v1/projects/.*/locations/us-central1/services/.*/revisions"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{\"revisions\": [{\"name\": \"orders-api-00002-xyz\", \"createTime\": \"2026-01-01T00:00:00Z\"}]}"
+  }
+}

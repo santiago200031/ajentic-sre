@@ -1,0 +1,13 @@
+{
+  "request": {
+    "method": "POST",
+    "urlPattern": "/v1/workspaces/.*/query"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{\"tables\": [{\"rows\": [[\"2026-01-01T00:00:00Z Azure container error: timeout connecting to backend\"]]}]}"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "/cloudwatch/get-metric-data"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{\"MetricDataResults\": [{\"Id\": \"m1\", \"Values\": [0.08]}, {\"Id\": \"m2\", \"Values\": [350.0]}]}"
+  }
+}

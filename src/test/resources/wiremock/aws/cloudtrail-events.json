@@ -1,0 +1,13 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "/cloudtrail/lookup-events"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{\"Events\": [{\"EventName\": \"UpdateService\", \"EventTime\": 1735689600}]}"
+  }
+}

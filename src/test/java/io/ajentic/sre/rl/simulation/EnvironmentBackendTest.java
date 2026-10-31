@@ -61,10 +61,16 @@ class EnvironmentBackendTest {
     void liveBackendsAreSelectableAndTolerateUnreachableEndpoints() {
         Environment local = factory("local-container").create("orders-bad-deployment", 1L);
         Environment cloud = factory("cloud-live").create("orders-bad-deployment", 1L);
+        Environment aws = factory("aws-live").create("orders-bad-deployment", 1L);
+        Environment azure = factory("azure-live").create("orders-bad-deployment", 1L);
+        Environment gcp = factory("gcp-live").create("orders-bad-deployment", 1L);
 
         // Unreachable endpoints must not throw; with no readings, nothing is resolved.
         assertFalse(local.isResolved());
         assertFalse(cloud.isResolved());
+        assertFalse(aws.isResolved());
+        assertFalse(azure.isResolved());
+        assertFalse(gcp.isResolved());
         assertFalse(local.isTerminal());
     }
 }

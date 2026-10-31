@@ -1,0 +1,13 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "/v2/entries:list"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{\"entries\": [{\"textPayload\": \"2026-01-01T00:00:00Z GCP Cloud Run container terminated with signal 9 (SIGKILL)\"}]}"
+  }
+}

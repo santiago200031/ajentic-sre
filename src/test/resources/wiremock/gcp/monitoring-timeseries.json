@@ -1,0 +1,13 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPattern": "/v3/projects/.*/timeSeries.*"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{\"timeSeries\": [{\"points\": [{\"value\": {\"doubleValue\": 0.11}}]}]}"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPattern": "/subscriptions/.*/providers/microsoft.insights/metrics.*"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{\"value\": [{\"name\": {\"value\": \"Errors\"}, \"timeseries\": [{\"data\": [{\"average\": 0.12}]}]}]}"
+  }
+}
