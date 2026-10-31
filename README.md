@@ -213,11 +213,20 @@ and `prompts/get`. `POST` takes one request or a batch array, and malformed JSON
 `GET` returns discovery metadata; `DELETE` clears the active episode.
 
 - Lifecycle tools: `list_scenarios`, `start_episode`, `run_incident_drill`.
-- Investigation tools: `query_telemetry`, `inspect_recent_changes`, `correlate_anomalies`, `get_service_topology`, `read_runbook`, `list_remediations` (READ) and `apply_remediation`, `declare_diagnosis`, `post_incident_summary` (MUTATE).
+- Investigation tools: `query_telemetry`, `inspect_recent_changes`, `correlate_anomalies`, `get_service_topology`, `read_runbook`, `list_remediations`, `search_past_incidents` (READ) and `apply_remediation`, `declare_diagnosis`, `post_incident_summary` (MUTATE).
 - GitHub code tools: `github_list_files`, `github_read_file`, `github_get_ci_status` (READ) and `github_create_branch`, `github_commit_file`, `github_create_pull_request` (MUTATE).
 - Resources: `sre://scenarios/{scenarioId}`, `sre://topology/{scenarioId}`, and `sre://runbooks/{scenarioId}/{runbookId}`.
 - Prompts: `investigate-incident` and `summarize-postmortem`.
 - A `tools/call` can pass `_scenarioId` to start an episode, or `_episodeId` to reuse one.
+
+## Episodic memory
+
+Completed episodes are persisted as one JSON line each in `.ajentic/incidents.jsonl` (append-only, fsync'd on
+every write, rotated when the file grows past `ajentic.memory.max-file-size`). Text fields are masked before they
+reach disk. `search_past_incidents` queries the store by symptom text, service, and fault kind (newest first), and
+every new agent session's system prompt includes a short "Similar past incidents" summary for the same service
+and fault kind when one exists. Corrupt lines are skipped, never fatal. Disable with
+`ajentic.memory.enabled=false`.
 
 ## Stream a chat turn (SSE)
 
@@ -362,6 +371,9 @@ sends `Authorization: Bearer <key>`, unless `ajentic.llm.api-key-header` says ot
 | `ajentic.tools.mutation-policy`           |                                   | Mutating-tool gate: `allow` \| `deny` \| `require-approval`; wins over `allow-mutations` |
 | `ajentic.tools.allow-mutations`           | `true`                            | Legacy boolean gate for mutating tools when `mutation-policy` is unset           |
 | `ajentic.approval.ttl`                    | `10m`                             | How long a pending mutating call waits for a decision before auto-deny          |
+| `ajentic.memory.enabled`                  | `true`                            | Persist completed episodes to `.ajentic/incidents.jsonl` and feed them back     |
+| `ajentic.memory.dir`                      | `.ajentic`                        | Directory holding `incidents.jsonl`                                            |
+| `ajentic.memory.max-file-size`            | `1048576`                         | Rotation threshold (bytes) for `incidents.jsonl`                                |
 | `ajentic.agent.max-tokens`                | `0`                               | Cumulative session token budget; `0` disables the hard stop                     |
 | `ajentic.agent.stagnation.threshold`      | `2`                               | Repeated identical tool call count that yields a "try something else" hint      |
 | `ajentic.agent.stagnation.escalate-after` | `3`                               | Repeated identical tool call count that stops the loop with a diagnostic answer |

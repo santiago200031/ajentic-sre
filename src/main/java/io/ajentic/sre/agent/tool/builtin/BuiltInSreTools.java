@@ -2,6 +2,8 @@ package io.ajentic.sre.agent.tool.builtin;
 
 import io.ajentic.sre.agent.integration.IncidentSummary;
 import io.ajentic.sre.agent.integration.NotificationChannel;
+import io.ajentic.sre.agent.memory.IncidentMemoryStore;
+import io.ajentic.sre.agent.memory.StoredIncident;
 import io.ajentic.sre.agent.context.AgentExecutionContext;
 import io.ajentic.sre.agent.tool.AgentTool;
 import io.ajentic.sre.agent.tool.Capability;
@@ -49,6 +51,7 @@ public class BuiltInSreTools {
     private final EpisodeService episodes;
     private final EpisodeCursor cursor;
     private final IncidentDrillRunner drills;
+    private final IncidentMemoryStore memory;
     private final String defaultScenarioId;
 
     @Inject
@@ -58,6 +61,7 @@ public class BuiltInSreTools {
             EpisodeService episodes,
             EpisodeCursor cursor,
             IncidentDrillRunner drills,
+            IncidentMemoryStore memory,
             @ConfigProperty(name = "ajentic.mcp.default-scenario", defaultValue = "checkout-latency-db-pool")
             String defaultScenarioId) {
         this.scenarios = scenarios;
@@ -65,6 +69,7 @@ public class BuiltInSreTools {
         this.episodes = episodes;
         this.cursor = cursor;
         this.drills = drills;
+        this.memory = memory;
         this.defaultScenarioId = defaultScenarioId;
     }
 
@@ -151,6 +156,30 @@ public class BuiltInSreTools {
         return ToolResult.ok(result.observation().feedback(), Map.of(
                 "reward", result.reward(),
                 "terminal", result.done()));
+    }
+
+    @AgentTool(name = "search_past_incidents", description = "Search previously resolved incidents by symptom text, service, and fault kind.")
+    public ToolResult searchPastIncidents(
+            @ToolParam("Symptom text to search for (blank = any).") String query,
+            @ToolParam("Service name (blank = any).") String service,
+            @ToolParam("Fault kind, e.g. DB_POOL_EXHAUSTION (blank = any).") String faultKind,
+            @ToolParam("Maximum number of results.") Integer limit) {
+        int max = limit == null || limit < 1 ? 3 : limit;
+        List<StoredIncident> matches = memory.search(query, service, faultKind, max);
+        if (matches.isEmpty()) {
+            return ToolResult.ok("No past incidents match.");
+        }
+        String content = matches.stream()
+                .map(incident -> "- %s [%s/%s] solved=%s reward=%.2f%s%s".formatted(
+                        incident.scenarioId(),
+                        incident.service(),
+                        incident.faultKind(),
+                        incident.solved(),
+                        incident.reward(),
+                        incident.diagnosis().isBlank() ? "" : " | diagnosis: " + incident.diagnosis(),
+                        incident.remediation().isBlank() ? "" : " | remediation: " + incident.remediation()))
+                .collect(Collectors.joining("\n"));
+        return ToolResult.ok(content, Map.of("count", matches.size()));
     }
 
     @AgentTool(name = "get_service_topology", description = "Show the service dependency graph for the active scenario.")

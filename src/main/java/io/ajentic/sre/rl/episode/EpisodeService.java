@@ -1,6 +1,7 @@
 package io.ajentic.sre.rl.episode;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
+import io.ajentic.sre.agent.memory.IncidentMemoryStore;
 import io.ajentic.sre.rl.Environment;
 import io.ajentic.sre.rl.policy.Policy;
 import io.ajentic.sre.rl.simulation.EnvironmentFactory;
@@ -24,13 +25,16 @@ public class EpisodeService {
     private final EnvironmentFactory environments;
     private final EpisodeRunner runner;
     private final MeterRegistry meters;
+    private final IncidentMemoryStore memory;
     private final Map<String, EpisodeHandle> episodes;
 
     @Inject
-    public EpisodeService(EnvironmentFactory environments, EpisodeRunner runner, MeterRegistry meters) {
+    public EpisodeService(EnvironmentFactory environments, EpisodeRunner runner, MeterRegistry meters,
+                          IncidentMemoryStore memory) {
         this.environments = environments;
         this.runner = runner;
         this.meters = meters;
+        this.memory = memory;
         this.episodes = Caffeine.newBuilder()
                 .maximumSize(DEFAULT_MAX_ACTIVE)
                 .<String, EpisodeHandle>build()
@@ -53,6 +57,7 @@ public class EpisodeService {
         EpisodeHandle handle = find(id).orElseThrow(() -> new UnknownEpisodeException(id));
         EpisodeResult result = runner.run(id, handle.environment(), policy);
         handle.complete(result);
+        memory.save(result);
         meters.counter("ajentic.episodes.finished",
                 "scenario", result.scenarioId(),
                 "solved", Boolean.toString(result.solved())).increment();
