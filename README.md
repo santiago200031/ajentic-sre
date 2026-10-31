@@ -308,8 +308,14 @@ sends `Authorization: Bearer <key>`, unless `ajentic.llm.api-key-header` says ot
 | Backend                     | Status                                                                                   |
 | --------------------------- | -------------------------------------------------------------------------------------- |
 | `simulated` *(default)*     | Deterministic, offline; the only backend used by tests and CI                            |
-| `local-container`           | Reserved for a live adapter; not implemented yet (fails fast on use)                    |
-| `cloud-live`                | Reserved for a live adapter; not implemented yet (fails fast on use)                    |
+| `local-container`           | Live adapters over Prometheus/Loki HTTP; remediation dispatched only when `AJENTIC_LIVE_REMEDIATION_URL` is set   |
+| `cloud-live`                | The same live adapters, read-only: `apply_remediation` returns a shadow-mode result and nothing is dispatched        |
+
+Live endpoints are `ajentic.live.prometheus-url` (default `http://localhost:9090`) and `ajentic.live.loki-url`
+(default `http://localhost:3100`), overridable via `AJENTIC_LIVE_PROMETHEUS_URL` / `AJENTIC_LIVE_LOKI_URL`.
+Every request is bounded by `ajentic.live.timeout` (default `5s`) with bounded retries and a per-backend circuit
+breaker; upstream failures surface as tool errors, not crashes. Live telemetry is tested with WireMock stubs, so
+`mvn test` stays offline.
 
 Unknown values fail fast at startup, and the active backend is logged when the application boots.
 

@@ -20,10 +20,10 @@ suite offline (`mvn test`, WireMock stubs, no model, no network), and targets Ja
 | 11 | `feat/investigation-tools` | 2 | `inspect_recent_changes`, `correlate_anomalies`, topology tool | 10 | ✅ done |
 | 12 | `feat/stagnation-breaker` | 2 | Duplicate tool-call detection with synthetic hint | 2 | ✅ done |
 | 13 | `feat/token-usage-budget` | 2 | Cumulative usage in `Conversation`/`ChatResponse` | — | ✅ done |
-| 14 | `feat/llm-policy-adapter` | 2 | `@PolicyModel(LLM)` ReAct policy | 2, 13 | ⬜ todo |
-| 15 | `feat/benchmark-cli` | 2 | `benchmark` subcommand + scorecard | 14 | ⬜ todo |
-| 16 | `feat/environment-backends` | 3 | `ajentic.environment.backend` strategy | 6, 10 | ⬜ todo |
-| 17 | `feat/live-telemetry-adapters` | 3 | `local-container` / `cloud-live` read-only adapters | 16 | ⬜ todo |
+| 14 | `feat/llm-policy-adapter` | 2 | `@PolicyModel(LLM)` ReAct policy | 2, 13 | ✅ done |
+| 15 | `feat/benchmark-cli` | 2 | `benchmark` subcommand + scorecard | 14 | ✅ done |
+| 16 | `feat/environment-backends` | 3 | `ajentic.environment.backend` strategy | 6, 10 | ✅ done |
+| 17 | `feat/live-telemetry-adapters` | 3 | `local-container` / `cloud-live` read-only adapters | 16 | ✅ done |
 | 18 | `feat/sse-chat-stream` | 3 | `/chat/stream` SSE | 13 | ⬜ todo |
 | 19 | `feat/alert-webhooks` | 3 | Alertmanager/PagerDuty/SNS intake | 16, 18 | ⬜ todo |
 | 20 | `feat/llm-fallback-router` | 3 | Local-first composite LLM client | 13 | ⬜ todo |
@@ -352,17 +352,19 @@ overwrite each other's active episode unless every call passes `_episodeId`.
 
 ### 17. `feat/live-telemetry-adapters`
 
-- [ ] `local-container`: `query_telemetry` queries local Prometheus (`/api/v1/query_range`) and Loki
-      (`/loki/api/v1/query_range`) via JDK `HttpClient`; `apply_remediation` restarts/scales local containers or
-      LocalStack resources (ECS/Lambda/SSM).
-- [ ] `cloud-live` (read-only): map telemetry to Prometheus/Grafana Tempo/Loki or native cloud REST APIs (AWS AMP,
-      GCP GMP, Azure Monitor) — no heavy cloud SDK BOMs.
-- [ ] Enforce read-only in `cloud-live` regardless of `ajentic.tools.allow-mutations`; `apply_remediation` returns a
-      "shadow mode" result.
-- [ ] Add timeouts, bounded retries, and a circuit breaker; never block a virtual thread indefinitely.
-- [ ] Tests: WireMock/local HTTP stubs for Prometheus/Loki responses; a mutation attempt in `cloud-live` is rejected;
-      upstream 5xx surfaces as a tool error, not a crash.
-- [ ] Document required endpoints/env vars per environment.
+- [x] `local-container`: `query_telemetry` queries Prometheus (`/api/v1/query_range`) and Loki
+      (`/loki/api/v1/query_range`) via JDK `HttpClient`; `apply_remediation` POSTs to `AJENTIC_LIVE_REMEDIATION_URL`
+      when set, otherwise it is never dispatched.
+- [x] `cloud-live` (read-only): same Prometheus/Loki telemetry adapters, no cloud SDK BOMs; all metrics/logs come
+      over HTTP.
+- [x] Enforce read-only in `cloud-live` regardless of `ajentic.tools.allow-mutations`; `apply_remediation` returns a
+      "shadow mode" result and no request is sent.
+- [x] Timeouts (`ajentic.live.timeout`, default 5s), bounded retries, and a per-backend circuit breaker (3 failures
+      open it); upstream 4xx/5xx and timeouts become `LiveHttpException`, surfaced as tool errors.
+- [x] Tests: WireMock stubs for Prometheus/Loki responses; a mutation attempt in `cloud-live` never hits the
+      remediation endpoint; upstream 5xx surfaces as a tool error, not a crash.
+- [x] Document required endpoints/env vars per environment (`AJENTIC_LIVE_PROMETHEUS_URL`,
+      `AJENTIC_LIVE_LOKI_URL`, `AJENTIC_LIVE_REMEDIATION_URL`).
 
 **Files.** new `rl/environment/local/*`, `rl/environment/cloud/*`, `agent/tool/builtin/BuiltInSreTools.java`
 (delegate through `Environment` only), `application.properties`.

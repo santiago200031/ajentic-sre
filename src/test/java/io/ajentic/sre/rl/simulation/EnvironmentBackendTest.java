@@ -8,9 +8,12 @@ import io.ajentic.sre.rl.action.QueryTelemetry;
 import io.ajentic.sre.rl.reward.IncidentRewardFunction;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
@@ -20,7 +23,14 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class EnvironmentBackendTest {
 
     private EnvironmentFactory factory(String backend) {
-        return new EnvironmentFactory(new ScenarioLibrary(), new IncidentRewardFunction(), backend);
+        return new EnvironmentFactory(
+                new ScenarioLibrary(),
+                new IncidentRewardFunction(),
+                backend,
+                "http://localhost:9090",
+                "http://localhost:3100",
+                Optional.empty(),
+                Duration.ofSeconds(5));
     }
 
     @Test
@@ -48,10 +58,13 @@ class EnvironmentBackendTest {
     }
 
     @Test
-    void liveBackendsAreSelectableButNotImplementedYet() {
-        assertThrows(UnsupportedOperationException.class,
-                () -> factory("local-container").create("orders-bad-deployment", 1L));
-        assertThrows(UnsupportedOperationException.class,
-                () -> factory("cloud-live").create("orders-bad-deployment", 1L));
+    void liveBackendsAreSelectableAndTolerateUnreachableEndpoints() {
+        Environment local = factory("local-container").create("orders-bad-deployment", 1L);
+        Environment cloud = factory("cloud-live").create("orders-bad-deployment", 1L);
+
+        // Unreachable endpoints must not throw; with no readings, nothing is resolved.
+        assertFalse(local.isResolved());
+        assertFalse(cloud.isResolved());
+        assertFalse(local.isTerminal());
     }
 }

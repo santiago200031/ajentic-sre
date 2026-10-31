@@ -47,6 +47,8 @@ Surefire is configured with `<skipITs>true</skipITs>`, so failsafe integration t
   instead.
 - Test HTTP port is 8081 (`quarkus.http.test-port`); dev/prod port is 8080.
 - Mutating tools are gated by `ajentic.tools.allow-mutations=true` (default on).
+- Live telemetry backends (`local-container` / `cloud-live`) are tested offline: `LiveTelemetryEnvironmentTest`
+  stubs Prometheus/Loki with a programmatic WireMock on a dynamic port; no external services needed.
 
 ## Entrypoints & layout
 
