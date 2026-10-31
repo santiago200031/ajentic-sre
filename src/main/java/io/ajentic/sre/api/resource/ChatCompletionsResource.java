@@ -1,5 +1,7 @@
 package io.ajentic.sre.api.resource;
 
+import io.ajentic.sre.agent.integration.ChatCrypto;
+import io.ajentic.sre.agent.llm.ChatMessage;
 import io.ajentic.sre.agent.session.AgentSession;
 import io.ajentic.sre.agent.session.AgentSessionConfig;
 import io.ajentic.sre.agent.session.ChatTurnResult;
@@ -34,8 +36,10 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -131,19 +135,24 @@ public class ChatCompletionsResource {
         }
 
         String prompt = extractUserPrompt(request.messages());
+        int lastUserIdx = findLastUserIndex(request.messages());
         String activeModel = (request.model() != null && !request.model().isBlank()) ? request.model() : configuredModel;
 
         boolean isStream = request.isStream();
         if (!isStream) {
-            return handleNonStreamCompletion(prompt, activeModel, request.user());
+            return handleNonStreamCompletion(request.messages(), prompt, lastUserIdx, activeModel, request.user());
         } else {
-            return handleStreamCompletion(prompt, activeModel, request.user());
+            return handleStreamCompletion(request.messages(), prompt, lastUserIdx, activeModel, request.user());
         }
     }
 
-    private Response handleNonStreamCompletion(String prompt, String modelName, String userId) {
+    private Response handleNonStreamCompletion(List<ChatMessageDto> messages, String prompt, int lastUserIdx, String modelName, String userId) {
         boolean reuseSession = userId != null && !userId.isBlank();
-        AgentSession session = resolveSession(userId, modelName);
+        boolean[] isNew = new boolean[1];
+        AgentSession session = resolveSession(userId, modelName, isNew);
+        if (isNew[0]) {
+            seedConversation(session, messages, lastUserIdx);
+        }
         try {
             ChatTurnResult result = session.chat(prompt);
             long now = Instant.now().getEpochSecond();
@@ -177,9 +186,13 @@ public class ChatCompletionsResource {
         }
     }
 
-    private Response handleStreamCompletion(String prompt, String modelName, String userId) {
+    private Response handleStreamCompletion(List<ChatMessageDto> messages, String prompt, int lastUserIdx, String modelName, String userId) {
         boolean reuseSession = userId != null && !userId.isBlank();
-        AgentSession session = resolveSession(userId, modelName);
+        boolean[] isNew = new boolean[1];
+        AgentSession session = resolveSession(userId, modelName, isNew);
+        if (isNew[0]) {
+            seedConversation(session, messages, lastUserIdx);
+        }
         long created = Instant.now().getEpochSecond();
         String id = "chatcmpl-" + session.id();
 
@@ -249,13 +262,15 @@ public class ChatCompletionsResource {
         out.flush();
     }
 
-    private AgentSession resolveSession(String userId, String modelName) {
+    private AgentSession resolveSession(String userId, String modelName, boolean[] isNew) {
         if (userId != null && !userId.isBlank()) {
             Optional<AgentSession> existing = sessions.find(userId);
             if (existing.isPresent()) {
+                isNew[0] = false;
                 return existing.get();
             }
         }
+        isNew[0] = true;
         AgentSessionConfig config = new AgentSessionConfig(
                 defaultScenario,
                 DEFAULT_SEED,
@@ -265,28 +280,57 @@ public class ChatCompletionsResource {
         return sessions.create(config);
     }
 
+    private static final Set<String> DEFAULT_MODEL_ALIASES = Set.of("default", "ajentic-sre");
+
     private boolean isAllowedModel(String model) {
         if (model == null) {
             return false;
         }
         String trimmed = model.trim();
         return trimmed.equalsIgnoreCase(configuredModel)
-                || trimmed.equalsIgnoreCase("ajentic-sre")
-                || trimmed.equalsIgnoreCase("default")
-                || trimmed.equalsIgnoreCase("wm-default")
-                || trimmed.equalsIgnoreCase("wm-stream")
-                || trimmed.equalsIgnoreCase("wm-approval");
+                || DEFAULT_MODEL_ALIASES.contains(trimmed.toLowerCase(Locale.ROOT));
+    }
+
+    private int findLastUserIndex(List<ChatMessageDto> messages) {
+        if (messages == null || messages.isEmpty()) {
+            return -1;
+        }
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            ChatMessageDto msg = messages.get(i);
+            if (msg.role() != null && ROLE_USER.equalsIgnoreCase(msg.role().trim())) {
+                return i;
+            }
+        }
+        return messages.size() - 1;
+    }
+
+    private void seedConversation(AgentSession session, List<ChatMessageDto> messages, int lastUserIdx) {
+        if (messages == null || lastUserIdx <= 0) {
+            return;
+        }
+        for (int i = 0; i < lastUserIdx; i++) {
+            ChatMessageDto msg = messages.get(i);
+            if (msg == null || msg.content() == null || msg.content().isBlank()) {
+                continue;
+            }
+            String role = msg.role() != null ? msg.role().toLowerCase(Locale.ROOT).trim() : ROLE_USER;
+            switch (role) {
+                case ROLE_USER -> session.conversation().add(ChatMessage.user(msg.content()));
+                case ROLE_ASSISTANT -> session.conversation().add(ChatMessage.assistant(msg.content()));
+                case "system" -> session.conversation().add(ChatMessage.system(msg.content()));
+                default -> session.conversation().add(ChatMessage.user(msg.content()));
+            }
+        }
     }
 
     private String extractUserPrompt(List<ChatMessageDto> messages) {
         if (messages == null || messages.isEmpty()) {
             return "";
         }
-        for (int i = messages.size() - 1; i >= 0; i--) {
-            ChatMessageDto msg = messages.get(i);
-            if (msg.role() != null && ROLE_USER.equalsIgnoreCase(msg.role().trim())) {
-                return msg.content() != null ? msg.content() : "";
-            }
+        int idx = findLastUserIndex(messages);
+        if (idx >= 0 && idx < messages.size()) {
+            String content = messages.get(idx).content();
+            return content != null ? content : "";
         }
         ChatMessageDto last = messages.getLast();
         return last.content() != null ? last.content() : "";
@@ -296,16 +340,28 @@ public class ChatCompletionsResource {
         if (apiKey.isEmpty() || apiKey.get().isBlank()) {
             return null; // Auth not configured, allow
         }
-        String required = "Bearer " + apiKey.get().trim();
-        if (authHeader == null || !authHeader.trim().equals(required)) {
-            return Response.status(401).entity(Map.of(
-                    "error", Map.of(
-                            "message", "Incorrect API key provided.",
-                            "type", "invalid_request_error",
-                            "code", "invalid_api_key"
-                    )
-            )).build();
+        if (authHeader == null || authHeader.isBlank()) {
+            return unauthorizedResponse();
+        }
+        String trimmed = authHeader.trim();
+        String prefix = "bearer ";
+        if (!trimmed.toLowerCase(Locale.ROOT).startsWith(prefix)) {
+            return unauthorizedResponse();
+        }
+        String token = trimmed.substring(prefix.length()).trim();
+        if (!ChatCrypto.constantTimeEquals(apiKey.get().trim(), token)) {
+            return unauthorizedResponse();
         }
         return null;
+    }
+
+    private Response unauthorizedResponse() {
+        return Response.status(401).entity(Map.of(
+                "error", Map.of(
+                        "message", "Incorrect API key provided.",
+                        "type", "invalid_request_error",
+                        "code", "invalid_api_key"
+                )
+        )).build();
     }
 }
