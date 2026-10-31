@@ -68,15 +68,30 @@ class SidecarConnectorsEndToEndTest {
         // 2. Replay of same nonce is rejected
         assertFalse(sec.verify(now, nonce1, sig1, body));
 
-        // 3. Bad signature rejected
+        // 3. Bad signature rejected and does not burn nonce
         String nonce2 = UUID.randomUUID().toString();
         assertFalse(sec.verify(now, nonce2, "bad-sig", body));
+        String validSig2 = sec.sign(now, nonce2, body);
+        assertTrue(sec.verify(now, nonce2, validSig2, body), "Legitimate request must succeed after unauthenticated attempt");
+        // Replaying validSig2 is now rejected
+        assertFalse(sec.verify(now, nonce2, validSig2, body));
 
         // 4. Stale timestamp rejected (> 5 min old)
         String staleTime = Instant.now().minusSeconds(600).toString();
         String nonce3 = UUID.randomUUID().toString();
         String sig3 = sec.sign(staleTime, nonce3, body);
         assertFalse(sec.verify(staleTime, nonce3, sig3, body));
+
+        // 5. Future timestamp rejected (> 5 min ahead)
+        String futureTime = Instant.now().plusSeconds(600).toString();
+        String nonce4 = UUID.randomUUID().toString();
+        String sig4 = sec.sign(futureTime, nonce4, body);
+        assertFalse(sec.verify(futureTime, nonce4, sig4, body));
+
+        // 6. Blank / null nonces and timestamps rejected
+        assertFalse(sec.verify(null, nonce1, sig1, body));
+        assertFalse(sec.verify(now, "", sig1, body));
+        assertFalse(sec.verify(now, nonce1, null, body));
     }
 
     @Test
@@ -97,6 +112,20 @@ class SidecarConnectorsEndToEndTest {
         assertTrue(logContent.contains("\"tool\":\"RESTART\""));
         assertTrue(logContent.contains("\"target\":\"orders-api@aws\""));
         assertTrue(logContent.contains("\"result\":\"SUCCESS\""));
+
+        // Verify masking in audit log for sensitive identifiers
+        SidecarAuditLogger auditLogger = new SidecarAuditLogger();
+        auditLogger.recordMutation(
+                "agent",
+                "RESTART",
+                "arn:aws:ecs:us-east-1:123456789012:service/orders-api",
+                "SUCCESS",
+                "Restarted service using token ghp_012345678901234567890123456789012345 on 192.168.1.100");
+
+        String updatedLog = Files.readString(AUDIT_LOG);
+        assertFalse(updatedLog.contains("ghp_012345678901234567890123456789012345"));
+        assertFalse(updatedLog.contains("192.168.1.100"));
+        assertTrue(updatedLog.contains("[[API_KEY_") || updatedLog.contains("[[TOKEN_") || updatedLog.contains("[[IP_"));
     }
 
     @Test

@@ -98,6 +98,9 @@ public final class AzureTokenSource {
 
             JsonNode json = MAPPER.readTree(response.body());
             String token = json.path("access_token").asString();
+            if (token == null || token.isBlank()) {
+                throw new IllegalStateException("Azure token response missing access_token: " + response.body());
+            }
             long expiresInSeconds = json.path("expires_in").asLong(3600);
             Instant expiresAt = Instant.now().plusSeconds(expiresInSeconds);
             return new CachedToken(token, expiresAt);
@@ -121,6 +124,9 @@ public final class AzureTokenSource {
 
             JsonNode json = MAPPER.readTree(response.body());
             String token = json.path("access_token").asString();
+            if (token == null || token.isBlank()) {
+                throw new IllegalStateException("Azure IMDS token response missing access_token: " + response.body());
+            }
             long expiresInSeconds = json.path("expires_in").asLong(3600);
             Instant expiresAt = Instant.now().plusSeconds(expiresInSeconds);
             return new CachedToken(token, expiresAt);

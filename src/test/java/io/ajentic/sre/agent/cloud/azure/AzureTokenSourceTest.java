@@ -103,4 +103,19 @@ class AzureTokenSourceTest {
         assertEquals("token-A", source.getAccessToken());
         server.verify(2, WireMock.postRequestedFor(urlEqualTo("/oauth2/token")));
     }
+
+    @Test
+    void throwsWhenAccessTokenIsMissing() {
+        server.stubFor(post(urlEqualTo("/oauth2/token"))
+                .willReturn(WireMock.aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"expires_in\": 3600}")));
+
+        AzureTokenSource source = new AzureTokenSource(
+                "tenant-1", "client-1", "secret-1", null,
+                "http://localhost:" + server.port() + "/oauth2/token", null, null);
+
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, source::getAccessToken);
+    }
 }

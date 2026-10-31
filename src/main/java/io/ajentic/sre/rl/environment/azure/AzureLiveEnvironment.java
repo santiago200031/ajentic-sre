@@ -220,6 +220,9 @@ public final class AzureLiveEnvironment extends AbstractCloudEnvironment {
         } catch (CloudApiException e) {
             if (e.statusCode() == 401) {
                 tokenSource.invalidate();
+                String freshToken = tokenSource.getAccessToken();
+                builder.setHeader("Authorization", "Bearer " + freshToken);
+                return httpClient.send(builder);
             }
             throw e;
         }

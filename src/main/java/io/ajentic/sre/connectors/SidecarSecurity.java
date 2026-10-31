@@ -38,7 +38,9 @@ public final class SidecarSecurity {
     }
 
     public boolean verify(String timestampStr, String nonce, String signature, String body) {
-        if (timestampStr == null || nonce == null || signature == null) {
+        if (timestampStr == null || timestampStr.isBlank()
+                || nonce == null || nonce.isBlank()
+                || signature == null || signature.isBlank()) {
             return false;
         }
 
@@ -54,16 +56,20 @@ public final class SidecarSecurity {
             return false; // Stale timestamp outside 5-minute window
         }
 
-        // Check nonce replay
+        // Verify HMAC authenticity FIRST before consuming the nonce
+        String expectedSignature = sign(timestampStr, nonce, body);
+        if (!MessageDigestUtil.constantTimeEquals(expectedSignature, signature)) {
+            return false;
+        }
+
+        // Check and record nonce replay for authenticated messages
         long nowMs = now.toEpochMilli();
         Long prev = seenNonces.putIfAbsent(nonce, nowMs);
         if (prev != null) {
             return false; // Nonce already seen -> replay attempt
         }
 
-        // Verify HMAC
-        String expectedSignature = sign(timestampStr, nonce, body);
-        return MessageDigestUtil.constantTimeEquals(expectedSignature, signature);
+        return true;
     }
 
     public static String computeHmacSha256(String key, String data) {

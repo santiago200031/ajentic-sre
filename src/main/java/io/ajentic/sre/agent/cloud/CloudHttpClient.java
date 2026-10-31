@@ -69,7 +69,15 @@ public final class CloudHttpClient {
                     circuitBreaker.recordFailure();
                     lastException = new CloudApiException(status, response.body());
                     if (attempt < maxRetries) {
-                        applyRetryAfter(response);
+                        boolean waited = applyRetryAfter(response);
+                        if (!waited) {
+                            try {
+                                Thread.sleep(50L * (attempt + 1));
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                                throw new CloudApiException("Interrupted during retry backoff");
+                            }
+                        }
                         continue;
                     }
                     throw lastException;
@@ -108,15 +116,18 @@ public final class CloudHttpClient {
         throw lastException != null ? lastException : new CloudApiException("Request failed after retries");
     }
 
-    private void applyRetryAfter(HttpResponse<?> response) {
-        response.headers().firstValue("Retry-After").ifPresent(header -> {
+    private boolean applyRetryAfter(HttpResponse<?> response) {
+        java.util.Optional<String> header = response.headers().firstValue("Retry-After");
+        if (header.isPresent()) {
             try {
-                long seconds = Long.parseLong(header.trim());
+                long seconds = Long.parseLong(header.get().trim());
                 long sleepMs = Math.min(seconds * 1000L, 500L); // Cap sleep in tests/production to keep virtual thread responsive
                 Thread.sleep(sleepMs);
+                return true;
             } catch (NumberFormatException | InterruptedException ignored) {
                 // fall back to loop backoff
             }
-        });
+        }
+        return false;
     }
 }

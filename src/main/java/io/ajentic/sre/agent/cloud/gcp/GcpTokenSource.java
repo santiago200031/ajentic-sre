@@ -117,6 +117,9 @@ public final class GcpTokenSource {
 
             JsonNode json = MAPPER.readTree(response.body());
             String token = json.path("access_token").asString();
+            if (token == null || token.isBlank()) {
+                throw new IllegalStateException("GCP token response missing access_token: " + response.body());
+            }
             long expiresIn = json.path("expires_in").asLong(3600);
             return new CachedToken(token, Instant.now().plusSeconds(expiresIn));
         } catch (Exception e) {
@@ -139,6 +142,9 @@ public final class GcpTokenSource {
 
             JsonNode json = MAPPER.readTree(response.body());
             String token = json.path("access_token").asString();
+            if (token == null || token.isBlank()) {
+                throw new IllegalStateException("GCP metadata token response missing access_token: " + response.body());
+            }
             long expiresIn = json.path("expires_in").asLong(3600);
             return new CachedToken(token, Instant.now().plusSeconds(expiresIn));
         } catch (Exception e) {

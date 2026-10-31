@@ -276,4 +276,42 @@ class CloudProviderAdaptersTest {
         client.resetTurnBudget();
         assertEquals(0, client.callsThisTurn());
     }
+
+    @Test
+    void azureTokenRefreshesOn401AndRetriesSuccessfully() {
+        server.stubFor(post(urlEqualTo("/oauth2/token"))
+                .willReturn(WireMock.aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"access_token\": \"az-fresh-token\", \"expires_in\": 3600}")));
+
+        server.stubFor(post(urlPathEqualTo("/subscriptions/sub-1/resourceGroups/rg-1/providers/Microsoft.App/containerApps/orders-api/restart"))
+                .inScenario("AzureAuthRetry")
+                .whenScenarioStateIs(com.github.tomakehurst.wiremock.stubbing.Scenario.STARTED)
+                .willSetStateTo("TokenRefreshed")
+                .willReturn(WireMock.aResponse()
+                        .withStatus(401)
+                        .withBody("{\"error\": \"Expired token\"}")));
+
+        server.stubFor(post(urlPathEqualTo("/subscriptions/sub-1/resourceGroups/rg-1/providers/Microsoft.App/containerApps/orders-api/restart"))
+                .inScenario("AzureAuthRetry")
+                .whenScenarioStateIs("TokenRefreshed")
+                .willReturn(WireMock.aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{}")));
+
+        AzureLiveEnvironment env = new AzureLiveEnvironment(
+                scenario,
+                new IncidentRewardFunction(),
+                new CloudHttpClient(),
+                "tenant-1", "client-1", "sec-1", "sub-1", "rg-1", "ws-1",
+                base(),
+                base() + "/oauth2/token",
+                true,
+                false);
+
+        StepResult rem = env.step(new ApplyRemediation(RemediationKind.RESTART, "orders-api"));
+        assertTrue(rem.observation().feedback().contains("Azure Container Apps: Executed restart"), rem.observation().feedback());
+    }
 }

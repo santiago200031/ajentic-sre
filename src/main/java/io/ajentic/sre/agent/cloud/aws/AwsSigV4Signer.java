@@ -138,16 +138,26 @@ public final class AwsSigV4Signer {
         for (String pair : pairs) {
             if (pair.isEmpty()) continue;
             int idx = pair.indexOf('=');
-            if (idx > 0) {
-                String key = urlEncode(pair.substring(0, idx));
-                String value = urlEncode(pair.substring(idx + 1));
+            if (idx >= 0) {
+                String rawKey = pair.substring(0, idx);
+                String rawVal = pair.substring(idx + 1);
+                String key = urlEncode(urlDecode(rawKey));
+                String value = urlEncode(urlDecode(rawVal));
                 sortedPairs.add(key + "=" + value);
             } else {
-                sortedPairs.add(urlEncode(pair) + "=");
+                sortedPairs.add(urlEncode(urlDecode(pair)) + "=");
             }
         }
         Collections.sort(sortedPairs);
         return String.join("&", sortedPairs);
+    }
+
+    private static String urlDecode(String value) {
+        try {
+            return java.net.URLDecoder.decode(value, StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            return value;
+        }
     }
 
     private static String urlEncode(String value) {

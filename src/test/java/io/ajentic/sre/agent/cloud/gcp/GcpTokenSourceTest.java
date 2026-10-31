@@ -94,4 +94,24 @@ class GcpTokenSourceTest {
         assertEquals("gcp-meta-token-789", token);
         server.verify(1, WireMock.getRequestedFor(urlEqualTo("/computeMetadata/v1/token")));
     }
+
+    @Test
+    void throwsWhenAccessTokenIsMissing() {
+        server.stubFor(get(urlEqualTo("/computeMetadata/v1/token"))
+                .withHeader("Metadata-Flavor", equalTo("Google"))
+                .willReturn(WireMock.aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"expires_in\": 3600}")));
+
+        GcpTokenSource source = new GcpTokenSource(
+                null,
+                null,
+                null,
+                null,
+                "http://localhost:" + server.port() + "/computeMetadata/v1/token",
+                null);
+
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class, source::getAccessToken);
+    }
 }

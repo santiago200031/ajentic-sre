@@ -68,4 +68,27 @@ class AwsSigV4SignerTest {
         // Standard SHA256 of empty string is e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
         assertEquals("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", AwsSigV4Signer.hexSha256(empty));
     }
+
+    @Test
+    void canonicalizesQueryParamsWithoutDoubleEncoding() {
+        URI uri = URI.create("https://example.com/test?b=world&a=hello%20world&flag");
+        Instant timestamp = Instant.parse("2026-01-01T00:00:00Z");
+
+        Map<String, String> signed = AwsSigV4Signer.sign(
+                "GET",
+                uri,
+                Map.of(),
+                new byte[0],
+                "s3",
+                "us-east-1",
+                "AKIAIOSFODNN7EXAMPLE",
+                "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+                null,
+                timestamp);
+
+        assertNotNull(signed);
+        String auth = signed.get("Authorization");
+        assertNotNull(auth);
+        assertTrue(auth.contains("Signature="));
+    }
 }

@@ -1,6 +1,9 @@
 package io.ajentic.sre.connectors;
 
+import io.ajentic.sre.agent.masking.MaskingSession;
+import io.ajentic.sre.agent.masking.SensitiveDataMasker;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import tools.jackson.databind.ObjectMapper;
 
@@ -14,6 +17,7 @@ import java.util.Map;
 
 /**
  * Appends audit log entries for every mutating action executed by the sidecar to .ajentic/audit.jsonl.
+ * Masks sensitive identifiers and tokens before persisting.
  */
 @ApplicationScoped
 public class SidecarAuditLogger {
@@ -21,12 +25,17 @@ public class SidecarAuditLogger {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final Path auditFilePath;
+    private final SensitiveDataMasker masker;
 
     public SidecarAuditLogger() {
-        this(".ajentic/audit.jsonl");
+        this(new SensitiveDataMasker(), ".ajentic/audit.jsonl");
     }
 
-    public SidecarAuditLogger(@ConfigProperty(name = "ajentic.sidecar.audit-file", defaultValue = ".ajentic/audit.jsonl") String path) {
+    @Inject
+    public SidecarAuditLogger(
+            SensitiveDataMasker masker,
+            @ConfigProperty(name = "ajentic.sidecar.audit-file", defaultValue = ".ajentic/audit.jsonl") String path) {
+        this.masker = masker != null ? masker : new SensitiveDataMasker();
         this.auditFilePath = Path.of(path);
     }
 
@@ -36,13 +45,17 @@ public class SidecarAuditLogger {
                 Files.createDirectories(auditFilePath.getParent());
             }
 
+            MaskingSession session = masker.newSession();
+            String maskedSummary = summary != null ? session.mask(summary) : "";
+            String maskedTarget = target != null ? session.mask(target) : "";
+
             Map<String, Object> entry = new LinkedHashMap<>();
             entry.put("timestamp", Instant.now().toString());
             entry.put("actor", actor != null ? actor : "agent");
             entry.put("tool", tool);
-            entry.put("target", target);
+            entry.put("target", maskedTarget);
             entry.put("result", result);
-            entry.put("summary", summary);
+            entry.put("summary", maskedSummary);
 
             String jsonLine = MAPPER.writeValueAsString(entry) + System.lineSeparator();
             Files.writeString(
