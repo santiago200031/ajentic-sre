@@ -16,9 +16,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.quarkus.test.junit.QuarkusTest;
+
 /**
  * Failover behaviour of the composite client, exercised offline against two WireMock endpoints.
  */
+@QuarkusTest
 class LlmFallbackRouterTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -52,8 +55,8 @@ class LlmFallbackRouterTest {
         fallback.resetAll();
     }
 
-    private static OpenAiCompatibleLlmClient client(WireMockServer server, String model) {
-        return new OpenAiCompatibleLlmClient(LlmProperties.of(
+    private static LangChain4jLlmClient client(WireMockServer server, String model) {
+        return new LangChain4jLlmClient(LlmProperties.of(
                 "openai-compatible", server.baseUrl(), Optional.empty(),
                 model, Duration.ofSeconds(10), 0.0, "/chat/completions", Optional.empty(), Optional.empty()), MAPPER);
     }

@@ -1,7 +1,9 @@
 package io.ajentic.sre.agent.llm;
 
+import dev.langchain4j.model.chat.ChatModel;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import tools.jackson.databind.ObjectMapper;
 
@@ -9,6 +11,9 @@ import java.util.Optional;
 
 @ApplicationScoped
 public class LlmClientProducer {
+
+    @Inject
+    ChatModel chatModel;
 
     /**
      * The unmasked client for the configured provider. {@link MaskingLlmClient} injects this under {@link RawLlm}
@@ -20,7 +25,7 @@ public class LlmClientProducer {
     @Singleton
     public LlmClient rawClient(LlmProperties properties, ObjectMapper mapper) {
         LlmClient primary = properties.providerType().usesHttpTransport()
-                ? new OpenAiCompatibleLlmClient(properties, mapper)
+                ? new LangChain4jLlmClient(chatModel, mapper)
                 : new ScriptedLlmClient();
         if (!properties.fallbackEnabled() || properties.fallbackEndpoints().isEmpty()) {
             return primary;
@@ -28,7 +33,7 @@ public class LlmClientProducer {
         java.util.List<LlmClient> fallbacks = java.util.Arrays.stream(properties.fallbackEndpoints().get().split(","))
                 .map(String::strip)
                 .filter(entry -> !entry.isEmpty())
-                .<LlmClient>map(entry -> new OpenAiCompatibleLlmClient(endpointProperties(entry, properties), mapper))
+                .<LlmClient>map(entry -> new LangChain4jLlmClient(endpointProperties(entry, properties), mapper))
                 .toList();
         return new CompositeLlmClient(primary, fallbacks);
     }

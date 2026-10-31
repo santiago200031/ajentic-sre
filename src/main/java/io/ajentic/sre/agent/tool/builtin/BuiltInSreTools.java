@@ -1,16 +1,12 @@
 package io.ajentic.sre.agent.tool.builtin;
 
+import io.ajentic.sre.agent.context.AgentExecutionContext;
 import io.ajentic.sre.agent.integration.IncidentSummary;
 import io.ajentic.sre.agent.integration.NotificationChannel;
 import io.ajentic.sre.agent.memory.IncidentMemoryStore;
 import io.ajentic.sre.agent.memory.StoredIncident;
-import io.ajentic.sre.agent.context.AgentExecutionContext;
-import io.ajentic.sre.agent.tool.AgentTool;
-import io.ajentic.sre.agent.tool.Capability;
 import io.ajentic.sre.agent.tool.ToolBox;
 import io.ajentic.sre.agent.tool.ToolContext;
-import io.ajentic.sre.agent.tool.ToolParam;
-import io.ajentic.sre.agent.tool.ToolResult;
 import io.ajentic.sre.rl.ObservedSignal;
 import io.ajentic.sre.rl.StepResult;
 import io.ajentic.sre.rl.TelemetrySignal;
@@ -30,17 +26,21 @@ import io.ajentic.sre.rl.simulation.Runbook;
 import io.ajentic.sre.rl.simulation.Scenario;
 import io.ajentic.sre.rl.simulation.ScenarioRepository;
 import io.ajentic.sre.schedule.drill.IncidentDrillRunner;
+import io.quarkiverse.mcp.server.McpConnection;
+import io.quarkiverse.mcp.server.Tool;
+import io.quarkiverse.mcp.server.ToolArg;
+import io.quarkiverse.mcp.server.ToolResponse;
 import io.quarkus.arc.Unremovable;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * The built-in SRE capabilities, declared as annotated methods instead of a class per tool. {@code
- * CdiToolRegistry} derives the JSON Schema from these signatures and binds the model's arguments to them.
+ * Built-in SRE capabilities declared as declarative Quarkus MCP {@link Tool} methods.
  */
 @ToolBox
 @Unremovable
@@ -73,101 +73,130 @@ public class BuiltInSreTools {
         this.defaultScenarioId = defaultScenarioId;
     }
 
-    @AgentTool(name = "query_telemetry", description = "Fetch correlated telemetry for a service.")
-    public ToolResult queryTelemetry(
-            @ToolParam("Telemetry signal to fetch.") TelemetrySignal signal,
-            @ToolParam("Service name to inspect.") String service,
-            ToolContext context) {
-        StepResult result = context.environment().step(new QueryTelemetry(signal, service));
-        List<ObservedSignal> signals = result.observation().signals();
-        if (signals.isEmpty()) {
-            return ToolResult.ok("No " + signal + " samples for " + service + ".");
+    @Tool(name = "query_telemetry", description = "Fetch correlated telemetry for a service.")
+    public ToolResponse queryTelemetry(
+            @ToolArg(name = "signal", description = "Telemetry signal: METRICS, LOGS, TRACES, DEPLOYS") TelemetrySignal signal,
+            @ToolArg(name = "service", description = "Service name to inspect") String service,
+            McpConnection connection) {
+        try {
+            ToolContext context = resolveContext(connection);
+            StepResult result = context.environment().step(new QueryTelemetry(signal, service));
+            List<ObservedSignal> signals = result.observation().signals();
+            if (signals.isEmpty()) {
+                return ToolResponse.success("No " + signal + " samples for " + service + ".");
+            }
+            return ToolResponse.success(ToolText.format(signals));
+        } catch (RuntimeException exception) {
+            return ToolResponse.error(errorMessage(exception));
         }
-        return ToolResult.ok(ToolText.format(signals), Map.of("signal", signal.name(), "count", signals.size()));
     }
 
-    @AgentTool(name = "inspect_recent_changes", description = "List recent deploys, config edits, flag flips and quota changes for a service.")
-    public ToolResult inspectRecentChanges(
-            @ToolParam("Service name to inspect.") String service,
-            @ToolParam("Lookback window in minutes. Default 1440.") Integer window,
-            ToolContext context) {
-        StepResult result = context.environment().step(new InspectRecentChanges(service, window == null ? 1440 : window));
-        List<ObservedSignal> signals = result.observation().signals();
-        if (signals.isEmpty()) {
-            return ToolResult.ok("No recent changes for " + service + ".");
+    @Tool(name = "inspect_recent_changes", description = "List recent deploys, config edits, flag flips and quota changes for a service.")
+    public ToolResponse inspectRecentChanges(
+            @ToolArg(name = "service", description = "Service name to inspect.") String service,
+            @ToolArg(name = "window", description = "Lookback window in minutes. Default 1440.", required = false) Integer window,
+            McpConnection connection) {
+        try {
+            ToolContext context = resolveContext(connection);
+            StepResult result = context.environment().step(new InspectRecentChanges(service, window == null ? 1440 : window));
+            List<ObservedSignal> signals = result.observation().signals();
+            if (signals.isEmpty()) {
+                return ToolResponse.success("No recent changes for " + service + ".");
+            }
+            return ToolResponse.success(ToolText.format(signals));
+        } catch (RuntimeException exception) {
+            return ToolResponse.error(errorMessage(exception));
         }
-        return ToolResult.ok(ToolText.format(signals), Map.of("service", service, "count", signals.size()));
     }
 
-    @AgentTool(name = "correlate_anomalies", description = "Rank metric anomalies across a service's topology neighborhood.")
-    public ToolResult correlateAnomalies(
-            @ToolParam("Service names to correlate; empty uses the alerting service.") List<String> services,
-            @ToolParam("Neighborhood radius in hops. Default 2.") Integer window,
-            ToolContext context) {
-        StepResult result = context.environment().step(
-                new CorrelateAnomalies(services == null ? List.of() : services, window == null ? 2 : window));
-        return ToolResult.ok(result.observation().feedback());
+    @Tool(name = "correlate_anomalies", description = "Rank metric anomalies across a service's topology neighborhood.")
+    public ToolResponse correlateAnomalies(
+            @ToolArg(name = "services", description = "Service names to correlate; empty uses the alerting service.", required = false) List<String> services,
+            @ToolArg(name = "window", description = "Neighborhood radius in hops. Default 2.", required = false) Integer window,
+            McpConnection connection) {
+        try {
+            ToolContext context = resolveContext(connection);
+            StepResult result = context.environment().step(
+                    new CorrelateAnomalies(services == null ? List.of() : services, window == null ? 2 : window));
+            return ToolResponse.success(result.observation().feedback());
+        } catch (RuntimeException exception) {
+            return ToolResponse.error(errorMessage(exception));
+        }
     }
 
-    @AgentTool(name = "read_runbook", description = "Read an operational runbook that matches the incident.")
-    public ToolResult readRunbook(
-            @ToolParam("Runbook identifier from the observation.") String runbookId,
-            ToolContext context) {
-        context.environment().step(new ReadRunbook(runbookId));
-        String scenarioId = context.environment().spec().scenarioId();
-        Scenario scenario = scenarios.byId(scenarioId)
-                .orElseThrow(() -> new IllegalArgumentException("Unknown scenario: " + scenarioId));
-        Runbook runbook = scenario.runbooks().stream()
-                .filter(candidate -> candidate.id().equals(runbookId))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Unknown runbook: " + runbookId));
-        return ToolResult.ok(runbook.title() + "\n" + runbook.body());
+    @Tool(name = "read_runbook", description = "Read an operational runbook that matches the incident.")
+    public ToolResponse readRunbook(
+            @ToolArg(name = "runbookId", description = "Runbook identifier from the observation.") String runbookId,
+            McpConnection connection) {
+        try {
+            ToolContext context = resolveContext(connection);
+            context.environment().step(new ReadRunbook(runbookId));
+            String scenarioId = context.environment().spec().scenarioId();
+            Scenario scenario = scenarios.byId(scenarioId)
+                    .orElseThrow(() -> new IllegalArgumentException("Unknown scenario: " + scenarioId));
+            Runbook runbook = scenario.runbooks().stream()
+                    .filter(candidate -> candidate.id().equals(runbookId))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Unknown runbook: " + runbookId));
+            return ToolResponse.success(runbook.title() + "\n" + runbook.body());
+        } catch (RuntimeException exception) {
+            return ToolResponse.error(errorMessage(exception));
+        }
     }
 
-    @AgentTool(name = "list_remediations", description = "List the remediation actions that can be applied.")
-    public ToolResult listRemediations(ToolContext context) {
-        StepResult result = context.environment().step(new ListRemediations());
-        List<RemediationKind> remediations = result.observation().availableRemediations();
-        String content = remediations.stream()
-                .map(kind -> "- %s: %s".formatted(kind, kind.description()))
-                .collect(Collectors.joining("\n"));
-        return ToolResult.ok(content, Map.of("count", remediations.size()));
+    @Tool(name = "list_remediations", description = "List the remediation actions that can be applied.")
+    public ToolResponse listRemediations(McpConnection connection) {
+        try {
+            ToolContext context = resolveContext(connection);
+            StepResult result = context.environment().step(new ListRemediations());
+            List<RemediationKind> remediations = result.observation().availableRemediations();
+            String content = remediations.stream()
+                    .map(kind -> "- %s: %s".formatted(kind, kind.description()))
+                    .collect(Collectors.joining("\n"));
+            return ToolResponse.success(content);
+        } catch (RuntimeException exception) {
+            return ToolResponse.error(errorMessage(exception));
+        }
     }
 
-    @AgentTool(name = "apply_remediation", description = "Apply a remediation action to a service.",
-            capability = Capability.MUTATE)
-    public ToolResult applyRemediation(
-            @ToolParam("Remediation to apply.") RemediationKind remediation,
-            @ToolParam("Service to remediate.") String service,
-            ToolContext context) {
-        StepResult result = context.environment().step(new ApplyRemediation(remediation, service));
-        return ToolResult.ok(result.observation().feedback(), Map.of(
-                "reward", result.reward(),
-                "terminal", result.done()));
+    @Tool(name = "apply_remediation", description = "Apply a remediation action to a service.")
+    public ToolResponse applyRemediation(
+            @ToolArg(name = "remediation", description = "Remediation to apply.") RemediationKind remediation,
+            @ToolArg(name = "service", description = "Service to remediate.") String service,
+            McpConnection connection) {
+        try {
+            ToolContext context = resolveContext(connection);
+            StepResult result = context.environment().step(new ApplyRemediation(remediation, service));
+            return ToolResponse.success(result.observation().feedback());
+        } catch (RuntimeException exception) {
+            return ToolResponse.error(errorMessage(exception));
+        }
     }
 
-    @AgentTool(name = "declare_diagnosis", description = "Record the identified root cause for the incident.",
-            capability = Capability.MUTATE)
-    public ToolResult declareDiagnosis(
-            @ToolParam("Service that owns the root cause.") String service,
-            @ToolParam("Concise root cause statement.") String rootCause,
-            ToolContext context) {
-        StepResult result = context.environment().step(new DeclareDiagnosis(service, rootCause));
-        return ToolResult.ok(result.observation().feedback(), Map.of(
-                "reward", result.reward(),
-                "terminal", result.done()));
+    @Tool(name = "declare_diagnosis", description = "Record the identified root cause for the incident.")
+    public ToolResponse declareDiagnosis(
+            @ToolArg(name = "service", description = "Service that owns the root cause.") String service,
+            @ToolArg(name = "rootCause", description = "Concise root cause statement.") String rootCause,
+            McpConnection connection) {
+        try {
+            ToolContext context = resolveContext(connection);
+            StepResult result = context.environment().step(new DeclareDiagnosis(service, rootCause));
+            return ToolResponse.success(result.observation().feedback());
+        } catch (RuntimeException exception) {
+            return ToolResponse.error(errorMessage(exception));
+        }
     }
 
-    @AgentTool(name = "search_past_incidents", description = "Search previously resolved incidents by symptom text, service, and fault kind.")
-    public ToolResult searchPastIncidents(
-            @ToolParam("Symptom text to search for (blank = any).") String query,
-            @ToolParam("Service name (blank = any).") String service,
-            @ToolParam("Fault kind, e.g. DB_POOL_EXHAUSTION (blank = any).") String faultKind,
-            @ToolParam("Maximum number of results.") Integer limit) {
+    @Tool(name = "search_past_incidents", description = "Search previously resolved incidents by symptom text, service, and fault kind.")
+    public ToolResponse searchPastIncidents(
+            @ToolArg(name = "query", description = "Symptom text to search for (blank = any).", required = false) String query,
+            @ToolArg(name = "service", description = "Service name (blank = any).", required = false) String service,
+            @ToolArg(name = "faultKind", description = "Fault kind, e.g. DB_POOL_EXHAUSTION (blank = any).", required = false) String faultKind,
+            @ToolArg(name = "limit", description = "Maximum number of results.", required = false) Integer limit) {
         int max = limit == null || limit < 1 ? 3 : limit;
         List<StoredIncident> matches = memory.search(query, service, faultKind, max);
         if (matches.isEmpty()) {
-            return ToolResult.ok("No past incidents match.");
+            return ToolResponse.success("No past incidents match.");
         }
         String content = matches.stream()
                 .map(incident -> "- %s [%s/%s] solved=%s reward=%.2f%s%s".formatted(
@@ -179,78 +208,103 @@ public class BuiltInSreTools {
                         incident.diagnosis().isBlank() ? "" : " | diagnosis: " + incident.diagnosis(),
                         incident.remediation().isBlank() ? "" : " | remediation: " + incident.remediation()))
                 .collect(Collectors.joining("\n"));
-        return ToolResult.ok(content, Map.of("count", matches.size()));
+        return ToolResponse.success(content);
     }
 
-    @AgentTool(name = "get_service_topology", description = "Show the service dependency graph for the active scenario.")
-    public ToolResult getServiceTopology(ToolContext context) {
-        String scenarioId = context.environment().spec().scenarioId();
-        Scenario scenario = scenarios.byId(scenarioId)
-                .orElseThrow(() -> new IllegalArgumentException("Unknown scenario: " + scenarioId));
-        String text = scenario.services().stream()
-                .map(spec -> spec.name() + (spec.dependencies().isEmpty()
-                        ? " -> (no dependencies)"
-                        : " -> " + String.join(", ", spec.dependencies())))
-                .collect(java.util.stream.Collectors.joining("\n"));
-        return ToolResult.ok(text, Map.of("scenarioId", scenarioId));
+    @Tool(name = "get_service_topology", description = "Show the service dependency graph for the active scenario.")
+    public ToolResponse getServiceTopology(McpConnection connection) {
+        try {
+            ToolContext context = resolveContext(connection);
+            String scenarioId = context.environment().spec().scenarioId();
+            Scenario scenario = scenarios.byId(scenarioId)
+                    .orElseThrow(() -> new IllegalArgumentException("Unknown scenario: " + scenarioId));
+            String text = scenario.services().stream()
+                    .map(spec -> spec.name() + (spec.dependencies().isEmpty()
+                            ? " -> (no dependencies)"
+                            : " -> " + String.join(", ", spec.dependencies())))
+                    .collect(Collectors.joining("\n"));
+            return ToolResponse.success(text);
+        } catch (RuntimeException exception) {
+            return ToolResponse.error(errorMessage(exception));
+        }
     }
 
-    @AgentTool(name = "post_incident_summary",
-            description = "Post an incident summary to the configured notification channel.",
-            capability = Capability.MUTATE)
-    public ToolResult postIncidentSummary(
-            @ToolParam("Summary to post.") String summary,
-            @ToolParam(value = "Incident status, for example resolved.", required = false, defaultValue = "investigating")
-            String status,
-            ToolContext context) {
-        channel.post(new IncidentSummary(context.sessionId(), summary, status, List.of()));
-        return ToolResult.ok("Incident summary posted with status '" + status + "'.");
+    @Tool(name = "post_incident_summary", description = "Post an incident summary to the configured notification channel.")
+    public ToolResponse postIncidentSummary(
+            @ToolArg(name = "summary", description = "Summary to post.") String summary,
+            @ToolArg(name = "status", description = "Incident status, for example resolved.", required = false, defaultValue = "investigating") String status,
+            McpConnection connection) {
+        try {
+            ToolContext context = resolveContext(connection);
+            channel.post(new IncidentSummary(context.sessionId(), summary, status, List.of()));
+            return ToolResponse.success("Incident summary posted with status '" + status + "'.");
+        } catch (RuntimeException exception) {
+            return ToolResponse.error(errorMessage(exception));
+        }
     }
 
-    @AgentTool(name = "list_scenarios", description = "List the incident scenarios available on this server.")
-    public ToolResult listScenarios() {
+    @Tool(name = "list_scenarios", description = "List the incident scenarios available on this server.")
+    public ToolResponse listScenarios() {
         List<Scenario> all = scenarios.all();
         String text = all.stream()
                 .map(scenario -> "- %s: %s".formatted(scenario.id(), scenario.title()))
                 .reduce((left, right) -> left + "\n" + right)
                 .orElse("No scenarios available.");
-        return ToolResult.ok(text, Map.of("count", all.size()));
+        return ToolResponse.success(text);
     }
 
-    @AgentTool(name = "start_episode",
-            description = "Start an isolated episode for a scenario and make it the active episode.",
-            capability = Capability.MUTATE)
-    public ToolResult startEpisode(
-            @ToolParam(value = "Scenario to start; defaults to the configured scenario.", required = false)
-            String scenarioId,
-            @ToolParam(value = "Deterministic seed; defaults to 42.", required = false, defaultValue = "42")
-            Long seed) {
+    @Tool(name = "start_episode", description = "Start an isolated episode for a scenario and make it the active episode.")
+    public ToolResponse startEpisode(
+            @ToolArg(name = "scenarioId", description = "Scenario to start; defaults to the configured scenario.", required = false) String scenarioId,
+            @ToolArg(name = "seed", description = "Deterministic seed; defaults to 42.", required = false) Long seed,
+            McpConnection connection) {
         String target = scenarioId == null || scenarioId.isBlank() ? defaultScenarioId : scenarioId;
-        EpisodeHandle handle = episodes.start(target, seed);
-        String scope = AgentExecutionContext.mcpScope() == null
-                ? AgentExecutionContext.sessionId()
-                : AgentExecutionContext.mcpScope();
+        long effectiveSeed = seed == null ? 42L : seed;
+        EpisodeHandle handle = episodes.start(target, effectiveSeed);
+        String scope = connection != null ? connection.id() : AgentExecutionContext.mcpScope();
+        if (scope == null || scope.isBlank()) {
+            scope = AgentExecutionContext.sessionId() != null ? AgentExecutionContext.sessionId() : EpisodeCursor.DEFAULT_SCOPE;
+        }
         cursor.activate(scope, handle.id());
-        return ToolResult.ok(
-                "Started episode %s for scenario %s.".formatted(handle.id(), target),
-                Map.of("episodeId", handle.id(), "scenarioId", target));
+        return ToolResponse.success("Started episode " + handle.id() + " for scenario " + target + ". episodeId: " + handle.id());
     }
 
-    @AgentTool(name = "run_incident_drill",
-            description = "Run the heuristic policy end to end against a scenario and report the result.",
-            capability = Capability.MUTATE)
-    public ToolResult runIncidentDrill(@ToolParam("Scenario to drill.") String scenarioId) {
-        EpisodeResult result = drills.drill(scenarioId);
-        return ToolResult.ok(
-                "Drill for %s finished: solved=%s diagnosed=%s resolved=%s reward=%.2f."
-                        .formatted(scenarioId, result.solved(), result.diagnosed(), result.resolved(),
-                                result.totalReward()),
-                Map.of(
-                        "scenarioId", scenarioId,
-                        "solved", result.solved(),
-                        "diagnosed", result.diagnosed(),
-                        "resolved", result.resolved(),
-                        "totalReward", result.totalReward(),
-                        "steps", result.steps()));
+    @Tool(name = "run_incident_drill", description = "Run the heuristic policy end to end against a scenario and report the result.")
+    public ToolResponse runIncidentDrill(
+            @ToolArg(name = "scenarioId", description = "Scenario to drill.") String scenarioId) {
+        try {
+            EpisodeResult result = drills.drill(scenarioId);
+            return ToolResponse.success("Drill for %s finished: solved=%s diagnosed=%s resolved=%s reward=%.2f. {\"solved\":%s}"
+                    .formatted(scenarioId, result.solved(), result.diagnosed(), result.resolved(), result.totalReward(), result.solved()));
+        } catch (RuntimeException exception) {
+            return ToolResponse.error(errorMessage(exception));
+        }
+    }
+
+    private ToolContext resolveContext(McpConnection connection) {
+        ToolContext bound = AgentExecutionContext.toolContext();
+        if (bound != null) {
+            return bound;
+        }
+        String scope = connection != null ? connection.id() : AgentExecutionContext.mcpScope();
+        if (scope == null || scope.isBlank()) {
+            scope = AgentExecutionContext.sessionId() != null ? AgentExecutionContext.sessionId() : EpisodeCursor.DEFAULT_SCOPE;
+        }
+        String activeId = cursor.activeId(scope);
+        if (activeId != null) {
+            Optional<EpisodeHandle> active = episodes.find(activeId);
+            if (active.isPresent()) {
+                return new ToolContext(active.get().id(), active.get().environment());
+            }
+        }
+        EpisodeHandle handle = episodes.start(defaultScenarioId, 42L);
+        cursor.activate(scope, handle.id());
+        return new ToolContext(handle.id(), handle.environment());
+    }
+
+    private static String errorMessage(RuntimeException exception) {
+        return exception.getMessage() != null && !exception.getMessage().isBlank()
+                ? exception.getMessage()
+                : exception.getClass().getSimpleName();
     }
 }

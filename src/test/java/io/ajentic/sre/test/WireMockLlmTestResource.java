@@ -18,6 +18,11 @@ import java.util.Map;
 public class WireMockLlmTestResource implements QuarkusTestResourceLifecycleManager {
 
     private static final List<String> LIVE_KEYS = List.of(
+            "quarkus.langchain4j.openai.base-url",
+            "quarkus.langchain4j.openai.api-key",
+            "quarkus.langchain4j.openai.chat-model.model-name",
+            "quarkus.langchain4j.openai.timeout",
+            "quarkus.langchain4j.openai.chat-model.temperature",
             "ajentic.llm.provider",
             "ajentic.llm.base-url",
             "ajentic.llm.api-key",
@@ -42,15 +47,20 @@ public class WireMockLlmTestResource implements QuarkusTestResourceLifecycleMana
                 server.start();
             }
         }
-        return Map.of(
-                "ajentic.llm.provider", "openai-compatible",
-                "ajentic.llm.base-url", "http://localhost:" + server.port() + "/v1",
-                "ajentic.llm.api-key", "",
-                "ajentic.llm.model", "wm-default",
-                "ajentic.llm.timeout", "30s",
-                "ajentic.llm.temperature", "0.0",
-                "ajentic.github.base-url", "http://localhost:" + server.port(),
-                "ajentic.github.token", "gh_test_token");
+        return Map.ofEntries(
+                Map.entry("quarkus.langchain4j.openai.base-url", "http://localhost:" + server.port() + "/v1"),
+                Map.entry("quarkus.langchain4j.openai.api-key", "wm-test-key"),
+                Map.entry("quarkus.langchain4j.openai.chat-model.model-name", "wm-default"),
+                Map.entry("quarkus.langchain4j.openai.timeout", "30s"),
+                Map.entry("quarkus.langchain4j.openai.chat-model.temperature", "0.0"),
+                Map.entry("ajentic.llm.provider", "openai-compatible"),
+                Map.entry("ajentic.llm.base-url", "http://localhost:" + server.port() + "/v1"),
+                Map.entry("ajentic.llm.api-key", ""),
+                Map.entry("ajentic.llm.model", "wm-default"),
+                Map.entry("ajentic.llm.timeout", "30s"),
+                Map.entry("ajentic.llm.temperature", "0.0"),
+                Map.entry("ajentic.github.base-url", "http://localhost:" + server.port()),
+                Map.entry("ajentic.github.token", "gh_test_token"));
     }
 
     @Override
@@ -86,6 +96,18 @@ public class WireMockLlmTestResource implements QuarkusTestResourceLifecycleMana
             }
         }
         configuration.putIfAbsent("ajentic.llm.provider", "openai-compatible");
+        if (configuration.containsKey("ajentic.llm.base-url")) {
+            configuration.putIfAbsent("quarkus.langchain4j.openai.base-url", configuration.get("ajentic.llm.base-url"));
+        }
+        if (configuration.containsKey("ajentic.llm.api-key")) {
+            configuration.putIfAbsent("quarkus.langchain4j.openai.api-key", configuration.get("ajentic.llm.api-key"));
+        }
+        if (configuration.containsKey("ajentic.llm.model")) {
+            configuration.putIfAbsent("quarkus.langchain4j.openai.chat-model.model-name", configuration.get("ajentic.llm.model"));
+        }
+        if (configuration.containsKey("ajentic.llm.temperature")) {
+            configuration.putIfAbsent("quarkus.langchain4j.openai.chat-model.temperature", configuration.get("ajentic.llm.temperature"));
+        }
         return configuration;
     }
 

@@ -13,7 +13,7 @@ import io.ajentic.sre.agent.llm.LlmProperties;
 import io.ajentic.sre.agent.llm.LlmProvider;
 import io.ajentic.sre.agent.llm.LlmRequest;
 import io.ajentic.sre.agent.llm.LlmResponse;
-import io.ajentic.sre.agent.llm.OpenAiCompatibleLlmClient;
+import io.ajentic.sre.agent.llm.LangChain4jLlmClient;
 import io.ajentic.sre.agent.llm.ToolCall;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,12 +28,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.quarkus.test.junit.QuarkusTest;
+
 /**
- * Formally pins the OpenAI-compatible HTTP contract that {@code ajentic-sre} consumes. Every interaction is driven
- * through the real {@link OpenAiCompatibleLlmClient}, so the generated contracts under {@code target/pacts} fail if
- * the wire format drifts, most importantly if {@code function.arguments} were ever serialised as an object instead of
- * a JSON-encoded string.
+ * Formally pins the OpenAI-compatible HTTP contract that {@code ajentic-sre} consumes.
  */
+@QuarkusTest
 @ExtendWith(PactConsumerTestExt.class)
 @PactTestFor(providerName = "openai-compatible-llm-provider", port = "0", pactVersion = PactSpecVersion.V3)
 class LlmConsumerPactContractTest {
@@ -180,8 +180,8 @@ class LlmConsumerPactContractTest {
         assertEquals("Azure deployment answered.", response.content());
     }
 
-    private static OpenAiCompatibleLlmClient client(LlmProperties properties) {
-        return new OpenAiCompatibleLlmClient(properties, JsonMapper.builder().build());
+    private static LangChain4jLlmClient client(LlmProperties properties) {
+        return new LangChain4jLlmClient(properties, JsonMapper.builder().build());
     }
 
     private static LlmProperties openAi(MockServer mockServer) {
