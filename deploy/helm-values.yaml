@@ -1,0 +1,51 @@
+# Default values for ajentic-sre with sidecar connector topology
+agent:
+  image:
+    repository: ajentic-sre
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 250m
+      memory: 512Mi
+  securityContext:
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+
+sidecar:
+  enabled: true
+  image:
+    repository: ajentic-connectors
+    tag: latest
+    pullPolicy: IfNotPresent
+  port: 8085
+  secretName: ajentic-sidecar-auth
+  cloudCredentialsSecret: cloud-credentials
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  securityContext:
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: false
+
+networkPolicy:
+  enabled: true

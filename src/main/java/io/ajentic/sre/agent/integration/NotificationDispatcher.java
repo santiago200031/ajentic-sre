@@ -51,7 +51,8 @@ public class NotificationDispatcher implements NotificationChannel {
             @ConfigProperty(name = "ajentic.notifications.telegram.api-url") Optional<String> telegramApiUrl,
             @ConfigProperty(name = "ajentic.notifications.mattermost.webhook-url") Optional<String> mattermostWebhookUrl,
             @ConfigProperty(name = "ajentic.notifications.webhook.url") Optional<String> genericWebhookUrl,
-            @ConfigProperty(name = "ajentic.notifications.webhook.secret") Optional<String> genericWebhookSecret) {
+            @ConfigProperty(name = "ajentic.notifications.webhook.secret") Optional<String> genericWebhookSecret,
+            jakarta.enterprise.inject.Instance<SidecarClient> sidecarClientInstance) {
 
         List<NotificationChannel> configured = new ArrayList<>();
         String[] selections = channelSelection.split(",");
@@ -62,6 +63,11 @@ public class NotificationDispatcher implements NotificationChannel {
             }
             switch (name) {
                 case "log" -> configured.add(new LoggingNotificationChannel());
+                case "sidecar" -> {
+                    if (sidecarClientInstance != null && sidecarClientInstance.isResolvable()) {
+                        configured.add(new SidecarNotificationChannel(sidecarClientInstance.get()));
+                    }
+                }
                 case "slack" -> configured.add(new SlackChannel(
                         slackWebhookUrl.orElse(null),
                         slackToken.orElse(null),

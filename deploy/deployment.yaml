@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ajentic-sre
+  labels:
+    app.kubernetes.io/name: ajentic-sre
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ajentic-sre
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ajentic-sre
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+      containers:
+        # Agent reasoning container (Zero Cloud Credentials)
+        - name: agent
+          image: ajentic-sre:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: AJENTIC_ENVIRONMENT_BACKEND
+              value: "sidecar"
+            - name: AJENTIC_SIDECAR_URL
+              value: "http://127.0.0.1:8085"
+            - name: AJENTIC_SIDECAR_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ajentic-sidecar-auth
+                  key: secret
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+
+        # Connectors sidecar container (Holds AWS/Azure/GCP and chat secrets)
+        - name: connectors
+          image: ajentic-connectors:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8085
+              name: internal
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: AJENTIC_SIDECAR_PORT
+              value: "8085"
+            - name: AJENTIC_SIDECAR_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ajentic-sidecar-auth
+                  key: secret
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: cloud-credentials
+                  key: aws-access-key-id
+                  optional: true
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: cloud-credentials
+                  key: aws-secret-access-key
+                  optional: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

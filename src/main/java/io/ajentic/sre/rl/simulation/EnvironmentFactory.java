@@ -35,6 +35,7 @@ public class EnvironmentFactory {
     public static final String AWS_LIVE = "aws-live";
     public static final String AZURE_LIVE = "azure-live";
     public static final String GCP_LIVE = "gcp-live";
+    public static final String SIDECAR = "sidecar";
 
     private static final Logger LOG = Logger.getLogger(EnvironmentFactory.class);
 
@@ -42,6 +43,7 @@ public class EnvironmentFactory {
     private final RewardFunction rewardFunction;
     private final String backend;
     private final LiveTelemetryConfig liveConfig;
+    private final io.ajentic.sre.agent.integration.SidecarClient sidecarClient;
 
     private final String awsRegion;
     private final String awsAccessKeyId;
@@ -80,7 +82,7 @@ public class EnvironmentFactory {
         this(scenarios, rewardFunction, backend, prometheusUrl, lokiUrl, remediationUrl, timeout,
                 "us-east-1", Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), false,
                 Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), false,
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), false, true);
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(), false, true, null);
     }
 
     @Inject
@@ -114,12 +116,14 @@ public class EnvironmentFactory {
             @ConfigProperty(name = "ajentic.gcp.endpoint-url") Optional<String> gcpEndpointUrl,
             @ConfigProperty(name = "ajentic.gcp.token-url") Optional<String> gcpTokenUrl,
             @ConfigProperty(name = "ajentic.gcp.allow-mutations", defaultValue = "false") boolean gcpAllowMutations,
-            @ConfigProperty(name = "ajentic.tools.allow-mutations", defaultValue = "true") boolean toolsAllowMutations) {
+            @ConfigProperty(name = "ajentic.tools.allow-mutations", defaultValue = "true") boolean toolsAllowMutations,
+            jakarta.enterprise.inject.Instance<io.ajentic.sre.agent.integration.SidecarClient> sidecarClientInstance) {
         this.scenarios = scenarios;
         this.rewardFunction = rewardFunction;
         this.liveConfig = new LiveTelemetryConfig(prometheusUrl, lokiUrl, remediationUrl.orElse(""), timeout);
+        this.sidecarClient = (sidecarClientInstance != null && sidecarClientInstance.isResolvable()) ? sidecarClientInstance.get() : null;
         this.backend = switch (backend == null ? "" : backend.trim().toLowerCase()) {
-            case SIMULATED, LOCAL_CONTAINER, CLOUD_LIVE, AWS_LIVE, AZURE_LIVE, GCP_LIVE -> backend.trim().toLowerCase();
+            case SIMULATED, LOCAL_CONTAINER, CLOUD_LIVE, AWS_LIVE, AZURE_LIVE, GCP_LIVE, SIDECAR -> backend.trim().toLowerCase();
             default -> throw new IllegalStateException("Unknown environment backend: " + backend);
         };
 
@@ -198,6 +202,12 @@ public class EnvironmentFactory {
                     gcpTokenUrl,
                     gcpAllowMutations && toolsAllowMutations,
                     false);
+            case SIDECAR -> new io.ajentic.sre.rl.environment.sidecar.SidecarEnvironment(
+                    scenario,
+                    rewardFunction,
+                    sidecarClient,
+                    awsRegion,
+                    toolsAllowMutations);
             default -> throw new IllegalStateException("Unknown environment backend: " + backend);
         };
     }
