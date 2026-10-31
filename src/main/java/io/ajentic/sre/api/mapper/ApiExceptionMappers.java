@@ -1,6 +1,7 @@
 package io.ajentic.sre.api.mapper;
 
 import io.ajentic.sre.agent.session.UnknownSessionException;
+import io.ajentic.sre.api.webhook.WebhookException;
 import io.ajentic.sre.rl.episode.UnknownEpisodeException;
 import io.ajentic.sre.rl.simulation.UnknownScenarioException;
 import io.ajentic.sre.schedule.cron.InvalidCronException;
@@ -36,10 +37,19 @@ public class ApiExceptionMappers {
         return error(Response.Status.CONFLICT, exception);
     }
 
+    @ServerExceptionMapper(WebhookException.class)
+    public Response webhook(WebhookException exception) {
+        return error(Response.status(exception.status()), exception);
+    }
+
     private static Response error(Response.Status status, RuntimeException exception) {
+        return error(Response.status(status), exception);
+    }
+
+    private static Response error(Response.ResponseBuilder builder, RuntimeException exception) {
         String message = exception.getMessage() == null
                 ? exception.getClass().getSimpleName()
                 : exception.getMessage();
-        return Response.status(status).entity(Map.of("error", message)).build();
+        return builder.entity(Map.of("error", message)).build();
     }
 }

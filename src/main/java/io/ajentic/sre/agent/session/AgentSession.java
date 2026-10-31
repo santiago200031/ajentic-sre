@@ -214,7 +214,7 @@ public final class AgentSession {
         if (meters == null) {
             return;
         }
-        String model = config.model();
+        String model = config.model() == null ? "default" : config.model();
         meters.counter("ajentic.llm.tokens", "kind", "prompt", "model", model)
                 .increment(response.usage().promptTokens());
         meters.counter("ajentic.llm.tokens", "kind", "completion", "model", model)

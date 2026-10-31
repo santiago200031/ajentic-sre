@@ -25,7 +25,7 @@ suite offline (`mvn test`, WireMock stubs, no model, no network), and targets Ja
 | 16 | `feat/environment-backends` | 3 | `ajentic.environment.backend` strategy | 6, 10 | ✅ done |
 | 17 | `feat/live-telemetry-adapters` | 3 | `local-container` / `cloud-live` read-only adapters | 16 | ✅ done |
 | 18 | `feat/sse-chat-stream` | 3 | `/chat/stream` SSE | 13 | ✅ done |
-| 19 | `feat/alert-webhooks` | 3 | Alertmanager/PagerDuty/SNS intake | 16, 18 | ⬜ todo |
+| 19 | `feat/alert-webhooks` | 3 | Alertmanager/PagerDuty/SNS intake | 16, 18 | ✅ done |
 | 20 | `feat/llm-fallback-router` | 3 | Local-first composite LLM client | 13 | ⬜ todo |
 | 21 | `feat/multicloud-identifier-masking` | 3 | GCP/Azure/K8s/Bearer categories | 1 | ✅ done |
 | 22 | `feat/approval-gates` | 3 | `ALLOW \| DENY \| REQUIRE_APPROVAL` | 18 | ⬜ todo |
@@ -387,18 +387,19 @@ new `agent/session/TurnListener.java`.
 
 ### 19. `feat/alert-webhooks`
 
-- [ ] Add `POST /api/v1/webhooks/alertmanager`, `/pagerduty`, `/cloudwatch-sns` with signature/secret verification
+- [x] Add `POST /api/v1/webhooks/alertmanager`, `/pagerduty`, `/cloudwatch-sns` with signature/secret verification
       and payload normalization to an internal `Alert`.
-- [ ] On intake: create/lookup an `AgentSession`, start or reuse an episode, run investigation (sync or async with
+- [x] On intake: create/lookup an `AgentSession`, start or reuse an episode, run investigation (sync or async with
       SSE/polling), and post the root-cause report through `NotificationChannel` (log/Slack/webhook).
-- [ ] Deduplicate by alert fingerprint; enforce a concurrency limit and a timeout for runaway investigations.
-- [ ] Persist the intake → session → report linkage for postmortems (feeds branch 23).
-- [ ] Test: an Alertmanager payload creates a session and posts a report via a capturing channel; duplicate
+- [x] Deduplicate by alert fingerprint; enforce a concurrency limit and a timeout for runaway investigations.
+- [x] Persist the intake → session → report linkage for postmortems (feeds branch 23).
+- [x] Test: an Alertmanager payload creates a session and posts a report via a capturing channel; duplicate
       fingerprint is coalesced; bad signature → 401.
-- [ ] Document payloads and required config.
+- [x] Document payloads and required config.
 
-**Files.** new `api/resource/WebhookResource.java`, `api/payload/AlertPayload.java`,
-`agent/integration/*`, `agent/session/SessionService.java`.
+**Files.** new `api/webhook/` package (`WebhookResource`, `Alert`, `AlertReport`, `AlertIntakeService`,
+`NotificationChannel`, `LogNotificationChannel`, `WebhookNotificationChannel`, `WebhookException`),
+`agent/session/AgentSession.java`, `application.properties`.
 
 ### 20. `feat/llm-fallback-router`
 
@@ -418,13 +419,13 @@ new `agent/session/TurnListener.java`.
 
 ### 21. `feat/multicloud-identifier-masking`
 
-- [ ] Extend `SensitiveDataCategory` with GCP resource paths (`//*.googleapis.com/projects/...`), Azure resource
+- [x] Extend `SensitiveDataCategory` with GCP resource paths (`//*.googleapis.com/projects/...`), Azure resource
       ids (`/subscriptions/.../resourceGroups/...`), Kubernetes pod/secret names+uid patterns, and
       `Bearer <token>` / common API-key shapes.
-- [ ] Order patterns longest-first and add negative tests to avoid over-masking (e.g. plain paths, UUIDs).
-- [ ] Verify masking works inside nested tool-call arguments (branch 1) and SSE payloads (branch 18).
-- [ ] Test per category: placeholder round-trip, id stability, and no leakage in outbound WireMock bodies.
-- [ ] Document the category table in `README.md`.
+- [x] Order patterns longest-first and add negative tests to avoid over-masking (e.g. plain paths, UUIDs).
+- [x] Verify masking works inside nested tool-call arguments (branch 1) and SSE payloads (branch 18).
+- [x] Test per category: placeholder round-trip, id stability, and no leakage in outbound WireMock bodies.
+- [x] Document the category table in `README.md`.
 
 **Files.** `agent/masking/SensitiveDataCategory.java`, `SensitiveDataMasker.java`, tests.
 

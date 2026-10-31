@@ -189,6 +189,8 @@ curl -s -X POST localhost:8080/api/v1/episodes/$EPISODE/run \
 | `POST`                    | `/agent/ask`                    | One-shot incident investigation           |
 | `DELETE`                  | `/agent/sessions/{id}`          | End a session                             |
 | `GET` / `POST` / `DELETE` | `/schedules` …                  | See [scheduled drills](#scheduled-drills) |
+| `POST`                    | `/webhooks/alertmanager`, `/webhooks/pagerduty`, `/webhooks/cloudwatch-sns` | Alert intake, see [alert webhooks](#alert-webhooks) |
+| `GET`                     | `/webhooks`                     | Stored intake reports (postmortems)       |
 | `GET` / `POST` / `DELETE` | `/mcp`                          | See [MCP](#use-mcp)                       |
 
 </details>
@@ -233,6 +235,30 @@ curl -N -s -X POST localhost:8080/api/v1/agent/sessions/$SESSION/chat/stream \
   -H 'content-type: application/json' \
   -H 'accept: text/event-stream' \
   -d '{"message":"Why is orders-api slow?"}'
+```
+
+## Alert webhooks
+
+`POST /api/v1/webhooks/alertmanager`, `/pagerduty`, and `/cloudwatch-sns` accept provider payloads, normalize
+them into an internal `Alert` (source, service, summary, severity, fingerprint), resolve the matching built-in
+scenario (service-name match, falling back to `ajentic.webhooks.default-scenario`), run a synchronous agent
+investigation, and return the report inline. Notifications fan out to a log channel and, when
+`ajentic.webhooks.notification-url` is set, to a JSON webhook.
+
+- Fingerprint dedupe: repeated alerts with the same stable identifiers coalesce onto the original report
+  (`"duplicate": true`), reusing its session and answer.
+- Concurrency: at most `ajentic.webhooks.max-concurrent` (default `4`) investigations run at once; excess
+  alerts get `429`.
+- Optional shared secret: with `ajentic.webhooks.secret` set, the header must match — `X-Alertmanager-Secret`,
+  `Authorization: Token ptoken=<secret>`, or `X-SNS-Secret` — or the request gets `401`.
+- `GET /api/v1/webhooks` lists the stored intake → session → report linkage for postmortems.
+
+```bash
+curl -s -X POST localhost:8080/api/v1/webhooks/alertmanager \
+  -H 'content-type: application/json' \
+  -H 'X-Alertmanager-Secret: <secret>' \
+  -d '{"alerts":[{"labels":{"alertname":"HighLatency","service":"orders-api","severity":"critical"},
+"annotations":{"summary":"p95 latency above 800ms on orders-api"}}]}' | jq
 ```
 
 ## Scheduled drills
@@ -317,6 +343,10 @@ sends `Authorization: Bearer <key>`, unless `ajentic.llm.api-key-header` says ot
 | `ajentic.github.token`                    |                                   | Optional PAT for code-remediation mutations; empty restricts to analysis-only  |
 | `ajentic.github.default-repo`             |                                   | Default repository (`owner/name`)                                               |
 | `ajentic.github.timeout`                  | `30s`                             | HTTP client timeout for GitHub requests                                         |
+| `ajentic.webhooks.secret`                 |                                   | Shared intake secret; `401` on header mismatch when set                          |
+| `ajentic.webhooks.notification-url`       |                                   | Optional report fan-out webhook; blank = log channel only                       |
+| `ajentic.webhooks.max-concurrent`         | `4`                               | Concurrent investigations; excess alerts get `429`                              |
+| `ajentic.webhooks.default-scenario`       | `orders-bad-deployment`           | Fallback scenario when the alert service matches none                          |
 
 </details>
 
