@@ -71,6 +71,7 @@ public class ChatWebhookResource {
     private static final int DEFAULT_MAX_ITERATIONS = 8;
 
     private final SessionService sessions;
+    private final io.ajentic.sre.rl.episode.EpisodeService episodeService;
     private final RemediationStore remediationStore;
     private final GitHubClient github;
     private final ObjectMapper mapper;
@@ -88,6 +89,7 @@ public class ChatWebhookResource {
     @Inject
     public ChatWebhookResource(
             SessionService sessions,
+            io.ajentic.sre.rl.episode.EpisodeService episodeService,
             RemediationStore remediationStore,
             GitHubClient github,
             ObjectMapper mapper,
@@ -97,6 +99,7 @@ public class ChatWebhookResource {
             @ConfigProperty(name = "ajentic.chat.twilio.auth-token") Optional<String> twilioAuthToken,
             @ConfigProperty(name = "ajentic.chat.google.jwt-secret") Optional<String> googleJwtSecret) {
         this.sessions = sessions;
+        this.episodeService = episodeService;
         this.remediationStore = remediationStore;
         this.github = github;
         this.mapper = mapper;
@@ -142,22 +145,18 @@ public class ChatWebhookResource {
             return buildResponse(prov, "No command provided.");
         }
 
-        // 3. Deduplication check
+        // 3. Atomic deduplication & command execution
+        String answer;
         if (eventId != null && !eventId.isBlank()) {
             String dedupKey = prov + ":" + eventId;
-            String cached = deduplicationCache.getIfPresent(dedupKey);
-            if (cached != null) {
-                LOG.debugf("Duplicate event %s for provider %s, returning cached result", eventId, prov);
-                return buildResponse(prov, cached);
+            try {
+                answer = deduplicationCache.get(dedupKey, k -> executeCommand(commandText));
+            } catch (Exception e) {
+                LOG.errorf("Failed executing chat command: %s", e.getMessage());
+                return buildResponse(prov, "Error executing command: " + e.getMessage());
             }
-        }
-
-        // 4. Execute command
-        String answer = executeCommand(commandText);
-
-        // 5. Cache result for deduplication
-        if (eventId != null && !eventId.isBlank()) {
-            deduplicationCache.put(prov + ":" + eventId, answer);
+        } else {
+            answer = executeCommand(commandText);
         }
 
         return buildResponse(prov, answer);
@@ -218,7 +217,7 @@ public class ChatWebhookResource {
             }
         } else if (provider.equals("google-chat") || provider.equals("google")) {
             if (googleJwtSecret.isPresent() && !googleJwtSecret.get().isBlank()) {
-                if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                if (authHeader == null || !authHeader.regionMatches(true, 0, "bearer ", 0, 7)) {
                     return Response.status(Response.Status.UNAUTHORIZED)
                             .entity(Map.of("error", "Missing Google JWT bearer token"))
                             .build();
@@ -246,7 +245,8 @@ public class ChatWebhookResource {
             mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
             byte[] signatureBytes = mac.doFinal(unsigned.getBytes(StandardCharsets.UTF_8));
             String expected = Base64.getUrlEncoder().withoutPadding().encodeToString(signatureBytes);
-            if (!ChatCrypto.constantTimeEquals(expected, parts[2])) {
+            String actualSig = parts[2].replace("=", "");
+            if (!ChatCrypto.constantTimeEquals(expected, actualSig)) {
                 return false;
             }
             // Check exp claim in payload if present
@@ -293,8 +293,18 @@ public class ChatWebhookResource {
                     if (eventId == null) {
                         eventId = root.path("message").path("name").asText(root.path("eventTime").asText(null));
                     }
-                } else if (root.has("data") && root.path("data").has("options")) {
-                    text = root.path("data").path("options").path(0).path("value").asText(null);
+                } else if (root.has("data")) {
+                    JsonNode data = root.path("data");
+                    String cmdName = data.path("name").asText(null);
+                    String val = null;
+                    if (data.has("options") && data.path("options").isArray() && !data.path("options").isEmpty()) {
+                        val = data.path("options").path(0).path("value").asText(null);
+                    }
+                    if (cmdName != null && !cmdName.isBlank()) {
+                        text = (val != null && !val.isBlank()) ? cmdName + " " + val : cmdName;
+                    } else if (val != null) {
+                        text = val;
+                    }
                 }
 
                 if (text == null && root.has("text")) {
@@ -363,9 +373,24 @@ public class ChatWebhookResource {
         if (clean.startsWith("/")) {
             clean = clean.substring(1).trim();
         }
+        if (clean.startsWith("@")) {
+            int spaceIdx = clean.indexOf(' ');
+            if (spaceIdx > 0) {
+                clean = clean.substring(spaceIdx + 1).trim();
+            }
+        } else if (clean.startsWith("<users/")) {
+            int closeIdx = clean.indexOf('>');
+            if (closeIdx > 0) {
+                clean = clean.substring(closeIdx + 1).trim();
+            }
+        }
 
         int space = clean.indexOf(' ');
         String verb = space > 0 ? clean.substring(0, space).toLowerCase(Locale.ROOT) : clean.toLowerCase(Locale.ROOT);
+        int atIdx = verb.indexOf('@');
+        if (atIdx > 0) {
+            verb = verb.substring(0, atIdx);
+        }
         String arg = space > 0 ? clean.substring(space + 1).trim() : "";
 
         return switch (verb) {
@@ -413,7 +438,18 @@ public class ChatWebhookResource {
                     session.pendingApprovals().size());
         }
 
-        // 2. Search remediation by repo or ID
+        // 2. Search episode by ID in EpisodeService
+        Optional<io.ajentic.sre.rl.episode.EpisodeHandle> episodeOpt = episodeService.find(target);
+        if (episodeOpt.isPresent()) {
+            io.ajentic.sre.rl.episode.EpisodeHandle ep = episodeOpt.get();
+            boolean resolved = ep.environment().observe().resolved();
+            return String.format("Episode %s: status=%s, terminal=%s",
+                    ep.id(),
+                    resolved ? "RESOLVED" : "IN_PROGRESS",
+                    ep.environment().isTerminal());
+        }
+
+        // 3. Search remediation by repo or ID
         Optional<RemediationRecord> recOpt = remediationStore.findLatestForRepo(target);
         if (recOpt.isEmpty()) {
             recOpt = remediationStore.findById(target);

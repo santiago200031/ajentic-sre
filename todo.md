@@ -35,7 +35,7 @@ suite offline (`mvn test`, WireMock stubs, no model, no network), and targets Ja
 | 26 | `feat/github-code-tools` | 4 | Zero-clone GitHub REST client + `@ToolBox` code tools + PAT masking | 25 | ✅ done |
 | 27 | `feat/alert-webhook-code-fix` | 4 | Multi-cloud alert normalizer + `POST /webhooks/alerts` code-fix turn | 26 | ✅ done |
 | 28 | `feat/ci-feedback-loop` | 4 | Non-blocking CI status/PR follow-up + remediation report | 27 | ✅ done |
-| 29 | `feat/chatops-channels` | 5 | Slack/Teams/Google Chat/Discord/Telegram + OpenAI-compatible chat API | 19, 22 | ⬜ todo |
+| 29 | `feat/chatops-channels` | 5 | Slack/Teams/Google Chat/Discord/Telegram + OpenAI-compatible chat API | 19, 22 | ✅ done |
 | 30 | `feat/cloud-provider-adapters` | 5 | AWS / Azure / GCP read-only adapters (SigV4, OAuth2, SA-JWT), zero SDK | 17, 21 | ⬜ todo |
 | 31 | `feat/local-cloud-emulation` | 5 | LocalStack + Azurite + fake-gcs/PubSub + monitor stubs in compose | 30 | ⬜ todo |
 | 32 | `feat/sidecar-connectors` | 5 | Connectors as a least-privilege sidecar next to the agent | 29, 31 | ⬜ todo |

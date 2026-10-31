@@ -64,7 +64,8 @@ public class TelegramChannel extends AbstractHttpNotificationChannel {
     @Override
     protected HttpRequest createRequest(IncidentSummary summary) throws Exception {
         String formatted = ChatFormat.TELEGRAM.format(summary);
-        String url = (apiUrl.endsWith("/") ? apiUrl : apiUrl + "/") + "bot" + botToken + "/sendMessage";
+        String token = botToken.startsWith("bot") ? botToken.substring(3) : botToken;
+        String url = (apiUrl.endsWith("/") ? apiUrl : apiUrl + "/") + "bot" + token + "/sendMessage";
 
         Map<String, Object> payload = Map.of(
                 "chat_id", chatId,

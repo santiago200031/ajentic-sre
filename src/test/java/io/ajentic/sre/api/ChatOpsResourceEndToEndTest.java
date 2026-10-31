@@ -11,6 +11,11 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.Base64;
 import java.util.Map;
 
 import static io.restassured.RestAssured.given;
@@ -27,6 +32,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ChatOpsResourceEndToEndTest {
 
     private static final String SLACK_SECRET = "test-slack-secret";
+    private static final String TWILIO_TOKEN = "test-twilio-token";
+    private static final String GOOGLE_SECRET = "test-google-jwt-secret";
     private static final String FACADE_API_KEY = "test-facade-key";
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -35,6 +42,8 @@ class ChatOpsResourceEndToEndTest {
         public Map<String, String> getConfigOverrides() {
             return Map.of(
                     "ajentic.chat.slack.signing-secret", SLACK_SECRET,
+                    "ajentic.chat.twilio.auth-token", TWILIO_TOKEN,
+                    "ajentic.chat.google.jwt-secret", GOOGLE_SECRET,
                     "ajentic.chat.api-key", FACADE_API_KEY,
                     "ajentic.tools.mutation-policy", "require-approval",
                     "ajentic.llm.model", "wm-default"
@@ -265,8 +274,145 @@ class ChatOpsResourceEndToEndTest {
         assertTrue(sseOutput.contains("data: [DONE]"), sseOutput);
     }
 
+    @Test
+    void badTwilioSignatureReturns401() {
+        given()
+                .contentType("application/x-www-form-urlencoded")
+                .header("X-Twilio-Signature", "invalid-sig")
+                .body("Body=ask+why+latency+spiked")
+                .when().post("/api/v1/webhooks/chat/twilio")
+                .then().statusCode(401);
+    }
+
+    @Test
+    void validTwilioSignatureExecutesCommand() {
+        String body = "Body=status+orders-bad-deployment";
+        String sig = ChatCrypto.hmacSha1Base64(body, TWILIO_TOKEN);
+
+        given()
+                .contentType("application/x-www-form-urlencoded")
+                .header("X-Twilio-Signature", sig)
+                .body(body)
+                .when().post("/api/v1/webhooks/chat/twilio")
+                .then().statusCode(200)
+                .body("status", equalTo("ok"));
+    }
+
+    @Test
+    void badOrExpiredGoogleJwtBearerReturns401() {
+        // Missing auth -> 401
+        given()
+                .contentType("application/json")
+                .body("{\"text\":\"status orders-bad-deployment\"}")
+                .when().post("/api/v1/webhooks/chat/google-chat")
+                .then().statusCode(401);
+
+        // Invalid signature -> 401
+        String invalidJwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c2VyMSJ9.invalidsig";
+        given()
+                .contentType("application/json")
+                .header("Authorization", "Bearer " + invalidJwt)
+                .body("{\"text\":\"status orders-bad-deployment\"}")
+                .when().post("/api/v1/webhooks/chat/google-chat")
+                .then().statusCode(401);
+
+        // Expired JWT -> 401
+        long past = Instant.now().getEpochSecond() - 3600;
+        String expiredPayload = Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(("{\"exp\":" + past + "}").getBytes(StandardCharsets.UTF_8));
+        String expiredJwt = createHmacJwt("{\"alg\":\"HS256\"}", "{\"exp\":" + past + "}", GOOGLE_SECRET);
+        given()
+                .contentType("application/json")
+                .header("Authorization", "Bearer " + expiredJwt)
+                .body("{\"text\":\"status orders-bad-deployment\"}")
+                .when().post("/api/v1/webhooks/chat/google-chat")
+                .then().statusCode(401);
+    }
+
+    @Test
+    void validGoogleJwtBearerExecutesCommand() {
+        long future = Instant.now().getEpochSecond() + 3600;
+        String validJwt = createHmacJwt("{\"alg\":\"HS256\"}", "{\"exp\":" + future + ",\"user\":\"test\"}", GOOGLE_SECRET);
+
+        given()
+                .contentType("application/json")
+                .header("Authorization", "bearer " + validJwt) // Lowercase bearer
+                .body("{\"message\":{\"text\":\"status orders-bad-deployment\"}}")
+                .when().post("/api/v1/webhooks/chat/google-chat")
+                .then().statusCode(200)
+                .body("text", containsString("orders-bad-deployment"));
+    }
+
+    @Test
+    void inboundDiscordInteractionWithDataNameExecutesCommand() {
+        String body = """
+                {
+                  "id": "discord-interaction-99",
+                  "data": {
+                    "name": "status",
+                    "options": [
+                      {"name": "target", "value": "orders-bad-deployment"}
+                    ]
+                  }
+                }
+                """;
+
+        given()
+                .contentType("application/json")
+                .body(body)
+                .when().post("/api/v1/webhooks/chat/discord")
+                .then().statusCode(200)
+                .body("type", equalTo(4))
+                .body("data.content", containsString("orders-bad-deployment"));
+    }
+
+    @Test
+    void openAiFacadeBearerAuthCaseInsensitiveAndMultiTurnHistory() {
+        // Lowercase "bearer " accepted
+        given()
+                .header("Authorization", "bearer " + FACADE_API_KEY)
+                .when().get("/v1/models")
+                .then().statusCode(200);
+
+        // Multi-turn messages conversation seeded
+        String body = """
+                {
+                  "model": "wm-default",
+                  "messages": [
+                    {"role": "user", "content": "Hello, bot"},
+                    {"role": "assistant", "content": "Hello! I am your SRE assistant."},
+                    {"role": "user", "content": "What is wrong with the orders service?"}
+                  ],
+                  "stream": false
+                }
+                """;
+
+        given()
+                .header("Authorization", "bearer " + FACADE_API_KEY)
+                .contentType("application/json")
+                .body(body)
+                .when().post("/v1/chat/completions")
+                .then().statusCode(200)
+                .body("choices[0].message.role", equalTo("assistant"));
+    }
+
     private static String computeSlackSig(String body, long timestamp) {
         String base = "v0:" + timestamp + ":" + body;
         return "v0=" + ChatCrypto.hmacSha256Hex(base, SLACK_SECRET);
+    }
+
+    private static String createHmacJwt(String headerJson, String payloadJson, String secret) {
+        String h = Base64.getUrlEncoder().withoutPadding().encodeToString(headerJson.getBytes(StandardCharsets.UTF_8));
+        String p = Base64.getUrlEncoder().withoutPadding().encodeToString(payloadJson.getBytes(StandardCharsets.UTF_8));
+        String unsigned = h + "." + p;
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            byte[] sigBytes = mac.doFinal(unsigned.getBytes(StandardCharsets.UTF_8));
+            String sig = Base64.getUrlEncoder().withoutPadding().encodeToString(sigBytes);
+            return unsigned + "." + sig;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 }

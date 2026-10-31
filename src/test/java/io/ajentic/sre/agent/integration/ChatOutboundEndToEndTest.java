@@ -146,4 +146,39 @@ class ChatOutboundEndToEndTest {
         server.verify(2, postRequestedFor(urlEqualTo("/flaky")));
         assertEquals(ChatResilience.CircuitState.CLOSED, channel.circuitBreaker().state());
     }
+
+    @Test
+    void telegramMattermostAndGenericSignedWebhookSucceedBehindStubs() {
+        server.stubFor(post(urlEqualTo("/bot12345/sendMessage")).willReturn(aResponse().withStatus(200).withBody("{}")));
+        server.stubFor(post(urlEqualTo("/mattermost")).willReturn(aResponse().withStatus(200).withBody("ok")));
+        server.stubFor(post(urlEqualTo("/generic-hook")).willReturn(aResponse().withStatus(200).withBody("{}")));
+
+        Duration timeout = Duration.ofSeconds(2);
+        TelegramChannel telegram = new TelegramChannel("bot12345", "chat-789", server.url("/"),
+                timeout, 1, Duration.ofMillis(10), 3, Duration.ofSeconds(10), 10.0);
+        MattermostChannel mattermost = new MattermostChannel(server.url("/mattermost"),
+                timeout, 1, Duration.ofMillis(10), 3, Duration.ofSeconds(10), 10.0);
+        GenericWebhookChannel webhook = new GenericWebhookChannel(server.url("/generic-hook"), "test-secret-42",
+                timeout, 1, Duration.ofMillis(10), 3, Duration.ofSeconds(10), 10.0);
+
+        NotificationDispatcher dispatcher = new NotificationDispatcher(List.of(telegram, mattermost, webhook));
+        dispatcher.postAsync(sample).join();
+
+        server.verify(1, postRequestedFor(urlEqualTo("/bot12345/sendMessage")));
+        server.verify(1, postRequestedFor(urlEqualTo("/mattermost")));
+        server.verify(1, postRequestedFor(urlEqualTo("/generic-hook"))
+                .withHeader("X-Ajentic-Signature", WireMock.matching("sha256=[0-9a-f]{64}")));
+    }
+
+    @Test
+    void tokenBucketRateLimiterLimitsExcessRequests() {
+        // Capacity = 3, refill rate = 1 token/sec
+        ChatResilience.TokenBucketRateLimiter limiter = new ChatResilience.TokenBucketRateLimiter(3.0, 1.0);
+
+        assertTrue(limiter.tryAcquire());
+        assertTrue(limiter.tryAcquire());
+        assertTrue(limiter.tryAcquire());
+        // 4th request must be rate limited
+        assertFalse(limiter.tryAcquire());
+    }
 }
