@@ -31,9 +31,13 @@ public class IncidentDrillRunner {
     }
 
     public EpisodeResult drill(String scenarioId) {
+        return drill(scenarioId, null);
+    }
+
+    public EpisodeResult drill(String scenarioId, EpisodeRunner.StepListener listener) {
         Environment environment = environments.create(scenarioId, 42L);
         EpisodeResult result = runner.run(
-                UUID.randomUUID().toString(), environment, policies.byName("heuristic"));
+                UUID.randomUUID().toString(), environment, policies.byName("heuristic"), listener);
         history.add(result);
         while (history.size() > HISTORY_LIMIT) {
             history.removeFirst();

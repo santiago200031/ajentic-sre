@@ -14,7 +14,19 @@ import java.util.List;
 @ApplicationScoped
 public class EpisodeRunner {
 
+    /**
+     * Observes every step of an episode, e.g. for streaming drills over SSE.
+     */
+    @FunctionalInterface
+    public interface StepListener {
+        void onStep(StepRecord step, Observation observation);
+    }
+
     public EpisodeResult run(String episodeId, Environment environment, Policy policy) {
+        return run(episodeId, environment, policy, null);
+    }
+
+    public EpisodeResult run(String episodeId, Environment environment, Policy policy, StepListener listener) {
         Observation observation = environment.observe();
         List<StepRecord> trajectory = new ArrayList<>();
         TerminationReason reason = TerminationReason.NONE;
@@ -23,10 +35,14 @@ public class EpisodeRunner {
         while (!observation.terminal()) {
             AgentAction action = policy.next(environment, observation);
             StepResult result = environment.step(action);
-            trajectory.add(new StepRecord(index++, action.describe(), result.reward(),
-                    result.observation().feedback(), result.done()));
+            StepRecord step = new StepRecord(index++, action.describe(), result.reward(),
+                    result.observation().feedback(), result.done());
+            trajectory.add(step);
             observation = result.observation();
             reason = result.reason();
+            if (listener != null) {
+                listener.onStep(step, observation);
+            }
         }
 
         return new EpisodeResult(
