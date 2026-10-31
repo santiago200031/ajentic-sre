@@ -39,6 +39,6 @@ public record EpisodeResult(
         List<StepRecord> trajectory) {
 
     public EpisodeResult {
-        trajectory = List.copyOf(trajectory);
+        trajectory = trajectory == null ? List.of() : List.copyOf(trajectory);
     }
 }

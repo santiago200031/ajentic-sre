@@ -226,7 +226,17 @@ every write, rotated when the file grows past `ajentic.memory.max-file-size`). T
 reach disk. `search_past_incidents` queries the store by symptom text, service, and fault kind (newest first), and
 every new agent session's system prompt includes a short "Similar past incidents" summary for the same service
 and fault kind when one exists. Corrupt lines are skipped, never fatal. Disable with
-`ajentic.memory.enabled=false`.
+## Durable state store
+
+Schedules and incident drill histories are persisted to `.ajentic/state.json` (schema versioned, atomic
+write-temp-then-rename, process-level file lock). Select the backend with `ajentic.state.store = file | memory | jdbc | redis`
+(defaults to `file`; `%test` defaults to `memory`).
+
+Inspect or backup state:
+```bash
+cat .ajentic/state.json | jq .
+cp .ajentic/state.json .ajentic/state.json.bak
+```
 
 ## Stream a chat turn (SSE)
 
@@ -374,6 +384,8 @@ sends `Authorization: Bearer <key>`, unless `ajentic.llm.api-key-header` says ot
 | `ajentic.memory.enabled`                  | `true`                            | Persist completed episodes to `.ajentic/incidents.jsonl` and feed them back     |
 | `ajentic.memory.dir`                      | `.ajentic`                        | Directory holding `incidents.jsonl`                                            |
 | `ajentic.memory.max-file-size`            | `1048576`                         | Rotation threshold (bytes) for `incidents.jsonl`                                |
+| `ajentic.state.store`                     | `file`                            | State persistence: `file` \| `memory` \| `jdbc` \| `redis`                      |
+| `ajentic.state.file`                      | `.ajentic/state.json`             | File path for file state store                                                  |
 | `ajentic.agent.max-tokens`                | `0`                               | Cumulative session token budget; `0` disables the hard stop                     |
 | `ajentic.agent.stagnation.threshold`      | `2`                               | Repeated identical tool call count that yields a "try something else" hint      |
 | `ajentic.agent.stagnation.escalate-after` | `3`                               | Repeated identical tool call count that stops the loop with a diagnostic answer |

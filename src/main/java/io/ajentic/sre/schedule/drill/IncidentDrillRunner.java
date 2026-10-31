@@ -6,6 +6,8 @@ import io.ajentic.sre.rl.episode.EpisodeResult;
 import io.ajentic.sre.rl.episode.EpisodeRunner;
 import io.ajentic.sre.rl.policy.PolicyFactory;
 import io.ajentic.sre.rl.simulation.EnvironmentFactory;
+import io.ajentic.sre.state.InMemoryStateStore;
+import io.ajentic.sre.state.StateStore;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -21,13 +23,27 @@ public class IncidentDrillRunner {
     private final EnvironmentFactory environments;
     private final EpisodeRunner runner;
     private final PolicyFactory policies;
+    private final StateStore stateStore;
     private final List<EpisodeResult> history = new CopyOnWriteArrayList<>();
 
-    @Inject
     public IncidentDrillRunner(EnvironmentFactory environments, EpisodeRunner runner, PolicyFactory policies) {
+        this(environments, runner, policies, new InMemoryStateStore());
+    }
+
+    @Inject
+    public IncidentDrillRunner(
+            EnvironmentFactory environments,
+            EpisodeRunner runner,
+            PolicyFactory policies,
+            StateStore stateStore) {
         this.environments = environments;
         this.runner = runner;
         this.policies = policies;
+        this.stateStore = stateStore;
+        List<EpisodeResult> loaded = stateStore.loadDrills();
+        if (loaded != null && !loaded.isEmpty()) {
+            history.addAll(loaded);
+        }
     }
 
     public EpisodeResult drill(String scenarioId) {
@@ -42,6 +58,7 @@ public class IncidentDrillRunner {
         while (history.size() > HISTORY_LIMIT) {
             history.removeFirst();
         }
+        stateStore.saveDrills(List.copyOf(history));
         return result;
     }
 

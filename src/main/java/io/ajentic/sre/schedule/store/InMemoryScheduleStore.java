@@ -1,7 +1,7 @@
 package io.ajentic.sre.schedule.store;
 
-import io.quarkus.arc.DefaultBean;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Typed;
 
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -11,8 +11,8 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 
-@DefaultBean
 @ApplicationScoped
+@Typed(InMemoryScheduleStore.class)
 public class InMemoryScheduleStore implements ScheduleStore {
 
     private final Map<String, ScheduleDefinition> schedules = new LinkedHashMap<>();

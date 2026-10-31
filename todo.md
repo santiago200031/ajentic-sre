@@ -30,7 +30,7 @@ suite offline (`mvn test`, WireMock stubs, no model, no network), and targets Ja
 | 21 | `feat/multicloud-identifier-masking` | 3 | GCP/Azure/K8s/Bearer categories | 1 | ✅ done |
 | 22 | `feat/approval-gates` | 3 | `ALLOW \| DENY \| REQUIRE_APPROVAL` | 18 | ✅ done |
 | 23 | `feat/episodic-memory` | 3 | `search_past_incidents` + `.ajentic/incidents.jsonl` | 6, 22 | ✅ done |
-| 24 | `feat/file-state-store` | 3 | Durable schedules/drills/episodes | 6 | ⬜ todo |
+| 24 | `feat/file-state-store` | 3 | Durable schedules/drills/episodes | 6 | ✅ done |
 | 25 | `feat/swagger-openapi-first` | 3 | Always-on Swagger UI + OpenAPI annotations + one-shot ask/simulate; CLI narrowed to open Swagger | — | ✅ done |
 | 26 | `feat/github-code-tools` | 4 | Zero-clone GitHub REST client + `@ToolBox` code tools + PAT masking | 25 | ✅ done |
 | 27 | `feat/alert-webhook-code-fix` | 4 | Multi-cloud alert normalizer + `POST /webhooks/alerts` code-fix turn | 26 | ⬜ todo |
@@ -464,14 +464,14 @@ new `agent/session/TurnListener.java`.
 
 ### 24. `feat/file-state-store`
 
-- [ ] Add a file-backed `ScheduleStore` (`.ajentic/state.json`) and durable drill/episode history; atomic
+- [x] Add a file-backed `ScheduleStore` (`.ajentic/state.json`) and durable drill/episode history; atomic
       write-temp-then-rename, file lock for concurrent processes, schema version field.
-- [ ] Keep `InMemoryScheduleStore` for tests; select via `ajentic.state.store = memory | file | jdbc`.
-- [ ] Persist only serializable fields — enabled by branch 6 (`scenarioId`, not a lambda).
-- [ ] Define the `jdbc`/Redis seam now (interface + config), implement later.
-- [ ] Test: create schedules → restart the app context → schedules and versions survive; crash-safety (partial temp
-      file is ignored).
-- [ ] Add `.ajentic/` to `.gitignore`; document backup/inspect commands.
+- [x] Keep `InMemoryScheduleStore` for tests; select via `ajentic.state.store = memory | file | jdbc`.
+- [x] Persist only serializable fields — enabled by branch 6 (`scenarioId`, not a lambda).
+- [x] Define the `jdbc`/Redis seam now (interface + config), implement later.
+- [x] Test: create schedules → restart the app context → schedules and versions survive; crash-safety (partial temp
+      file is ignored) (`FileStateStoreTest`, `FileStateStoreEndToEndTest`).
+- [x] Add `.ajentic/` to `.gitignore`; document backup/inspect commands.
 
 **Files.** new `schedule/store/FileScheduleStore.java`, new `state/` package, `application.properties`,
 `schedule/drill/IncidentDrillRunner.java`.
