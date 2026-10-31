@@ -4,6 +4,8 @@ import io.ajentic.sre.agent.session.AgentSession;
 import io.ajentic.sre.agent.session.AgentSessionConfig;
 import io.ajentic.sre.agent.session.ChatTurnResult;
 import io.ajentic.sre.agent.session.SessionService;
+import io.ajentic.sre.agent.session.TurnEvent;
+import io.ajentic.sre.agent.session.TurnListener;
 import io.ajentic.sre.agent.session.UnknownSessionException;
 import io.ajentic.sre.api.payload.AskRequest;
 import io.ajentic.sre.api.payload.ChatRequest;
@@ -21,11 +23,21 @@ import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.sse.Sse;
+import jakarta.ws.rs.sse.SseEventSink;
 import org.jboss.resteasy.reactive.ResponseStatus;
 import org.jboss.resteasy.reactive.RestPath;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
+import tools.jackson.databind.ObjectMapper;
+
+import java.io.IOException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Autonomous ReAct investigation agent. Sessions are bounded by a Caffeine cache so a hosted deployment cannot grow
@@ -42,10 +54,14 @@ public class AgentResource {
     private static final int DEFAULT_MAX_ITERATIONS = 8;
 
     private final SessionService sessions;
+    private final ObjectMapper mapper;
+    private final Sse sse;
 
     @Inject
-    public AgentResource(SessionService sessions) {
+    public AgentResource(SessionService sessions, ObjectMapper mapper, Sse sse) {
         this.sessions = sessions;
+        this.mapper = mapper;
+        this.sse = sse;
     }
 
     @POST
@@ -82,6 +98,48 @@ public class AgentResource {
         ChatTurnResult result = session.chat(request.message());
         return new ChatResponse(session.id(), result.answer(), result.observation(), result.toolCalls(),
                 result.usage());
+    }
+
+    @POST
+    @Path("/sessions/{id}/chat/stream")
+    @Produces("text/event-stream")
+    @Operation(summary = "Stream a chat turn as server-sent events",
+            description = "Emits thought, tool_call, tool_result, usage and done events as the ReAct turn "
+                    + "progresses; one heartbeat comment is sent every 10 seconds while the turn is in flight.")
+    @APIResponse(responseCode = "200", description = "The server-sent event stream")
+    @APIResponse(responseCode = "404", description = "Unknown session")
+    public Response chatStream(@RestPath String id, @Valid ChatRequest request, SseEventSink sink) {
+        AgentSession session = require(id);
+        AtomicBoolean cancelled = new AtomicBoolean();
+        TurnListener listener = event -> send(sink, event, cancelled);
+        ScheduledExecutorService heartbeat = Executors.newSingleThreadScheduledExecutor();
+        heartbeat.scheduleAtFixedRate(
+                () -> sink.send(sse.newEventBuilder().comment("heartbeat").build()),
+                10, 10, TimeUnit.SECONDS);
+        try {
+            session.chat(request.message(), listener, cancelled::get);
+        } catch (RuntimeException e) {
+            send(sink, TurnEvent.error(String.valueOf(e.getMessage())), cancelled);
+        } finally {
+            heartbeat.shutdownNow();
+            try {
+                sink.close();
+            } catch (IOException ignored) {
+            }
+        }
+        return Response.ok().header("Cache-Control", "no-cache").build();
+    }
+
+    private void send(SseEventSink sink, TurnEvent event, AtomicBoolean cancelled) {
+        sink.send(sse.newEventBuilder()
+                .name(event.type())
+                .data(mapper.writeValueAsString(event.payload()))
+                .build())
+                .toCompletableFuture()
+                .exceptionally(ex -> {
+                    cancelled.set(true);
+                    return null;
+                });
     }
 
     @POST

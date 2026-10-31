@@ -1,0 +1,22 @@
+{
+ "id": "chatcmpl-wm-stream",
+ "object": "chat.completion",
+ "created": 1735689600,
+ "model": "wm-stream",
+ "choices": [
+  {
+   "index": 0,
+   "message": {
+    "role": "assistant",
+    "content": "The orders database pool is exhausted; restarting orders-api should recover it.",
+    "tool_calls": null
+   },
+   "finish_reason": "stop"
+  }
+ ],
+ "usage": {
+  "prompt_tokens": 55,
+  "completion_tokens": 18,
+  "total_tokens": 73
+ }
+}

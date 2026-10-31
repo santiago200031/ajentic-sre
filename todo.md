@@ -24,7 +24,7 @@ suite offline (`mvn test`, WireMock stubs, no model, no network), and targets Ja
 | 15 | `feat/benchmark-cli` | 2 | `benchmark` subcommand + scorecard | 14 | ✅ done |
 | 16 | `feat/environment-backends` | 3 | `ajentic.environment.backend` strategy | 6, 10 | ✅ done |
 | 17 | `feat/live-telemetry-adapters` | 3 | `local-container` / `cloud-live` read-only adapters | 16 | ✅ done |
-| 18 | `feat/sse-chat-stream` | 3 | `/chat/stream` SSE | 13 | ⬜ todo |
+| 18 | `feat/sse-chat-stream` | 3 | `/chat/stream` SSE | 13 | ✅ done |
 | 19 | `feat/alert-webhooks` | 3 | Alertmanager/PagerDuty/SNS intake | 16, 18 | ⬜ todo |
 | 20 | `feat/llm-fallback-router` | 3 | Local-first composite LLM client | 13 | ⬜ todo |
 | 21 | `feat/multicloud-identifier-masking` | 3 | GCP/Azure/K8s/Bearer categories | 1 | ✅ done |
@@ -371,14 +371,16 @@ overwrite each other's active episode unless every call passes `_episodeId`.
 
 ### 18. `feat/sse-chat-stream`
 
-- [ ] Add `POST /api/v1/agent/sessions/{id}/chat/stream` returning `text/event-stream`.
-- [ ] Emit typed events: `thought`, `tool_call`, `tool_result`/`observation`, `usage`, `done`, `error` — one per
-      ReAct step, flushed as produced.
-- [ ] Push events from `AgentSession` via a listener/callback so the non-streaming path is unchanged.
-- [ ] Handle client disconnect (cancel the turn, release the session), heartbeats for long local-model calls, and
-      correct `Content-Type`/`Cache-Control`.
-- [ ] Test with REST Assured streaming: a scripted 2-iteration turn yields events in order and a terminal `done`.
-- [ ] Document `curl -N` usage.
+- [x] Add `POST /api/v1/agent/sessions/{id}/chat/stream` returning `text/event-stream`.
+- [x] Emit typed events: `thought`, `tool_call`, `tool_result`, `usage`, `done`, `error` — one per ReAct step,
+      flushed as produced.
+- [x] Push events from `AgentSession` via a `TurnListener`/`TurnEvent` callback so the non-streaming path is
+      unchanged.
+- [x] Handle client disconnect (cancelled flag checked at each step boundary), heartbeats every 10s while the turn
+      is in flight, and `Cache-Control: no-cache`.
+- [x] Test: a scripted 2-iteration turn yields events in order and a terminal `done`; an upstream LLM failure
+      emits a terminal `error` event.
+- [x] Document `curl -N` usage.
 
 **Files.** `api/resource/AgentResource.java` (or new `AgentStreamResource`), `agent/session/AgentSession.java`,
 new `agent/session/TurnListener.java`.

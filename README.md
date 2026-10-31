@@ -185,6 +185,7 @@ curl -s -X POST localhost:8080/api/v1/episodes/$EPISODE/run \
 | `POST`                    | `/agent/sessions`               | Start an LLM session                      |
 | `GET`                     | `/agent/sessions/{id}`          | Session state                             |
 | `POST`                    | `/agent/sessions/{id}/chat`     | One ReAct turn                            |
+| `POST`                    | `/agent/sessions/{id}/chat/stream` | One ReAct turn as server-sent events (`thought`, `tool_call`, `tool_result`, `usage`, `done`, `error`) |
 | `POST`                    | `/agent/ask`                    | One-shot incident investigation           |
 | `DELETE`                  | `/agent/sessions/{id}`          | End a session                             |
 | `GET` / `POST` / `DELETE` | `/schedules` …                  | See [scheduled drills](#scheduled-drills) |
@@ -215,6 +216,24 @@ and `prompts/get`. `POST` takes one request or a batch array, and malformed JSON
 - Resources: `sre://scenarios/{scenarioId}`, `sre://topology/{scenarioId}`, and `sre://runbooks/{scenarioId}/{runbookId}`.
 - Prompts: `investigate-incident` and `summarize-postmortem`.
 - A `tools/call` can pass `_scenarioId` to start an episode, or `_episodeId` to reuse one.
+
+## Stream a chat turn (SSE)
+
+`POST /api/v1/agent/sessions/{id}/chat/stream` returns `text/event-stream` and emits one typed event per ReAct
+step as it happens: `thought` (intermediate assistant text), `tool_call`, `tool_result`, `usage` (per LLM
+call), `done` (final answer plus cumulative tokens) or `error`. A `: heartbeat` comment is sent every 10 seconds
+while the turn is in flight; if the client disconnects, the turn is cancelled at the next step boundary.
+
+```bash
+SESSION=$(curl -s -X POST localhost:8080/api/v1/agent/sessions \
+  -H 'content-type: application/json' \
+  -d '{"scenarioId":"orders-bad-deployment","seed":1}' | jq -r .id)
+
+curl -N -s -X POST localhost:8080/api/v1/agent/sessions/$SESSION/chat/stream \
+  -H 'content-type: application/json' \
+  -H 'accept: text/event-stream' \
+  -d '{"message":"Why is orders-api slow?"}'
+```
 
 ## Scheduled drills
 

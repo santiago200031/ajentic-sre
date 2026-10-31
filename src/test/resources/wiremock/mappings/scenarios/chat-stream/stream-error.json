@@ -1,0 +1,19 @@
+{
+ "priority": 5,
+ "request": {
+  "method": "POST",
+  "urlPath": "/v1/chat/completions",
+  "bodyPatterns": [
+   {
+    "matchesJsonPath": {
+     "expression": "$.model",
+     "equalTo": "wm-stream-error"
+    }
+   }
+  ]
+ },
+ "response": {
+  "status": 200,
+  "fault": "CONNECTION_RESET_BY_PEER"
+ }
+}

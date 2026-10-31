@@ -27,6 +27,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.function.BooleanSupplier;
 import java.util.stream.Gatherers;
 
 public final class AgentSession {
@@ -113,39 +114,68 @@ public final class AgentSession {
     }
 
     public ChatTurnResult chat(String userMessage) {
-        return ScopedValue.where(AgentExecutionContext.MASKING_SESSION, maskingSession)
-                .call(() -> chatScoped(userMessage));
+        return chat(userMessage, TurnListener.NOOP, () -> false);
     }
 
-    private ChatTurnResult chatScoped(String userMessage) {
+    /**
+     * Runs one chat turn, pushing {@link TurnEvent}s to {@code listener} as they are produced and stopping early
+     * when {@code cancelled} reports that the client went away.
+     */
+    public ChatTurnResult chat(String userMessage, TurnListener listener, BooleanSupplier cancelled) {
+        return ScopedValue.where(AgentExecutionContext.MASKING_SESSION, maskingSession)
+                .call(() -> chatScoped(userMessage, listener, cancelled));
+    }
+
+    private ChatTurnResult chatScoped(String userMessage, TurnListener listener, BooleanSupplier cancelled) {
         conversation.add(ChatMessage.user(userMessage));
         List<ToolCall> lastToolCalls = List.of();
         Map<String, Integer> repeats = new ConcurrentHashMap<>();
 
         for (int iteration = 0; iteration < config.maxIterations(); iteration++) {
+            if (cancelled.getAsBoolean()) {
+                String answer = "Turn cancelled: the client disconnected before the agent finished.";
+                conversation.add(ChatMessage.assistant(answer));
+                emitDone(listener, answer);
+                return new ChatTurnResult(answer, lastToolCalls, environment.observe(), conversation.usage());
+            }
             if (overBudget()) {
                 String answer = "Token budget exhausted after " + conversation.usage().totalTokens() + " tokens.";
                 conversation.add(ChatMessage.assistant(answer));
+                emitDone(listener, answer);
                 return new ChatTurnResult(answer, lastToolCalls, environment.observe(), conversation.usage());
             }
             LlmResponse response = llm.complete(
                     new LlmRequest(conversation.messages(), tools.descriptors(), config.model()));
             recordTokens(response);
             conversation.addUsage(response.usage());
+            listener.onEvent(TurnEvent.usage(
+                    response.usage().promptTokens(), response.usage().completionTokens(), response.usage().totalTokens()));
 
             if (!response.hasToolCalls()) {
                 String answer = response.content() == null ? "" : response.content();
                 conversation.add(ChatMessage.assistant(answer));
+                emitDone(listener, answer);
                 return new ChatTurnResult(answer, lastToolCalls, environment.observe(), conversation.usage());
             }
 
+            if (response.content() != null && !response.content().isBlank()) {
+                listener.onEvent(TurnEvent.thought(response.content()));
+            }
             conversation.add(ChatMessage.assistant(response.content(), response.toolCalls()));
             lastToolCalls = response.toolCalls();
-            if (executeAll(response.toolCalls(), repeats)) {
+            for (ToolCall call : response.toolCalls()) {
+                listener.onEvent(TurnEvent.toolCall(call.name(), call.arguments()));
+            }
+            String[] results = new String[response.toolCalls().size()];
+            if (executeAll(response.toolCalls(), repeats, results)) {
                 String answer = "Stalled: repeated identical tool calls produced no new evidence. "
                         + "Try a different tool or different arguments.";
                 conversation.add(ChatMessage.assistant(answer));
+                emitDone(listener, answer);
                 return new ChatTurnResult(answer, lastToolCalls, environment.observe(), conversation.usage());
+            }
+            for (int index = 0; index < response.toolCalls().size(); index++) {
+                listener.onEvent(TurnEvent.toolResult(response.toolCalls().get(index).name(), results[index]));
             }
 
             if (environment.isTerminal()) {
@@ -153,7 +183,17 @@ public final class AgentSession {
             }
         }
 
-        return new ChatTurnResult(finalizeAnswer(), lastToolCalls, environment.observe(), conversation.usage());
+        String answer = finalizeAnswer();
+        emitDone(listener, answer);
+        return new ChatTurnResult(answer, lastToolCalls, environment.observe(), conversation.usage());
+    }
+
+    private void emitDone(TurnListener listener, String answer) {
+        listener.onEvent(TurnEvent.done(
+                answer,
+                conversation.usage().promptTokens(),
+                conversation.usage().completionTokens(),
+                conversation.usage().totalTokens()));
     }
 
     public ChatTurnResult chatUntilGoal(String userMessage, Goal goal) {
@@ -181,8 +221,7 @@ public final class AgentSession {
                 .increment(response.usage().completionTokens());
     }
 
-    private boolean executeAll(List<ToolCall> toolCalls, Map<String, Integer> repeats) {
-        String[] results = new String[toolCalls.size()];
+    private boolean executeAll(List<ToolCall> toolCalls, Map<String, Integer> repeats, String[] results) {
         List<Integer> readOnly = new ArrayList<>();
         List<Integer> mutating = new ArrayList<>();
         boolean stalled = false;
