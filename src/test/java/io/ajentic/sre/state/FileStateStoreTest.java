@@ -145,6 +145,48 @@ class FileStateStoreTest {
     }
 
     @Test
+    void concurrentReadsAndUpdatesDoNotThrowOverlappingLockException() throws InterruptedException {
+        FileStateStore store = new FileStateStore(mapper, STATE_FILE);
+        int threadCount = 8;
+        int operationsPerThread = 20;
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(threadCount);
+        java.util.concurrent.atomic.AtomicInteger errors = new java.util.concurrent.atomic.AtomicInteger();
+        java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(threadCount);
+
+        for (int i = 0; i < threadCount; i++) {
+            final int threadId = i;
+            pool.submit(() -> {
+                try {
+                    for (int j = 0; j < operationsPerThread; j++) {
+                        if (threadId % 2 == 0) {
+                            store.saveSchedules(List.of(new ScheduleDefinition(
+                                    "s-" + threadId + "-" + j,
+                                    "task",
+                                    "0 0 * * *",
+                                    true,
+                                    false,
+                                    (long) j,
+                                    null,
+                                    ZoneId.of("UTC"),
+                                    "orders-bad-deployment")));
+                        } else {
+                            store.loadSchedules();
+                        }
+                    }
+                } catch (Throwable t) {
+                    errors.incrementAndGet();
+                } finally {
+                    latch.countDown();
+                }
+            });
+        }
+
+        assertTrue(latch.await(10, java.util.concurrent.TimeUnit.SECONDS));
+        pool.shutdown();
+        assertEquals(0, errors.get(), "Concurrent access threw errors");
+    }
+
+    @Test
     void unimplementedSeamsThrowUnsupportedOperation() {
         JdbcStateStore jdbc = new JdbcStateStore();
         assertThrows(UnsupportedOperationException.class, jdbc::loadSchedules);

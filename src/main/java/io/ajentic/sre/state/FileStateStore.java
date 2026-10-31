@@ -80,7 +80,7 @@ public class FileStateStore implements StateStore {
                 drills));
     }
 
-    private StateSnapshot readSnapshot() {
+    private synchronized StateSnapshot readSnapshot() {
         if (!Files.exists(file)) {
             return StateSnapshot.empty();
         }
@@ -90,7 +90,7 @@ public class FileStateStore implements StateStore {
                  FileLock ignored = channel.lock()) {
                 return readFromFileUnderLock();
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             LOG.warnf("Could not acquire lock to read state from %s: %s", file, e.getMessage());
             return StateSnapshot.empty();
         }
@@ -105,7 +105,7 @@ public class FileStateStore implements StateStore {
                 StateSnapshot updated = updater.apply(current);
                 writeAtomicUnderLock(updated);
             }
-        } catch (IOException e) {
+        } catch (Exception e) {
             LOG.warnf("Failed to update state file %s: %s", file, e.getMessage());
         }
     }
