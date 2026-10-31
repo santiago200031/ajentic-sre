@@ -27,7 +27,8 @@ public class SimulateCommand implements Runnable {
     @Option(names = "--scenario", required = true, description = "Scenario id to simulate.")
     String scenarioId;
 
-    @Option(names = "--policy", defaultValue = "heuristic", description = "Policy: heuristic or idle.")
+    @Option(names = "--policy", defaultValue = "heuristic",
+            description = "Policy: heuristic, idle, llm or random.")
     String policy;
 
     @Option(names = "--seed", defaultValue = "42", description = "Deterministic seed.")

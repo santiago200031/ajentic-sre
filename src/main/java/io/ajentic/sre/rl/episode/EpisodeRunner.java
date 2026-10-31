@@ -21,7 +21,7 @@ public class EpisodeRunner {
         int index = 0;
 
         while (!observation.terminal()) {
-            AgentAction action = policy.next(observation);
+            AgentAction action = policy.next(environment, observation);
             StepResult result = environment.step(action);
             trajectory.add(new StepRecord(index++, action.describe(), result.reward(),
                     result.observation().feedback(), result.done()));

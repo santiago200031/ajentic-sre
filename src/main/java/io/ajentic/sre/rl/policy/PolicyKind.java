@@ -12,7 +12,9 @@ import java.util.Locale;
 public enum PolicyKind {
 
     HEURISTIC,
-    IDLE;
+    IDLE,
+    LLM,
+    RANDOM;
 
     @JsonCreator
     public static PolicyKind fromName(String name) {

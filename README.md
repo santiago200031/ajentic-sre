@@ -142,7 +142,7 @@ to stderr; stdout carries only command output (and the MCP JSON-RPC stream for `
 | Command                                                                            | Purpose                               |
 | ---------------------------------------------------------------------------------- | ------------------------------------- |
 | `scenarios`                                                                        | List the scenario library             |
-| `simulate --scenario <id> [--policy heuristic\|idle] [--seed 42]`                  | Run a scenario with a baseline policy |
+| `simulate --scenario <id> [--policy heuristic\|idle\|llm\|random] [--seed 42]`     | Run a scenario with a baseline policy |
 | `ask "<question>" [--scenario <id>]`                                               | Ask the LLM agent one question        |
 | `schedules [--add <name> --cron '<cron>' --scenario <id>] [--tick] [--run <name>]` | Manage drills                         |
 | `serve`                                                                            | Start the HTTP API and block          |

@@ -307,15 +307,15 @@ overwrite each other's active episode unless every call passes `_episodeId`.
 
 ### 14. `feat/llm-policy-adapter`
 
-- [ ] Add `LLM` to `PolicyKind` (and `RANDOM` for the benchmark baseline) and register the new policy with the
+- [x] Add `LLM` to `PolicyKind` (and `RANDOM` for the benchmark baseline) and register the new policy with the
       existing `@PolicyModel` qualifier / `PolicyFactory` lookup.
-- [ ] Add `@PolicyModel(PolicyKind.LLM) LlmPolicy implements Policy`, bridging the `Policy` contract to the ReAct
+- [x] Add `@PolicyModel(PolicyKind.LLM) LlmPolicy implements Policy`, bridging the `Policy` contract to the ReAct
       loop (one `AgentSession` per episode, `chat`/`chatUntilGoal`).
-- [ ] Map `Observation` → prompt, tool calls → `AgentAction`, terminal → episode end; reuse masking and tools.
-- [ ] Guard against infinite loops (`maxIterations`, stagnation from branch 12) and surface usage.
-- [ ] Test with `ScriptedLlmClient`: a scripted policy solves a scenario; unknown/scenario mismatch yields a clean
+- [x] Map `Observation` → prompt, tool calls → `AgentAction`, terminal → episode end; reuse masking and tools.
+- [x] Guard against infinite loops (`maxIterations`, stagnation from branch 12) and surface usage.
+- [x] Test with `ScriptedLlmClient`: a scripted policy solves a scenario; unknown/scenario mismatch yields a clean
       failure, not an exception.
-- [ ] Test: masking is active for LLM policies (no raw identifiers in stub requests).
+- [x] Test: masking is active for LLM policies (no raw identifiers in stub requests).
 
 **Files.** new `rl/policy/LlmPolicy.java`, `rl/policy/PolicyModel.java`/registry, `agent/session/*`,
 `rl/episode/EpisodeService.java`.

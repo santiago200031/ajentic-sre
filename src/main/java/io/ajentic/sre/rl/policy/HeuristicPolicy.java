@@ -5,6 +5,7 @@ import io.ajentic.sre.rl.action.ApplyRemediation;
 import io.ajentic.sre.rl.action.DeclareDiagnosis;
 import io.ajentic.sre.rl.action.Idle;
 import io.ajentic.sre.rl.action.ListRemediations;
+import io.ajentic.sre.rl.Environment;
 import io.ajentic.sre.rl.Observation;
 import io.ajentic.sre.rl.ObservedSignal;
 import io.ajentic.sre.rl.action.QueryTelemetry;
@@ -50,7 +51,7 @@ public final class HeuristicPolicy implements Policy {
     private boolean diagnosisDeclared;
 
     @Override
-    public AgentAction next(Observation observation) {
+    public AgentAction next(Environment environment, Observation observation) {
         if (observation.terminal()) {
             return new Idle();
         }
