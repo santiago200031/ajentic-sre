@@ -20,7 +20,7 @@ import jakarta.ws.rs.sse.SseEventSink;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
-import tools.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.util.Map;
@@ -80,16 +80,22 @@ public class DrillResource {
         } finally {
             try {
                 sink.close();
-            } catch (IOException ignored) {
+            } catch (Exception ignored) {
             }
         }
         return Response.ok().header("Cache-Control", "no-cache").build();
     }
 
     private void send(SseEventSink sink, String type, Map<String, Object> payload) {
+        String data;
+        try {
+            data = mapper.writeValueAsString(payload);
+        } catch (Exception e) {
+            data = "{}";
+        }
         sink.send(sse.newEventBuilder()
                 .name(type)
-                .data(mapper.writeValueAsString(payload))
+                .data(data)
                 .build())
                 .toCompletableFuture()
                 .exceptionally(ex -> null);

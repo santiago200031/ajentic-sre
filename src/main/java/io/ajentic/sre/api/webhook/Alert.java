@@ -1,7 +1,7 @@
 package io.ajentic.sre.api.webhook;
 
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -52,7 +52,12 @@ public record Alert(String source, String service, String summary, String severi
         if (root == null || root.path("Message").asText().isBlank()) {
             throw new WebhookException(400, "CloudWatch SNS payload must contain a 'Message' field.");
         }
-        JsonNode alarm = MAPPER.readTree(root.path("Message").asText());
+        JsonNode alarm;
+        try {
+            alarm = MAPPER.readTree(root.path("Message").asText());
+        } catch (Exception e) {
+            throw new WebhookException(400, "CloudWatch SNS payload 'Message' is not valid JSON.");
+        }
         String alarmName = alarm.path("AlarmName").asText();
         if (alarmName.isBlank()) {
             throw new WebhookException(400, "CloudWatch SNS payload must name the alarm in 'Message.AlarmName'.");

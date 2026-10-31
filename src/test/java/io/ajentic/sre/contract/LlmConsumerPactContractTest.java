@@ -17,7 +17,7 @@ import io.ajentic.sre.agent.llm.LangChain4jLlmClient;
 import io.ajentic.sre.agent.llm.ToolCall;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import tools.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 
 import java.time.Duration;
 import java.util.List;

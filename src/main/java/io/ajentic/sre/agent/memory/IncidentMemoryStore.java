@@ -10,7 +10,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
-import tools.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.nio.channels.FileChannel;
@@ -168,7 +168,7 @@ public class IncidentMemoryStore {
         }
         try {
             return mapper.readValue(line, StoredIncident.class);
-        } catch (RuntimeException e) {
+        } catch (Exception e) {
             LOG.warnf("Skipping corrupt incident memory line: %s", e.getMessage());
             return null;
         }

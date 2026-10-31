@@ -2,7 +2,7 @@ package io.ajentic.sre.agent.alerts;
 
 import io.ajentic.sre.agent.mcp.SreAgentPrompts;
 import org.junit.jupiter.api.Test;
-import tools.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.List;
 import java.util.Map;

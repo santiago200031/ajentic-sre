@@ -32,7 +32,7 @@ import org.jboss.resteasy.reactive.RestPath;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
-import tools.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.util.concurrent.Executors;
@@ -125,16 +125,22 @@ public class AgentResource {
             heartbeat.shutdownNow();
             try {
                 sink.close();
-            } catch (IOException ignored) {
+            } catch (Exception ignored) {
             }
         }
         return Response.ok().header("Cache-Control", "no-cache").build();
     }
 
     private void send(SseEventSink sink, TurnEvent event, AtomicBoolean cancelled) {
+        String data;
+        try {
+            data = mapper.writeValueAsString(event.payload());
+        } catch (Exception e) {
+            data = "{}";
+        }
         sink.send(sse.newEventBuilder()
                 .name(event.type())
-                .data(mapper.writeValueAsString(event.payload()))
+                .data(data)
                 .build())
                 .toCompletableFuture()
                 .exceptionally(ex -> {

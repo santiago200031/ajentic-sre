@@ -6,8 +6,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.inject.Provider;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.dataformat.yaml.YAMLMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -43,14 +43,14 @@ public class ScenarioLibrary implements ScenarioRepository {
 
     /** Test/non-CDI convenience: built-ins only, external packs disabled. */
     public ScenarioLibrary() {
-        this(Optional.of(""), () -> new tools.jackson.databind.ObjectMapper());
+        this(Optional.of(""), () -> new com.fasterxml.jackson.databind.ObjectMapper());
     }
 
     /** Test seam: built-ins plus packs from {@code dir}, throwing on any invalid pack. */
     public List<Scenario> loadForTest(Path dir) {
         LinkedHashMap<String, Scenario> index = new LinkedHashMap<>();
         build().forEach(scenario -> index.put(scenario.id(), scenario));
-        loadPacks(dir, new tools.jackson.databind.ObjectMapper()).forEach(scenario -> index.putIfAbsent(scenario.id(), scenario));
+        loadPacks(dir, new com.fasterxml.jackson.databind.ObjectMapper()).forEach(scenario -> index.putIfAbsent(scenario.id(), scenario));
         return new ArrayList<>(index.values());
     }
 
@@ -189,7 +189,7 @@ public class ScenarioLibrary implements ScenarioRepository {
             ScenarioPack pack = mapper.readValue(file.toFile(), ScenarioPack.class);
             validate(file, pack);
             return pack.toScenario();
-        } catch (tools.jackson.core.JacksonException exception) {
+        } catch (IOException exception) {
             throw new IllegalStateException("Invalid scenario pack " + file + ": " + exception.getMessage(), exception);
         }
     }

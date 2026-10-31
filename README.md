@@ -1,758 +1,99 @@
 # ajentic-sre
 
-ajentic-sre is a practice range for AI agents that handle infrastructure incidents. It stages fake
-production failures, gives an agent tools to look into them, and grades whether the agent found the real
-root cause and brought the service back. Nothing here touches live systems, and the tests run without a
-model or a network.
+**Practice range for autonomous AI SRE agents handling infrastructure incidents.**
 
-Written in Java 25 on Quarkus 4. Runs on Linux.
+`ajentic-sre` stages simulated production failures, equips AI agents with observability and remediation tools, and grades whether the agent diagnoses the root cause and restores the service.
 
-## Quick start
+- **Offline-First:** Runs without a live model or network; the entire 236-test suite runs offline against WireMock stubs.
+- **Java 25 on Quarkus 3.40:** Modern virtual threads (`Thread.startVirtualThread`), Scoped Values, and official Quarkus LTS release.
+- **HTTP-First Entrypoint:** Root `/` redirects directly to Swagger UI at `/q/swagger-ui`. Full REST API under `/api/v1`.
+- **Model Context Protocol (MCP):** Native MCP server (stdio and streamable HTTP `/mcp`) for AI IDEs and agents.
+- **Credential Isolation:** Sidecar connector model ensures sensitive cloud credentials never enter the reasoning agent pod.
 
-```bash
-mise install          # JDK 27 and Maven 3.10, per .mise.toml
-mvn quarkus:dev       # dev server at http://localhost:8080
-mvn test              # offline end-to-end suite
-```
+---
 
-## Contents
-
-| Topic                                   | What you'll find                                            |
-| --------------------------------------- | ----------------------------------------------------------- |
-| [How it works](#how-it-works)           | The incident loop, the agent, and the scenarios             |
-| [Install](#install)                     | Requirements and build                                      |
-| [Run](#run)                             | Dev mode, packaged jar, HTTP server                         |
-| [Deploy](#deploy)                       | Container image and configuration                           |
-| [HTTP-First Usage](#http-first-usage)   | HTTP curl cookbook for scenarios, simulate, ask, benchmarks |
-| [Use the REST API](#use-the-rest-api)   | Episodes, sessions, schedules, OpenAPI                      |
-| [Use MCP](#use-mcp)                     | stdio and streamable HTTP transports                        |
-| [Scheduled drills](#scheduled-drills)   | Cron-backed recurring incidents                             |
-| [Sidecar Connectors](#sidecar-connectors) | Credential isolation, HMAC signing, audit logging         |
-| [ChatOps & OpenAI facade](#chatops--openai-facade) | Channels fan-out, inbound chat commands, OpenAI API facade |
-| [Configure the LLM](#configure-the-llm) | Providers, local llama.cpp, Azure                           |
-| [Test](#test)                           | End-to-end, WireMock, Pact, live mode                       |
-| [Project layout](#project-layout)       | Packages and responsibilities                               |
-| [JDK support](#jdk-support)             | Java 25 default, Java 27 preview                            |
-
-## How it works
-
-An episode is one incident. A scenario sets up the failure, and the environment reports what is wrong. From
-there the agent acts one step at a time until it repairs the service, runs out of budget, or makes things
-worse.
-
-1. `reset()` returns the alert, the telemetry, and the actions on offer.
-2. The agent investigates with read-only tools (`query_telemetry`, `read_runbook`, `list_remediations`).
-3. It records a root cause with `declare_diagnosis` and applies a fix with `apply_remediation`.
-4. Each step returns an observation, a reward, and a reason if the episode ended.
-5. The result reports `solved`, `resolved`, `diagnosed`, the total reward, and the full trajectory.
-
-The agent runs a ReAct loop. `AgentSession.chat()` sends the conversation to the model, runs the tool calls
-it gets back against the environment, feeds the results into the conversation, and repeats until the model
-stops asking for tools or the episode ends. You can also leave the model out and run a baseline policy.
-
-<details>
-<summary><strong>RL interface</strong></summary>
-
-| Type             | Responsibility                                                            |
-| ---------------- | ------------------------------------------------------------------------- |
-| `Environment`    | `reset`, `step`, `observe`, `spec`, terminal flags                        |
-| `Observation`    | incident, telemetry, service health, available actions, cumulative reward |
-| `AgentAction`    | sealed action model: telemetry, runbook, remediations, diagnosis, idle    |
-| `StepResult`     | next observation, reward, termination reason                              |
-| `RewardFunction` | maps a `Transition` to a scalar reward                                    |
-| `Policy`         | chooses the next action from an observation                               |
-| `EpisodeRunner`  | rolls out a policy and collects an `EpisodeResult`                        |
-
-Rewards credit a correct diagnosis and remediation, charge a small cost per step, and penalise mistakes.
-Repeated wrong remediations turn catastrophic and end the episode.
-
-</details>
-
-<details>
-<summary><strong>Scenarios</strong></summary>
-
-| Scenario                   | Root cause                          | Correct remediation |
-| -------------------------- | ----------------------------------- | ------------------- |
-| `checkout-latency-db-pool` | database connection pool exhaustion | `SCALE_UP`          |
-| `payments-memory-leak`     | application memory leak             | `RESTART`           |
-| `auth-certificate-expiry`  | expired TLS certificate             | `FIX_CONFIG`        |
-| `search-dns-failure`       | cluster DNS resolution failure      | `FAILOVER`          |
-| `orders-bad-deployment`    | bad application deployment          | `ROLLBACK_DEPLOY`   |
-| `storage-disk-pressure`    | node disk pressure                  | `EXPAND_DISK`       |
-
-Each scenario defines services, injected faults, runbooks, and a step budget. Telemetry comes from the
-simulated service state, so metrics, logs, traces, and deploys stay consistent with one another.
-
-Services declare their dependencies, forming a DAG validated at load (unknown references and cycles are
-rejected). A fault on a service degrades every service that depends on it, with the severity decayed by a
-factor of 0.5 per edge, so downstream saturation shows up as upstream latency and error-rate degradation.
-
-</details>
-
-## Install
-
-You need Linux, JDK 25 or newer (JDK 27 for the preview profile), and Maven 3.9 or newer. `mise install`
-pulls the pinned toolchain from `.mise.toml`; if you don't use mise, install the JDK and Maven yourself.
+## Quick Start
 
 ```bash
-mvn package        # compile, test, and build target/quarkus-app/
-mvn verify         # full validation, including packaging
+mise install          # JDK 27 and Maven 3.10 (per .mise.toml)
+mvn quarkus:dev       # Launch dev server at http://localhost:8080 (live reload + Dev UI)
+mvn test              # Run 100% offline test suite (236 tests)
 ```
 
-`make dev`, `make test`, `make verify`, and `make package` are thin wrappers around the same commands.
-
-## Run
-
-```bash
-java -jar target/quarkus-app/quarkus-run.jar         # server on :8080 (sole entrypoint)
-mvn quarkus:dev                                      # dev mode with live reload
-```
-
-## Deploy
-
+Package and run standalone:
 ```bash
 mvn package
-docker build -f src/main/docker/Dockerfile.jvm -t ajentic-sre .
-docker run -i --rm -p 8080:8080 ajentic-sre
+java -jar target/quarkus-app/quarkus-run.jar   # Starts server on :8080
 ```
 
-The image is Linux-only and runs on Eclipse Temurin 27. Pass configuration as environment variables, for
-example `AJENTIC_LLM_BASE_URL`, `AJENTIC_LLM_MODEL`, or `QUARKUS_HTTP_PORT`.
+---
 
-### Local observability stack
+## Core Capabilities
 
-```bash
-make lab-up     # build the image, then app + Prometheus + Grafana
-make lab-down
+```mermaid
+flowchart LR
+    A["Inbound Alert<br>(CloudWatch, Alertmanager, Chat)"] --> B["ajentic-sre Agent<br>(ReAct Loop)"]
+    B --> C["Observability Tools<br>(Metrics, Logs, Runbooks)"]
+    B --> D["MCP Server<br>(/mcp JSON-RPC)"]
+    B --> E["Sidecar Connectors<br>(HMAC Credential Isolation)"]
+    B --> F["Code Remediation<br>(GitHub PR & CI Verification)"]
+    B --> G["ChatOps Fan-Out<br>(Slack, Teams, Discord)"]
 ```
 
-The app is on `:8080`, Prometheus on `:9090`, and Grafana on `:3000` (anonymous admin, dashboard
-"Ajentic SRE"). Prometheus scrapes `/q/metrics` every 15s; the scrape config is
-`src/main/docker/prometheus.yml` and the Grafana provisioning lives under `src/main/docker/grafana/`.
-`AJENTIC_LLM_BASE_URL` defaults to the host llama.cpp router via `host.docker.internal`.
-
-## HTTP-First Usage
-
-ajentic-sre is an HTTP-first service. Root `/` redirects (303) straight to Swagger UI at `/q/swagger-ui`.
-Every previous CLI subcommand is accessible via standard REST endpoints or Swagger UI:
-
-| Former CLI Command                                                                 | HTTP Equivalent Endpoint                   | Method | Description |
-| ---------------------------------------------------------------------------------- | ------------------------------------------ | ------ | ----------- |
-| `scenarios`                                                                        | `/api/v1/scenarios`                        | `GET`  | List scenario library |
-| `simulate --scenario <id> [--policy heuristic]`                                    | `/api/v1/episodes/simulate`                 | `POST` | One-shot scenario simulation |
-| `ask "<question>" [--scenario <id>]`                                               | `/api/v1/agent/ask`                        | `POST` | Ask the LLM agent an incident question |
-| `benchmark --scenarios <ids> --seeds N --policy <p>`                               | `/api/v1/benchmarks`                       | `POST` | Run benchmark across policies & seeds |
-| `schedules`                                                                        | `/api/v1/schedules`                        | `GET`  | List scheduled drills |
-| `schedules --add <name> --cron '<cron>' --scenario <id>`                           | `/api/v1/schedules`                        | `POST` | Create a drill schedule |
-| `schedules --run <id>`                                                             | `/api/v1/schedules/{id}/run`               | `POST` | Trigger an immediate drill execution |
-| `serve` / `swagger`                                                                | `java -jar …`                              | —      | Starts HTTP server (:8080) & Swagger UI |
-| `mcp`                                                                              | `/mcp` or stdio                            | `POST` | Quarkiverse MCP Server protocol |
-
-### HTTP Curl Cookbook
-
-```bash
-# 1. List available scenarios
-curl -s http://localhost:8080/api/v1/scenarios | jq
-
-# 2. Run a one-shot incident simulation
-curl -s -X POST http://localhost:8080/api/v1/episodes/simulate \
-  -H 'Content-Type: application/json' \
-  -d '{"scenarioId": "orders-bad-deployment", "policy": "heuristic", "seed": 42}' | jq
-
-# 3. Ask the agent to investigate an incident
-curl -s -X POST http://localhost:8080/api/v1/agent/ask \
-  -H 'Content-Type: application/json' \
-  -d '{"scenarioId": "checkout-latency-db-pool", "question": "Why is checkout-api latency spiking?", "seed": 42}' | jq
-
-# 4. Run benchmarks across policies and seeds
-curl -s -X POST http://localhost:8080/api/v1/benchmarks \
-  -H 'Content-Type: application/json' \
-  -d '{"scenarios": ["orders-bad-deployment", "checkout-latency-db-pool"], "seeds": 2, "policies": ["HEURISTIC", "RANDOM"]}' | jq
-
-# 5. List and trigger scheduled incident drills
-curl -s http://localhost:8080/api/v1/schedules | jq
-curl -s -X POST http://localhost:8080/api/v1/schedules/<id>/run | jq
-
-## Use the REST API
-
-Everything lives under `/api/v1`. Root `/` redirects (303) straight to Swagger UI at `/q/swagger-ui`, OpenAPI is at
-`/q/openapi`, health at `/q/health`, and Prometheus metrics at `/q/metrics` (episode, tool, and LLM token counters/timers).
-
-```bash
-curl -s localhost:8080/api/v1/scenarios | jq
-curl -s localhost:8080/api/v1/tools | jq
-
-EPISODE=$(curl -s -X POST localhost:8080/api/v1/episodes \
-  -H 'content-type: application/json' \
-  -d '{"scenarioId":"orders-bad-deployment"}' | jq -r .id)
-
-curl -s -X POST localhost:8080/api/v1/episodes/$EPISODE/run \
-  -H 'content-type: application/json' \
-  -d '{"policy":"heuristic"}' | jq
-```
-
-<details>
-<summary><strong>Endpoint reference</strong></summary>
-
-| Method                    | Path                            | Purpose                                   |
-| ------------------------- | ------------------------------- | ----------------------------------------- |
-| `GET`                     | `/`                             | Redirect (303) to `/q/swagger-ui`         |
-| `GET`                     | `/scenarios`, `/scenarios/{id}` | Scenario library                          |
-| `GET`                     | `/tools`                        | Tool catalog                              |
-| `POST`                    | `/episodes`                     | Start an episode                          |
-| `GET`                     | `/episodes/{id}`                | Episode state                             |
-| `POST`                    | `/episodes/{id}/actions`        | Apply one action                          |
-| `POST`                    | `/episodes/{id}/run`            | Run a policy to completion                |
-| `POST`                    | `/episodes/simulate`            | One-shot episode simulation               |
-| `DELETE`                  | `/episodes/{id}`                | Forget an episode                         |
-| `POST`                    | `/agent/sessions`               | Start an LLM session                      |
-| `GET`                     | `/agent/sessions/{id}`          | Session state                             |
-| `POST`                    | `/agent/sessions/{id}/chat`     | One ReAct turn                            |
-| `POST`                    | `/agent/sessions/{id}/chat/stream` | One ReAct turn as server-sent events (`thought`, `tool_call`, `tool_result`, `usage`, `done`, `error`) |
-| `POST`                    | `/agent/ask`                    | One-shot incident investigation           |
-| `POST`                    | `/benchmarks`                   | Benchmark policies across scenarios/seeds |
-| `DELETE`                  | `/agent/sessions/{id}`          | End a session                             |
-| `GET` / `POST` / `DELETE` | `/schedules` …                  | See [scheduled drills](#scheduled-drills) |
-| `POST`                    | `/webhooks/alertmanager`, `/webhooks/pagerduty`, `/webhooks/cloudwatch-sns` | Alert intake, see [alert webhooks](#alert-webhooks) |
-| `POST`                    | `/webhooks/alerts`              | Multi-cloud alert normalizer and automated code remediation |
-| `GET`                     | `/webhooks`                     | Stored intake reports (postmortems)       |
-| `GET` / `POST` / `DELETE` | `/mcp`                          | See [MCP](#use-mcp)                       |
-
-</details>
-
-## Use MCP
-
-The tool registry speaks Model Context Protocol over JSON-RPC 2.0 via Quarkiverse MCP Server. It provides
-both stdio and HTTP transports:
-
-```bash
-# Streamable HTTP MCP endpoint
-curl -s localhost:8080/mcp \
-  -H 'content-type: application/json' \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | jq
-```
-
-Methods: `initialize`, `ping`, `tools/list`, `tools/call`, `resources/list`, `resources/read`, `prompts/list`,
-and `prompts/get`. `POST` takes one request or a batch array, and malformed JSON comes back as `-32700`.
-`GET` returns discovery metadata; `DELETE` clears the active episode.
-
-- Lifecycle tools: `list_scenarios`, `start_episode`, `run_incident_drill`.
-- Investigation tools: `query_telemetry`, `inspect_recent_changes`, `correlate_anomalies`, `get_service_topology`, `read_runbook`, `list_remediations`, `search_past_incidents` (READ) and `apply_remediation`, `declare_diagnosis`, `post_incident_summary` (MUTATE).
-- GitHub code tools: `github_list_files`, `github_read_file`, `github_get_ci_status` (READ) and `github_create_branch`, `github_commit_file`, `github_create_pull_request`, `github_trigger_workflow` (MUTATE).
-- Resources: `sre://scenarios/{scenarioId}`, `sre://topology/{scenarioId}`, and `sre://runbooks/{scenarioId}/{runbookId}`.
-- Prompts: `investigate-incident` and `summarize-postmortem`.
-- A `tools/call` can pass `_scenarioId` to start an episode, or `_episodeId` to reuse one.
-
-## Episodic memory
-
-Completed episodes are persisted as one JSON line each in `.ajentic/incidents.jsonl` (append-only, fsync'd on
-every write, rotated when the file grows past `ajentic.memory.max-file-size`). Text fields are masked before they
-reach disk. `search_past_incidents` queries the store by symptom text, service, and fault kind (newest first), and
-every new agent session's system prompt includes a short "Similar past incidents" summary for the same service
-and fault kind when one exists. Corrupt lines are skipped, never fatal. Disable with
-## Durable state store
-
-Schedules and incident drill histories are persisted to `.ajentic/state.json` (schema versioned, atomic
-write-temp-then-rename, process-level file lock). Select the backend with `ajentic.state.store = file | memory | jdbc | redis`
-(defaults to `file`; `%test` defaults to `memory`).
-
-Inspect or backup state:
-```bash
-cat .ajentic/state.json | jq .
-cp .ajentic/state.json .ajentic/state.json.bak
-```
-
-## Stream a chat turn (SSE)
-
-`POST /api/v1/agent/sessions/{id}/chat/stream` returns `text/event-stream` and emits one typed event per ReAct
-step as it happens: `thought` (intermediate assistant text), `tool_call`, `tool_result`, `usage` (per LLM
-call), `done` (final answer plus cumulative tokens) or `error`. A `: heartbeat` comment is sent every 10 seconds
-while the turn is in flight; if the client disconnects, the turn is cancelled at the next step boundary.
-
-```bash
-SESSION=$(curl -s -X POST localhost:8080/api/v1/agent/sessions \
-  -H 'content-type: application/json' \
-  -d '{"scenarioId":"orders-bad-deployment","seed":1}' | jq -r .id)
-
-curl -N -s -X POST localhost:8080/api/v1/agent/sessions/$SESSION/chat/stream \
-  -H 'content-type: application/json' \
-  -H 'accept: text/event-stream' \
-  -d '{"message":"Why is orders-api slow?"}'
-```
-
-## Approval gate
-
-With `ajentic.tools.mutation-policy=require-approval`, every MUTATE call is deferred behind an operator decision:
-the tool result is a `PENDING_APPROVAL` placeholder carrying an approval id and an expiry, and READ tools keep
-working in the meantime. The operator decides via `POST /api/v1/agent/sessions/{id}/approve`
-(`{"approvalId":...,"decision":"approve"|"deny","note":...}`) and can list pending calls at
-`GET /api/v1/agent/sessions/{id}/pending`. Approval executes the deferred call exactly once and appends the real
-tool result to the conversation; denial or expiry appends a denied result and never executes it. Decisions are
-single-use and idempotent — repeats return the stored outcome.
-
-```bash
-SESSION=$(curl -s -X POST localhost:8080/api/v1/agent/sessions \
-  -H 'content-type: application/json' \
-  -d '{"scenarioId":"orders-bad-deployment","seed":1}' | jq -r .id)
-
-curl -s -X POST localhost:8080/api/v1/agent/sessions/$SESSION/chat \
-  -H 'content-type: application/json' -d '{"message":"Fix the incident."}'
-
-APPROVAL=$(curl -s localhost:8080/api/v1/agent/sessions/$SESSION/pending | jq -r '.[0].approvalId')
-
-curl -s -X POST localhost:8080/api/v1/agent/sessions/$SESSION/approve \
-  -H 'content-type: application/json' -d "{\"approvalId\":\"$APPROVAL\",\"decision\":\"approve\"}"
-```
-
-## Alert webhooks
-
-`POST /api/v1/webhooks/alertmanager`, `/pagerduty`, and `/cloudwatch-sns` accept provider payloads, normalize
-them into an internal `Alert` (source, service, summary, severity, fingerprint), resolve the matching built-in
-scenario (service-name match, falling back to `ajentic.webhooks.default-scenario`), run a synchronous agent
-investigation, and return the report inline. Notifications fan out to a log channel and, when
-`ajentic.webhooks.notification-url` is set, to a JSON webhook.
-
-- Fingerprint dedupe: repeated alerts with the same stable identifiers coalesce onto the original report
-  (`"duplicate": true`), reusing its session and answer.
-- Concurrency: at most `ajentic.webhooks.max-concurrent` (default `4`) investigations run at once; excess
-  alerts get `429`.
-- Optional shared secret: with `ajentic.webhooks.secret` set, the header must match — `X-Alertmanager-Secret`,
-  `Authorization: Token ptoken=<secret>`, or `X-SNS-Secret` — or the request gets `401`.
-- `GET /api/v1/webhooks` lists the stored intake → session → report linkage for postmortems.
-
-```bash
-curl -s -X POST localhost:8080/api/v1/webhooks/alertmanager \
-  -H 'content-type: application/json' \
-  -H 'X-Alertmanager-Secret: <secret>' \
-  -d '{"alerts":[{"labels":{"alertname":"HighLatency","service":"orders-api","severity":"critical"},
-"annotations":{"summary":"p95 latency above 800ms on orders-api"}}]}' | jq
-```
-
-## Multi-cloud alert webhook and automated code remediation
-
-`POST /api/v1/webhooks/alerts` accepts alerts from AWS CloudWatch, Azure Monitor, Alertmanager, or direct JSON.
-Alerts are filtered against `ajentic.alerts.min-severity` (`INFO < WARNING < ERROR < CRITICAL`, default `ERROR`)
-and checked for a target repository.
-
-- **Status `202 Accepted` (`status = "IGNORED"`):** Alert is below the severity threshold or no repository can be resolved (zero LLM calls made).
-- **Status `200 OK` (`status = "PROCESSED"`):** Executes a bounded one-shot ReAct investigation (max 8 iterations) that inspects code via `github_read_file`, creates a branch `ajentic/fix-<fingerprint8>`, commits a fix and regression test via `github_commit_file`, queries CI status via `github_get_ci_status`, and opens a PR via `github_create_pull_request`.
-- **Optional token mode:** When `ajentic.github.token` is blank, mutating tools return clean errors and the agent returns code analysis without failing.
-
-### CI feedback loop and contract
-
-- **CI Contract:** Continuous integration workflows in target repositories must either trigger automatically on `push` to branches matching `ajentic/**`, or workflow dispatch must be enabled by setting `ajentic.github.ci.trigger-workflows=true` so the agent can invoke `github_trigger_workflow`.
-- **Non-blocking PR turn:** The alert remediation turn opens the pull request immediately and snapshots the initial CI check-run status (reporting `ciStatus: "PENDING"` when checks have not started yet), returning in seconds without holding the HTTP thread.
-- **Asynchronous follow-up:** When `ajentic.github.ci.poll-attempts` is set to greater than `0`, an asynchronous scheduled worker polls pending checks using `ajentic.github.ci.poll-interval`, updates the remediation record in `RemediationStore`, and posts the final verdict (`SUCCESS` or `FAILURE`) to `NotificationChannel`.
-
-### Payload examples
-
-<details>
-<summary>Direct JSON</summary>
-
-```json
-{
-  "severity": "ERROR",
-  "repository": "acme/checkout-service",
-  "branch": "main",
-  "title": "NullPointerException in OrderProcessor",
-  "message": "NullPointerException: order cannot be null",
-  "stackTrace": "java.lang.NullPointerException at com.acme.OrderProcessor.process(OrderProcessor.java:42)"
-}
-```
-
-</details>
-
-<details>
-<summary>AWS CloudWatch / SNS</summary>
-
-```json
-{
-  "AlarmName": "HighErrorRate-checkout",
-  "NewStateReason": "Threshold Crossed: 5xx rate > 5%",
-  "AlarmDescription": "java.lang.NullPointerException at CheckoutService",
-  "NewStateValue": "ALARM",
-  "repository": "acme/checkout-service"
-}
-```
-
-</details>
-
-<details>
-<summary>Azure Monitor</summary>
-
-```json
-{
-  "data": {
-    "essentials": {
-      "alertRule": "High Latency - checkout",
-      "description": "5xx spike in checkout service",
-      "severity": "Sev1",
-      "repository": "acme/checkout-service"
-    },
-    "alertContext": "java.lang.NullPointerException at CheckoutService.process"
-  }
-}
-```
-
-</details>
-
-<details>
-<summary>Alertmanager</summary>
-
-```json
-{
-  "alerts": [
-    {
-      "labels": {
-        "alertname": "CheckoutLatencyHigh",
-        "severity": "error",
-        "github_repo": "acme/checkout-service"
-      },
-      "annotations": {
-        "summary": "High latency in checkout service",
-        "stackTrace": "java.lang.NullPointerException at CheckoutService"
-      }
-    }
-  ]
-}
-```
-
-</details>
-
-## ChatOps & OpenAI facade
-
-ajentic-sre provides multi-channel ChatOps notification fan-out, inbound chat command webhooks with provider
-signature verification and event deduplication, and an OpenAI-compatible API facade (`/v1/chat/completions` + `/v1/models`).
-
-### Outbound notification channels
-
-Outbound notifications fan out concurrently across channels configured via `ajentic.notifications.channel` (comma-separated: `log,slack,teams,google-chat,discord,telegram,mattermost,webhook`). Outbound calls are executed asynchronously on virtual threads, bounded by per-channel timeouts, exponential backoff retries with jitter, circuit breakers, and token-bucket rate limiters. If a channel configuration is blank, it is safely disabled without errors.
-
-A unified `ChatFormat` strategy handles differences between Markdown, Slack mrkdwn, Google Chat, Telegram, and Microsoft Teams Adaptive Cards so incident summaries (root cause, PR link, CI status, episode id) are formatted consistently.
-
-| Provider | Configuration Key(s) | Required Scopes / Permissions | Payload Format |
-|---|---|---|---|
-| **Slack** | `ajentic.notifications.slack.webhook-url`<br>`ajentic.notifications.slack.token`<br>`ajentic.notifications.slack.channel` | Incoming Webhook or Bot Token (`chat:write`) | mrkdwn / JSON |
-| **Microsoft Teams** | `ajentic.notifications.teams.webhook-url` | Incoming Webhook connector or Workflows webhook | Adaptive Card 1.4 JSON |
-| **Google Chat** | `ajentic.notifications.google-chat.webhook-url` | Webhook URL (`chat.googleapis.com`) | JSON (`text` / card) |
-| **Discord** | `ajentic.notifications.discord.webhook-url` | Webhook URL (`discord.com/api/webhooks/...`) | Markdown JSON (`content`) |
-| **Telegram** | `ajentic.notifications.telegram.bot-token`<br>`ajentic.notifications.telegram.chat-id` | Bot Token from `@BotFather` | Markdown (`sendMessage`) |
-| **Mattermost** | `ajentic.notifications.mattermost.webhook-url` | Incoming Webhook | Markdown JSON (`text`) |
-| **Generic Webhook** | `ajentic.notifications.webhook.url`<br>`ajentic.notifications.webhook.secret` | Webhook URL receiving signed JSON | JSON (`X-Ajentic-Signature: sha256=...`) |
-
-### Inbound ChatOps commands
-
-Inbound chat commands are ingested at `POST /api/v1/webhooks/chat/{provider}` (`slack`, `teams`, `google-chat`, `discord`, `telegram`, `generic`).
-
-- **Signatures:** Slack HMAC verification via `X-Slack-Signature` and timestamp freshness (< 300s) against `ajentic.chat.slack.signing-secret`, Twilio signature check via `X-Twilio-Signature` against `ajentic.chat.twilio.auth-token`, and Google JWT bearer token verification against `ajentic.chat.google.jwt-secret`. Unsigned, invalid, or expired requests are rejected with `401`.
-- **Deduplication:** Events are deduplicated by provider event ID (`event_id`, `trigger_id`, `update_id`, or header `X-Slack-Request-Id`) using an in-memory cache, ensuring a duplicate event never triggers a duplicate agent turn.
-- **Commands:**
-  - `ask <question>`: Runs an autonomous ReAct investigation turn against the default scenario and returns the agent's answer.
-  - `status <episode|repo>`: Returns session status or code remediation PR/CI status.
-  - `fix <repo> <trace>`: Triggers automated code remediation, opens a branch, commits a fix, and opens a PR.
-  - `approve <id>` / `deny <id>`: Approves or denies a pending mutating tool call gated by operator approval gates.
-
-```bash
-# Example: Slack slash-command payload
-curl -s -X POST localhost:8080/api/v1/webhooks/chat/slack \
-  -H 'Content-Type: application/x-www-form-urlencoded' \
-  -d 'command=/ask&text=why+is+checkout+latency+spiking%3F' | jq
-```
-
-### OpenAI-compatible facade
-
-Any standard OpenAI client or web interface can interact directly with the agent through `/v1`.
-The facade maps incoming messages to `AgentSession` turns and returns standard OpenAI completion objects or Server-Sent Events (SSE).
-
-- `GET /v1/models`: Lists the active configured SRE model.
-- `POST /v1/chat/completions`: Supports both non-streaming (`stream: false`) and streaming (`stream: true`). Unknown model requests return `404`.
-- **Authorization:** Optional API key enforcement via `ajentic.chat.api-key` (Bearer token header).
-
-#### cURL examples
-
-```bash
-# List models
-curl -s http://localhost:8080/v1/models \
-  -H 'Authorization: Bearer test-key' | jq
-
-# One-shot chat completion (non-streaming)
-curl -s -X POST http://localhost:8080/v1/chat/completions \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer test-key' \
-  -d '{
-    "model": "Cyber-Tiel-Coder-35B-A3B-UD-Q4_K_XL",
-    "messages": [
-      {"role": "user", "content": "What is wrong with the orders service?"}
-    ],
-    "stream": false
-  }' | jq
-
-# Streaming chat completion (SSE)
-curl -N -X POST http://localhost:8080/v1/chat/completions \
-  -H 'Content-Type: application/json' \
-  -H 'Accept: text/event-stream' \
-  -H 'Authorization: Bearer test-key' \
-  -d '{
-    "model": "Cyber-Tiel-Coder-35B-A3B-UD-Q4_K_XL",
-    "messages": [
-      {"role": "user", "content": "Investigate database connection pool exhaustion"}
-    ],
-    "stream": true
-  }'
-```
-
-#### Point Open WebUI at it
-
-To use Open WebUI (or LibreChat / ChatGPT-Next-Web / Continue.dev) with ajentic-sre:
-
-1. Open Open WebUI Settings -> **Connections** -> **OpenAI API**.
-2. Set **OpenAI API URL** to `http://localhost:8080/v1` (or your ajentic-sre host).
-3. Set **OpenAI API Key** to the value of `ajentic.chat.api-key` (leave blank if disabled).
-4. Save and select the model (`Cyber-Tiel-Coder-35B-A3B-UD-Q4_K_XL` or your configured model name).
-5. Start a chat. Your prompts will trigger autonomous ReAct investigation turns against the incident range, with thoughts and answers streamed directly into the WebUI chat interface.
-
-## Scheduled drills
-
-Recurring incidents run on a five-field cron engine backed by `com.cronutils`. Named ranges accept steps
-(`mon-fri/2`, `jan-dec/3`), `*/15` starts from the earliest minute, and invalid expressions fail at parse
-time. A schedule's identity ignores the loop-group id, so duplicates are refused and stopped schedules can
-be added again. Writes are versioned, which keeps a stale update from resurrecting or overwriting.
-
-```bash
-SCHEDULE=$(curl -s -X POST localhost:8080/api/v1/schedules \
-  -H 'content-type: application/json' \
-  -d '{"name":"nightly-drill","cron":"0 3 * * *","scenarioId":"orders-bad-deployment"}' | jq -r .id)
-
-curl -s -X POST localhost:8080/api/v1/schedules/$SCHEDULE/run | jq
-curl -s localhost:8080/api/v1/schedules/drills | jq
-```
-
-In server mode `QuarkusScheduleTicker` drives `tick()` on a virtual thread. The tests call `tick()`
-themselves, which keeps them deterministic. Dispatch is capped by a concurrency limit, and failed or
-deferred runs go to a recovery lane.
-
-## Sidecar Connectors
-
-ajentic-sre decouples sensitive cloud credentials and chat webhooks from the core reasoning agent via a
-credential-isolated sidecar connector architecture:
-
-- **Security Isolation:** The agent container has no cloud secrets, AWS access keys, or Slack webhooks.
-- **HMAC-SHA256 Signing:** All calls between agent and sidecar are signed with HMAC-SHA256, checking a 5-minute timestamp window and an anti-replay nonce cache.
-- **Fail-Closed Resilience:** If the sidecar is unreachable, the agent fails closed (`503` tool error) rather than crashing, continuing with read-only in-memory tools.
-- **Mutating Audit Log:** Every mutating remediation call records actor, action, target, result, and timestamp to `.ajentic/audit.jsonl`.
-
-### Secret Placement Matrix
-
-| Secret / Credential | Held by Agent? | Held by Sidecar Connectors? |
-| ------------------- | :------------: | :-------------------------: |
-| `AJENTIC_AWS_*` (Access Key / Secret) | ❌ No | ✅ Yes |
-| `AJENTIC_AZURE_*` (Client Secret / OAuth) | ❌ No | ✅ Yes |
-| `AJENTIC_GCP_*` (Service Account Key) | ❌ No | ✅ Yes |
-| Chat Webhooks (Slack, Discord, Teams) | ❌ No | ✅ Yes |
-| Sidecar Shared Secret (`ajentic.sidecar.shared-secret`) | ✅ Yes | ✅ Yes |
-| Local LLM / WireMock config | ✅ Yes | ❌ No |
-
-Manifests for Kubernetes sidecar deployment live under `deploy/` (`deployment.yaml`, `service.yaml`, `networkpolicy.yaml`, `helm-values.yaml`).
-
-## External scenario packs
-
-Set `ajentic.scenarios.dir` to a directory of YAML or JSON packs to add scenarios beyond the built-ins.
-Each file is one scenario mirroring the built-in shape; external ids that collide with a built-in are ignored
-(built-ins win). A missing directory disables loading, and a malformed pack fails fast at startup with the
-offending file. Authoring schema lives at `examples/scenarios/scenario-pack.schema.json`, with two sample packs
-next to it.
-
-```yaml
-# examples/scenarios/db-pool-exhaustion-sample.yaml
-id: db-pool-exhaustion-sample
-title: Database connection pool saturation (sample)
-summary: Checkout latency climbs as the checkout API starves for connections.
-services:
-  - {name: edge-gateway, kind: GATEWAY, replicas: 3}
-  - {name: checkout-api, kind: API, replicas: 4}
-  - {name: samples-db, kind: DATABASE, replicas: 1}
-faults:
-  - {kind: DB_POOL_EXHAUSTION, service: checkout-api, severity: 0.8}
-runbooks:
-  - {id: rb-db-pool, title: Database connection pool saturation, body: Raise the pool limit and confirm connections recover.}
-maxSteps: 12
-```
-
-## Configure the LLM
-
-`ajentic.llm.provider` picks the client. The shipped default points at a local llama.cpp router on
-`http://127.0.0.1:9931/v1`.
-
-| Provider                                                           | Behaviour                                         |
-| ------------------------------------------------------------------ | ------------------------------------------------- |
-| `openai-compatible` *(default)*                                    | Any OpenAI `/chat/completions` endpoint           |
-| `openai`, `azure`, `aws`, `llamacpp`, `ollama`, `vllm`, `wiremock` | Aliases for the same wire contract                |
-| `scripted`                                                         | Fully offline client, used by the `%test` profile |
-
-Azure appends `ajentic.llm.api-version` and authenticates with the `api-key` header. Every other provider
-sends `Authorization: Bearer <key>`, unless `ajentic.llm.api-key-header` says otherwise.
-
-<details>
-<summary><strong>Common properties</strong></summary>
-
-| Property                                  | Default                           | Notes                                                                           |
-| ----------------------------------------- | --------------------------------- | ------------------------------------------------------------------------------- |
-| `ajentic.llm.provider`                    | `openai-compatible`               | Client selection                                                                |
-| `ajentic.llm.base-url`                    | `http://127.0.0.1:9931/v1`        | Endpoint root                                                                   |
-| `ajentic.llm.api-key`                     | `local`                           | Left out of the request when empty                                              |
-| `ajentic.llm.model`                       | `Qwen3.8-27B-GSQ-RCO-IQ3_XXS-mtp` | Model name                                                                      |
-| `ajentic.llm.timeout`                     | `300s`                            | Local models can be slow to load                                                |
-| `ajentic.llm.temperature`                 | `0.0`                             | Deterministic sampling                                                          |
-| `ajentic.llm.chat-completions-path`       | `/chat/completions`               | For gateways with a custom path                                                 |
-| `ajentic.llm.api-version`                 |                                   | Azure only                                                                      |
-| `ajentic.llm.api-key-header`              |                                   | Override the auth header                                                        |
-| `ajentic.llm.fallback-enabled`            | `false`                           | Enable ordered LLM endpoint failover                                            |
-| `ajentic.llm.fallback-endpoints`          |                                   | Ordered endpoints: `base-url\|model\|api-key\|api-version\|api-key-header`, comma-separated |
-| `ajentic.tools.mutation-policy`           |                                   | Mutating-tool gate: `allow` \| `deny` \| `require-approval`; wins over `allow-mutations` |
-| `ajentic.tools.allow-mutations`           | `true`                            | Legacy boolean gate for mutating tools when `mutation-policy` is unset           |
-| `ajentic.approval.ttl`                    | `10m`                             | How long a pending mutating call waits for a decision before auto-deny          |
-| `ajentic.memory.enabled`                  | `true`                            | Persist completed episodes to `.ajentic/incidents.jsonl` and feed them back     |
-| `ajentic.memory.dir`                      | `.ajentic`                        | Directory holding `incidents.jsonl`                                            |
-| `ajentic.memory.max-file-size`            | `1048576`                         | Rotation threshold (bytes) for `incidents.jsonl`                                |
-| `ajentic.state.store`                     | `file`                            | State persistence: `file` \| `memory` \| `jdbc` \| `redis`                      |
-| `ajentic.state.file`                      | `.ajentic/state.json`             | File path for file state store                                                  |
-| `ajentic.agent.max-tokens`                | `0`                               | Cumulative session token budget; `0` disables the hard stop                     |
-| `ajentic.agent.stagnation.threshold`      | `2`                               | Repeated identical tool call count that yields a "try something else" hint      |
-| `ajentic.agent.stagnation.escalate-after` | `3`                               | Repeated identical tool call count that stops the loop with a diagnostic answer |
-| `ajentic.scenarios.dir`                   |                                   | External YAML/JSON scenario packs; empty disables loading                       |
-| `ajentic.mcp.default-scenario`            | `checkout-latency-db-pool`        | Episode bootstrap                                                               |
-| `ajentic.github.base-url`                 | `https://api.github.com`          | GitHub REST API base URL                                                        |
-| `ajentic.github.token`                    |                                   | Optional PAT for code-remediation mutations; empty restricts to analysis-only  |
-| `ajentic.github.default-repo`             |                                   | Default repository (`owner/name`)                                               |
-| `ajentic.github.timeout`                  | `30s`                             | HTTP client timeout for GitHub requests                                         |
-| `ajentic.github.ci.poll-attempts`         | `0`                               | Number of background CI check-run polls (`0` = snapshot only, no polling)       |
-| `ajentic.github.ci.poll-interval`         | `5s`                              | Interval between background CI check-run polls                                  |
-| `ajentic.github.ci.trigger-workflows`     | `false`                           | Enable manual workflow dispatch via `github_trigger_workflow`                   |
-| `ajentic.webhooks.secret`                 |                                   | Shared intake secret; `401` on header mismatch when set                          |
-| `ajentic.webhooks.notification-url`       |                                   | Optional report fan-out webhook; blank = log channel only                       |
-| `ajentic.webhooks.max-concurrent`         | `4`                               | Concurrent investigations; excess alerts get `429`                              |
-| `ajentic.webhooks.default-scenario`       | `orders-bad-deployment`           | Fallback scenario when the alert service matches none                          |
-| `ajentic.alerts.min-severity`             | `ERROR`                           | Minimum severity threshold: `INFO` < `WARNING` < `ERROR` < `CRITICAL`            |
-| `ajentic.alerts.default-scenario`         | `orders-bad-deployment`           | Fallback scenario for alert code-remediation sessions                           |
-
-</details>
-
-## LLM endpoint failover
-
-When `ajentic.llm.fallback-enabled=true`, every chat completion goes through a composite client: the primary
-endpoint first, then the ordered `ajentic.llm.fallback-endpoints` on transport errors, upstream 4xx/5xx,
-unparseable responses, or context-overflow rejections. Each fallback entry is an OpenAI-compatible
-`/chat/completions` base with its own model and, optionally, its own key:
-
-```
-#ajentic.llm.fallback-enabled=true
-#ajentic.llm.fallback-endpoints=https://openrouter.ai/api/v1|openai/gpt-4o|${OPENROUTER_API_KEY}
-```
-
-Masking is applied once around the whole composite (`MaskingLlmClient`), so failover never bypasses redaction.
-When no endpoint answers, the turn fails with a single `LlmException` ("All LLM endpoints failed"). Keys are
-never logged.
-
-## Environment backends
-
-`ajentic.environment.backend` selects the `Environment` implementation that episodes and agent sessions run against.
-
-| Backend                     | Status                                                                                   |
-| --------------------------- | -------------------------------------------------------------------------------------- |
-| `simulated` *(default)*     | Deterministic, offline; the only backend used by tests and CI                            |
-| `local-container`           | Live adapters over Prometheus/Loki HTTP; remediation dispatched only when `AJENTIC_LIVE_REMEDIATION_URL` is set   |
-| `cloud-live`                | The same live adapters, read-only: `apply_remediation` returns a shadow-mode result and nothing is dispatched        |
-
-Live endpoints are `ajentic.live.prometheus-url` (default `http://localhost:9090`) and `ajentic.live.loki-url`
-(default `http://localhost:3100`), overridable via `AJENTIC_LIVE_PROMETHEUS_URL` / `AJENTIC_LIVE_LOKI_URL`.
-Every request is bounded by `ajentic.live.timeout` (default `5s`) with bounded retries and a per-backend circuit
-breaker; upstream failures surface as tool errors, not crashes. Live telemetry is tested with WireMock stubs, so
-`mvn test` stays offline.
-
-Unknown values fail fast at startup, and the active backend is logged when the application boots.
-
-## Identifier masking
-
-Every LLM request passes through `SensitiveDataMaskingInterceptor`, which replaces sensitive identifiers with
-stable `[[CATEGORY_N]]` placeholders and restores them in the response. Categories are applied longest (most
-specific) first, so compound identifiers are redacted whole before generic patterns can match inside them.
-
-| Category      | Placeholder | Matches                                                                                       |
-| ------------- | ----------- | ------------------------------------------------------------------------------------------- |
-| `ARN`         | `[[ARN_N]]`     | AWS ARNs (`arn:aws...`)                                                                      |
-| `GCP_RESOURCE`| `[[GCP_N]]`   | GCP resource paths (`//*.googleapis.com/projects/...`, `.../locations/...`)                 |
-| `AZURE_RESOURCE`| `[[AZURE_N]]` | Azure resource ids (`/subscriptions/<guid>/resourceGroups/...`)                             |
-| `K8S_OBJECT`  | `[[K8S_N]]`   | Kubernetes object name + uid pairs (`db-creds:<uuid>`); bare UUIDs are not masked           |
-| `API_KEY`     | `[[API_KEY_N]]` | `sk-`, `ghp_`/`ghs_`/... GitHub tokens, `github_pat_`, AWS access key ids (`AKIA...`)       |
-| `BEARER`      | `[[BEARER_N]]`  | `Bearer <token>` with 16+ token characters (known API-key prefixes stay in `API_KEY`)      |
-| `EMAIL`       | `[[EMAIL_N]]`  | Email addresses                                                                             |
-| `NAMESPACE`   | `[[NAMESPACE_N]]` | `namespace_` / `cluster-` / `project-` / `account-` qualified names                       |
-| `POD`         | `[[POD_N]]`   | Kubernetes pod names (`name-hexhash-suffix`)                                               |
-| `IP`          | `[[IP_N]]`    | IPv4 addresses                                                                              |
-| `ACCOUNT`     | `[[ACCOUNT_N]]` | 12-digit account ids                                                                       |
-
-## Test
-
-`mvn test` needs no model and no network.
-
-| Test                           | Covers                                                       |
-| ------------------------------ | ------------------------------------------------------------ |
-| `IncidentResponseEndToEndTest` | Heuristic baseline solves every scenario                     |
-| `AgentSessionEndToEndTest`     | ReAct loop over the real HTTP client against WireMock        |
-| `GitHubCodeToolsTest`          | Zero-clone GitHub REST operations over WireMock              |
-| `GitHubTokenMaskingTest`       | PAT masking (classic `ghp_`, fine-grained `github_pat_`, app `ghs_`) |
-| `MulticloudMaskingTest`        | GCP/Azure/K8s/Bearer/AWS categories: round-trip, stability, no over-masking |
-| `LlmConsumerPactContractTest`  | OpenAI-compatible and Azure wire contracts (`target/pacts/`) |
-| `SchedulerEndToEndTest`        | Cron correctness, versioning, concurrency, recovery          |
-| `ApiEndToEndTest`              | REST surface, including the MCP HTTP transport               |
-| `McpProtocolEndToEndTest`      | Quarkiverse MCP tools, resources, prompts and HTTP transport |
-| `ServerStartupTest`            | Bare jar startup, Swagger UI redirect, health, OpenAPI       |
-| `SidecarConnectorsEndToEndTest`| Sidecar HMAC auth, replay defense, credential isolation      |
-| `CloudProviderAdaptersTest`    | AWS, Azure, GCP signing, token sources, resilient HTTP client |
-
-Stubs live in `src/test/resources/wiremock/`, started by `WireMockLlmTestResource`. To point the suite at a
-live endpoint instead, run `mvn test -Plive-llm` and override with `AJENTIC_LLM_BASE_URL` or
-`AJENTIC_LLM_MODEL`. Those assertions depend on the model following the incident, so treat them as a smoke
-test. The default run stays offline.
-
-## Project layout
-
-<details>
-<summary><strong>Packages</strong></summary>
+- **ReAct Incident Engine:** Multi-turn autonomous investigation using sealed action spaces, step budgets, and reward grading.
+- **Service Dependency Graph:** Validated DAG topologies with cascading failure attenuation across service dependencies.
+- **Automated PR Remediation:** Ingests alerts, inspects code, commits fixes, and opens GitHub pull requests with CI validation.
+- **OpenAI-Compatible Facade:** Drop-in `/v1/chat/completions` API to power Open WebUI, LibreChat, or Continue.dev.
+- **Operator Approval Gates:** Human-in-the-loop authorization policy (`require-approval`) for mutating operational changes.
+
+---
+
+## Documentation Index
+
+Detailed documentation is organized into topic-specific guides:
+
+| Guide | Description |
+|---|---|
+| [**01. Architecture & RL Model**](docs/01-architecture.md) | Episode lifecycle, ReAct reasoning loop, reward functions, and scenario DAG topologies. |
+| [**02. HTTP API & Cookbook**](docs/02-http-api.md) | Complete REST endpoint reference, OpenAPI/Swagger discovery, and cURL recipes for simulation & SSE chat. |
+| [**03. Model Context Protocol (MCP)**](docs/03-mcp.md) | Quarkiverse MCP server setup, stdio and streamable HTTP transports, tool catalogs, resources, and prompts. |
+| [**04. ChatOps & OpenAI Facade**](docs/04-chatops-and-facade.md) | Outbound notification fan-out (Slack, Teams, Discord), inbound chat commands, and OpenAI `/v1` compatibility. |
+| [**05. Alerts & Automated Remediation**](docs/05-alerts-and-remediation.md) | Ingestion of Alertmanager/CloudWatch/Azure alerts, severity gating, and autonomous GitHub PR creation. |
+| [**06. Sidecar & Security Connectors**](docs/06-sidecar-and-security.md) | Credential isolation, HMAC-SHA256 signing, anti-replay nonce caching, and mutating audit logs. |
+| [**07. Schedules & State Persistence**](docs/07-schedules-and-state.md) | 5-field cron disaster drills, atomic `.ajentic/state.json` persistence, episodic memory, and approval gates. |
+| [**08. LLM Providers & Masking**](docs/08-llm-and-masking.md) | OpenAI-compatible endpoints, ordered failover routing, and PII/secret sensitive data masking interceptors. |
+| [**09. Deployment & Operations**](docs/09-deployment-and-operations.md) | Container builds, Kubernetes/Helm manifests, and the local observability lab (Prometheus + Grafana). |
+| [**10. Testing & Extensibility**](docs/10-testing-and-extensibility.md) | Offline WireMock test suite, Pact consumer contracts, and authoring external YAML/JSON scenario packs. |
+
+---
+
+## Project Layout
 
 ```
 io.ajentic.sre
-├── rl                  environment contracts, rewards, episodes, policies, simulation
+├── rl                  # Environment contracts, rewards, episodes, policies, simulation
 ├── agent
-│   ├── alerts          cloud alert normalizer and automated remediation
-│   ├── context         ScopedValue execution context for virtual threads
-│   ├── github          type-safe GitHub REST client
-│   ├── integration     chat channels (Slack, Discord, Teams) and sidecar client
-│   ├── llm             LangChain4j chat model integration
-│   ├── masking         per-request identifier masking and unmasking
-│   ├── mcp             Quarkiverse MCP resources and prompts
-│   ├── session         ReAct session, conversation, goals, session registry
-│   └── tool            tool contract, CDI toolboxes, built-in tools
-├── connectors          credential-isolated sidecar security (HMAC-SHA256) and audit logging
-├── schedule            cron, versioned store, bounded engine, drill runner
-├── api                 JAX-RS resources, mappers, typed payloads
-└── health              liveness and readiness checks
+│   ├── alerts          # Multi-cloud alert normalizer and automated remediation
+│   ├── context         # Java 25 ScopedValue execution context for virtual threads
+│   ├── github          # Resilient GitHub REST client (zero git clone)
+│   ├── integration     # Chat channels (Slack, Teams, Discord) and sidecar client
+│   ├── llm             # LangChain4j model integration and endpoint failover
+│   ├── masking         # Sensitive data masking and unmasking interceptors
+│   ├── mcp             # Quarkiverse MCP resources and prompt templates
+│   ├── session         # ReAct session state, conversation history, and transcript
+│   └── tool            # Tool contract, CDI toolboxes, built-in investigation tools
+├── connectors          # Credential-isolated sidecar security (HMAC-SHA256) and audit logging
+├── schedule            # 5-field cron engine, versioned store, and drill runner
+├── api                 # JAX-RS resources, SSE event sinks, and OpenAI facade
+└── health              # SmallRye health liveness and readiness checks
 ```
 
-Tools are `@AgentTool` methods on `@ToolBox` beans. The registry reads their signatures to build the JSON
-Schema and bind arguments, and prompts work the same way through `@AgentPrompt`. Read-only tools run in
-parallel windows of eight on virtual threads, while mutations run one at a time behind an authorization
-gate. Request context travels as Java 25 `ScopedValue`s. Identifier masking is a CDI interceptor around
-the LLM client, and the episode and session registries are bounded Caffeine caches.
+---
 
-</details>
+## Toolchain & Versions
 
-## JDK support
-
-The default build targets Java 25 (`maven.compiler.release=25`) and runs on Java 25 or newer. The
-`jdk27-preview` profile switches to `--release 27 --enable-preview`. Both profiles pass the full suite.
-
-```bash
-mvn test                 # Java 25
-mvn test -Pjdk27-preview # Java 27 preview
-```
+- **Runtime:** Java 25 (`--release 25`), optional Java 27 Preview (`-Pjdk27-preview`).
+- **Framework:** Quarkus `3.40.1.1`.
+- **MCP Server:** `io.quarkiverse.mcp:quarkus-mcp-server-*` `2.0.4`.
+- **LangChain4j:** `io.quarkiverse.langchain4j:quarkus-langchain4j-*` `1.14.2`.
+- **Build Tool:** Apache Maven 3.10+ (via `mise`).

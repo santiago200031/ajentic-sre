@@ -1,6 +1,6 @@
 package io.ajentic.sre.api.webhook;
 
-import tools.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.net.URI;
 import java.net.http.HttpClient;

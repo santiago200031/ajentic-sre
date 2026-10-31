@@ -5,8 +5,8 @@ import io.quarkus.test.common.WithTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import org.junit.jupiter.api.Test;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
 import java.util.Map;
@@ -138,7 +138,7 @@ class WebhookEndToEndTest {
     }
 
     @Test
-    void reportsAreListedForPostMortems() {
+    void reportsAreListedForPostMortems() throws Exception {
         JsonNode listed = post("/api/v1/webhooks/alertmanager", ALERTMANAGER_BODY_3, "X-Alertmanager-Secret", SECRET);
         String fingerprint = listed.get("fingerprint").asText();
 
@@ -169,6 +169,10 @@ class WebhookEndToEndTest {
                 .then()
                 .statusCode(200)
                 .extract().body().asString();
-        return MAPPER.readTree(raw);
+        try {
+            return MAPPER.readTree(raw);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 }

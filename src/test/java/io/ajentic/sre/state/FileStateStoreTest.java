@@ -5,8 +5,8 @@ import io.ajentic.sre.schedule.store.ScheduleDefinition;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -24,7 +24,7 @@ class FileStateStoreTest {
 
     private static final Path TEST_DIR = Path.of(".ajentic", "test-state-unit");
     private static final Path STATE_FILE = TEST_DIR.resolve("state.json");
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
 
     @BeforeEach
     @AfterEach

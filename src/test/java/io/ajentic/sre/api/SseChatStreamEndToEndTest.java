@@ -5,8 +5,8 @@ import io.quarkus.test.common.WithTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.StringReader;
 import java.util.ArrayList;
@@ -33,7 +33,7 @@ class SseChatStreamEndToEndTest {
     }
 
     @Test
-    void streamsReActEventsInOrderAndFinishesWithDone() {
+    void streamsReActEventsInOrderAndFinishesWithDone() throws Exception {
         String sessionId = given()
                 .contentType("application/json")
                 .body(Map.of("scenarioId", "orders-bad-deployment", "seed", 1L, "model", "wm-stream"))

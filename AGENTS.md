@@ -1,6 +1,6 @@
 # ajentic-sre
 
-Practice range for AI agents that handle infrastructure incidents. Java 25 on Quarkus 4.0.0.Beta1, Linux only.
+Practice range for AI agents that handle infrastructure incidents. Java 25 on Quarkus 3.40.1.1, Linux only.
 Nothing touches live systems; the test suite runs offline (no model, no network) against WireMock stubs.
 
 ## Toolchain & setup

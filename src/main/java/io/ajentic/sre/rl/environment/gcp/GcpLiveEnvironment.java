@@ -10,8 +10,8 @@ import io.ajentic.sre.rl.environment.cloud.AbstractCloudEnvironment;
 import io.ajentic.sre.rl.reward.RewardFunction;
 import io.ajentic.sre.rl.simulation.DeployRecord;
 import io.ajentic.sre.rl.simulation.Scenario;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.net.URI;
 import java.net.http.HttpRequest;
@@ -145,9 +145,9 @@ public final class GcpLiveEnvironment extends AbstractCloudEnvironment {
             List<String> lines = new ArrayList<>();
             if (entries.isArray()) {
                 for (JsonNode entry : entries) {
-                    String payload = entry.path("textPayload").asString();
+                    String payload = entry.path("textPayload").asText();
                     if (payload.isEmpty()) {
-                        payload = entry.path("jsonPayload").path("message").asString();
+                        payload = entry.path("jsonPayload").path("message").asText();
                     }
                     if (!payload.isEmpty()) {
                         lines.add(payload);
@@ -171,8 +171,8 @@ public final class GcpLiveEnvironment extends AbstractCloudEnvironment {
             List<DeployRecord> records = new ArrayList<>();
             if (revisions.isArray()) {
                 for (JsonNode rev : revisions) {
-                    String name = rev.path("name").asString("rev-latest");
-                    String createTime = rev.path("createTime").asString();
+                    String name = rev.path("name").asText("rev-latest");
+                    String createTime = rev.path("createTime").asText();
                     Instant time = Instant.now();
                     try {
                         if (!createTime.isEmpty()) {

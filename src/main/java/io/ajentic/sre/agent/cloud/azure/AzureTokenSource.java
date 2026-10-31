@@ -1,7 +1,7 @@
 package io.ajentic.sre.agent.cloud.azure;
 
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.net.URI;
 import java.net.URLEncoder;
@@ -97,7 +97,7 @@ public final class AzureTokenSource {
             }
 
             JsonNode json = MAPPER.readTree(response.body());
-            String token = json.path("access_token").asString();
+            String token = json.path("access_token").asText();
             if (token == null || token.isBlank()) {
                 throw new IllegalStateException("Azure token response missing access_token: " + response.body());
             }
@@ -123,7 +123,7 @@ public final class AzureTokenSource {
             }
 
             JsonNode json = MAPPER.readTree(response.body());
-            String token = json.path("access_token").asString();
+            String token = json.path("access_token").asText();
             if (token == null || token.isBlank()) {
                 throw new IllegalStateException("Azure IMDS token response missing access_token: " + response.body());
             }

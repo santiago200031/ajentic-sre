@@ -24,8 +24,8 @@ import io.ajentic.sre.rl.reward.TransitionEffect;
 import io.ajentic.sre.rl.simulation.Runbook;
 import io.ajentic.sre.rl.simulation.Scenario;
 import io.ajentic.sre.rl.simulation.ServiceSpec;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -234,7 +234,7 @@ public class LiveTelemetryEnvironment implements Environment {
 
     private double prometheusLastValue(String service, String query) {
         String body = http.get(queryRangeUrl(config.prometheusUrl(), query));
-        JsonNode values = MAPPER.readTree(body).path("data").path("result").path(0).path("values");
+        JsonNode values = readTree(body).path("data").path("result").path(0).path("values");
         if (!values.isArray() || values.isEmpty()) {
             return 0.0;
         }
@@ -243,14 +243,22 @@ public class LiveTelemetryEnvironment implements Environment {
 
     private List<String> lokiLines(String service) {
         String body = http.get(queryRangeUrl(config.lokiUrl(), "{service=\"" + service + "\"}"));
-        JsonNode streams = MAPPER.readTree(body).path("data").path("result");
+        JsonNode streams = readTree(body).path("data").path("result");
         List<String> lines = new ArrayList<>();
         for (JsonNode stream : streams) {
             for (JsonNode value : stream.path("values")) {
-                lines.add(value.path(1).asString());
+                lines.add(value.path(1).asText());
             }
         }
         return lines;
+    }
+
+    private static JsonNode readTree(String body) {
+        try {
+            return MAPPER.readTree(body);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to parse telemetry JSON response: " + e.getMessage(), e);
+        }
     }
 
     private static String queryRangeUrl(String baseUrl, String query) {

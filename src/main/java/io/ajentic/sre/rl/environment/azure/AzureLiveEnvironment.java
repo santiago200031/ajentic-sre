@@ -10,8 +10,8 @@ import io.ajentic.sre.rl.environment.cloud.AbstractCloudEnvironment;
 import io.ajentic.sre.rl.reward.RewardFunction;
 import io.ajentic.sre.rl.simulation.DeployRecord;
 import io.ajentic.sre.rl.simulation.Scenario;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.net.URI;
 import java.net.http.HttpRequest;
@@ -111,7 +111,7 @@ public final class AzureLiveEnvironment extends AbstractCloudEnvironment {
             double p95 = 110.0;
             if (valueArr.isArray()) {
                 for (JsonNode metricNode : valueArr) {
-                    String name = metricNode.path("name").path("value").asString();
+                    String name = metricNode.path("name").path("value").asText();
                     JsonNode timeseries = metricNode.path("timeseries");
                     if (timeseries.isArray() && !timeseries.isEmpty()) {
                         JsonNode data = timeseries.get(0).path("data");
@@ -146,7 +146,7 @@ public final class AzureLiveEnvironment extends AbstractCloudEnvironment {
             if (rows.isArray()) {
                 for (JsonNode row : rows) {
                     if (row.isArray() && !row.isEmpty()) {
-                        lines.add(row.get(0).asString());
+                        lines.add(row.get(0).asText());
                     }
                 }
             }
@@ -167,8 +167,8 @@ public final class AzureLiveEnvironment extends AbstractCloudEnvironment {
             List<DeployRecord> records = new ArrayList<>();
             if (values.isArray()) {
                 for (JsonNode item : values) {
-                    String operationName = item.path("operationName").path("value").asString("Microsoft.App/containerApps/write");
-                    String eventTimestamp = item.path("eventTimestamp").asString();
+                    String operationName = item.path("operationName").path("value").asText("Microsoft.App/containerApps/write");
+                    String eventTimestamp = item.path("eventTimestamp").asText();
                     Instant time = Instant.now();
                     try {
                         if (!eventTimestamp.isEmpty()) {

@@ -10,8 +10,8 @@ import io.ajentic.sre.rl.environment.cloud.AbstractCloudEnvironment;
 import io.ajentic.sre.rl.reward.RewardFunction;
 import io.ajentic.sre.rl.simulation.DeployRecord;
 import io.ajentic.sre.rl.simulation.Scenario;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.net.URI;
 import java.net.http.HttpRequest;
@@ -115,7 +115,7 @@ public final class AwsLiveEnvironment extends AbstractCloudEnvironment {
             double p95 = 120.0;
             if (results.isArray()) {
                 for (JsonNode res : results) {
-                    String id = res.path("Id").asString();
+                    String id = res.path("Id").asText();
                     JsonNode vals = res.path("Values");
                     if (vals.isArray() && !vals.isEmpty()) {
                         double v = vals.get(0).asDouble();
@@ -150,7 +150,7 @@ public final class AwsLiveEnvironment extends AbstractCloudEnvironment {
             List<String> lines = new ArrayList<>();
             if (events.isArray()) {
                 for (JsonNode ev : events) {
-                    lines.add(ev.path("message").asString());
+                    lines.add(ev.path("message").asText());
                 }
             }
             return lines;
@@ -175,7 +175,7 @@ public final class AwsLiveEnvironment extends AbstractCloudEnvironment {
             List<DeployRecord> records = new ArrayList<>();
             if (events.isArray()) {
                 for (JsonNode ev : events) {
-                    String eventName = ev.path("EventName").asString("UpdateService");
+                    String eventName = ev.path("EventName").asText("UpdateService");
                     long timeSec = ev.path("EventTime").asLong(Instant.now().getEpochSecond());
                     records.add(new DeployRecord(
                             service,

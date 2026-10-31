@@ -1,6 +1,6 @@
 package io.ajentic.sre.agent.integration;
 
-import tools.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.LinkedHashMap;
 import java.util.List;

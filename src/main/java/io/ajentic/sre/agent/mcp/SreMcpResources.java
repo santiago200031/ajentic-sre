@@ -11,7 +11,8 @@ import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
-import tools.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -48,7 +49,12 @@ public class SreMcpResources {
 
     private void registerScenario(Scenario scenario) {
         String uri = SCENARIO_URI_PREFIX + scenario.id();
-        String json = mapper.writeValueAsString(ScenarioPayload.from(scenario));
+        String json;
+        try {
+            json = mapper.writeValueAsString(ScenarioPayload.from(scenario));
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialize scenario MCP resource", e);
+        }
         resourceManager.newResource(uri)
                 .setUri(uri)
                 .setTitle(scenario.title())
@@ -65,7 +71,12 @@ public class SreMcpResources {
         payload.put("services", scenario.services().stream()
                 .map(spec -> Map.of("name", spec.name(), "dependencies", spec.dependencies()))
                 .toList());
-        String json = mapper.writeValueAsString(payload);
+        String json;
+        try {
+            json = mapper.writeValueAsString(payload);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialize topology MCP resource", e);
+        }
         resourceManager.newResource(uri)
                 .setUri(uri)
                 .setTitle("Service dependency graph for " + scenario.id())
