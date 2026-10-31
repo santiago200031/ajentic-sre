@@ -20,6 +20,11 @@ public record Scenario(
         runbooks = List.copyOf(runbooks);
     }
 
+    /** The validated service dependency DAG; throws on unknown references or cycles. */
+    public ServiceTopology topology() {
+        return ServiceTopology.of(services);
+    }
+
     public String culpritService() {
         return faults.isEmpty() ? services.getFirst().name() : faults.getFirst().service();
     }

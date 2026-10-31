@@ -81,6 +81,10 @@ Repeated wrong remediations turn catastrophic and end the episode.
 Each scenario defines services, injected faults, runbooks, and a step budget. Telemetry comes from the
 simulated service state, so metrics, logs, traces, and deploys stay consistent with one another.
 
+Services declare their dependencies, forming a DAG validated at load (unknown references and cycles are
+rejected). A fault on a service degrades every service that depends on it, with the severity decayed by a
+factor of 0.5 per edge, so downstream saturation shows up as upstream latency and error-rate degradation.
+
 </details>
 
 ## Install
@@ -206,7 +210,7 @@ and `prompts/get`. `POST` takes one request or a batch array, and malformed JSON
 
 - Lifecycle tools: `list_scenarios`, `start_episode`, `run_incident_drill`.
 - GitHub code tools: `github_list_files`, `github_read_file`, `github_get_ci_status` (READ) and `github_create_branch`, `github_commit_file`, `github_create_pull_request` (MUTATE).
-- Resources: `sre://scenarios/{scenarioId}` and `sre://runbooks/{scenarioId}/{runbookId}`.
+- Resources: `sre://scenarios/{scenarioId}`, `sre://topology/{scenarioId}`, and `sre://runbooks/{scenarioId}/{runbookId}`.
 - Prompts: `investigate-incident` and `summarize-postmortem`.
 - A `tools/call` can pass `_scenarioId` to start an episode, or `_episodeId` to reuse one.
 

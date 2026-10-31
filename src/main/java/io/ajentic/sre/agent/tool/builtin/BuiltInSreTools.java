@@ -128,6 +128,19 @@ public class BuiltInSreTools {
                 "terminal", result.done()));
     }
 
+    @AgentTool(name = "get_service_topology", description = "Show the service dependency graph for the active scenario.")
+    public ToolResult getServiceTopology(ToolContext context) {
+        String scenarioId = context.environment().spec().scenarioId();
+        Scenario scenario = scenarios.byId(scenarioId)
+                .orElseThrow(() -> new IllegalArgumentException("Unknown scenario: " + scenarioId));
+        String text = scenario.services().stream()
+                .map(spec -> spec.name() + (spec.dependencies().isEmpty()
+                        ? " -> (no dependencies)"
+                        : " -> " + String.join(", ", spec.dependencies())))
+                .collect(java.util.stream.Collectors.joining("\n"));
+        return ToolResult.ok(text, Map.of("scenarioId", scenarioId));
+    }
+
     @AgentTool(name = "post_incident_summary",
             description = "Post an incident summary to the configured notification channel.",
             capability = Capability.MUTATE)

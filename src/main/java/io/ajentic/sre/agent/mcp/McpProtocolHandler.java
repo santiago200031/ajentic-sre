@@ -48,6 +48,7 @@ public class McpProtocolHandler {
     public static final String SERVER_NAME = "ajentic-sre";
     private static final String SCENARIO_URI_PREFIX = "sre://scenarios/";
     private static final String RUNBOOK_URI_PREFIX = "sre://runbooks/";
+    private static final String TOPOLOGY_URI_PREFIX = "sre://topology/";
     private static final long DEFAULT_SEED = 42L;
     private static final TypeReference<Map<String, Object>> ARGUMENTS = new TypeReference<>() {
     };
@@ -230,6 +231,11 @@ public class McpProtocolHandler {
                     scenario.title(),
                     scenario.summary(),
                     "application/json"));
+            resources.add(new McpResourceView(
+                    TOPOLOGY_URI_PREFIX + scenario.id(),
+                    "Service dependency graph for " + scenario.id(),
+                    null,
+                    "application/json"));
             for (Runbook runbook : scenario.runbooks()) {
                 resources.add(new McpResourceView(
                         RUNBOOK_URI_PREFIX + scenario.id() + "/" + runbook.id(),
@@ -249,6 +255,18 @@ public class McpProtocolHandler {
                     .orElseThrow(() -> new IllegalArgumentException("Unknown scenario resource: " + uri));
             return new ResourceReadResult(List.of(new ResourceContent(
                     uri, "application/json", mapper.writeValueAsString(ScenarioPayload.from(scenario)))));
+        }
+        if (uri.startsWith(TOPOLOGY_URI_PREFIX)) {
+            String scenarioId = uri.substring(TOPOLOGY_URI_PREFIX.length());
+            Scenario scenario = scenarios.byId(scenarioId)
+                    .orElseThrow(() -> new IllegalArgumentException("Unknown scenario resource: " + uri));
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("scenarioId", scenarioId);
+            payload.put("services", scenario.services().stream()
+                    .map(spec -> Map.of("name", spec.name(), "dependencies", spec.dependencies()))
+                    .toList());
+            return new ResourceReadResult(List.of(new ResourceContent(
+                    uri, "application/json", mapper.writeValueAsString(payload))));
         }
         if (uri.startsWith(RUNBOOK_URI_PREFIX)) {
             String remainder = uri.substring(RUNBOOK_URI_PREFIX.length());

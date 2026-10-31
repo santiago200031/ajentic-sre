@@ -70,6 +70,29 @@ class McpProtocolEndToEndTest {
     }
 
     @Test
+    void listsAndReadsTopologyResources() {
+        String list = handler.handle("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"resources/list\"}");
+        assertTrue(list.contains("sre://topology/checkout-latency-db-pool"), list);
+
+        String topology = handler.handle("""
+                {"jsonrpc":"2.0","id":2,"method":"resources/read","params":
+                {"uri":"sre://topology/checkout-latency-db-pool"}}""");
+        assertTrue(topology.contains("\"mimeType\":\"application/json\""), topology);
+        assertTrue(topology.contains("checkout-api"), topology);
+        assertTrue(topology.contains("orders-db"), topology);
+    }
+
+    @Test
+    void callsTheTopologyTool() {
+        String call = handler.handle("""
+                {"jsonrpc":"2.0","id":3,"method":"tools/call","params":
+                {"name":"get_service_topology","arguments":{}}}""");
+        assertTrue(call.contains("\"isError\":false"), call);
+        assertTrue(call.contains("edge-gateway -> checkout-api"), call);
+        assertTrue(call.contains("checkout-api -> orders-db"), call);
+    }
+
+    @Test
     void listsAndRendersPrompts() {
         String list = handler.handle("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"prompts/list\"}");
         assertTrue(list.contains("investigate-incident"), list);

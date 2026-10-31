@@ -23,19 +23,23 @@ public record ScenarioPack(
         int maxSteps) {
 
     public Scenario toScenario() {
-        return new Scenario(
+        Scenario scenario = new Scenario(
                 id,
                 title,
                 summary,
                 incidentSummary,
-                services.stream().map(s -> new ServiceSpec(s.name(), ServiceKind.valueOf(s.kind()), s.replicas())).toList(),
+                services.stream().map(s -> new ServiceSpec(
+                        s.name(), ServiceKind.valueOf(s.kind()), s.replicas(),
+                        s.dependencies() == null ? List.of() : s.dependencies())).toList(),
                 faults.stream().map(f -> new Fault(FaultKind.valueOf(f.kind().toUpperCase()), f.service(), f.severity())).toList(),
                 runbooks.stream().map(r -> new Runbook(r.id(), r.title(), r.body())).toList(),
                 maxSteps);
+        scenario.topology();
+        return scenario;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record ServicePack(String name, String kind, int replicas) {
+    public record ServicePack(String name, String kind, int replicas, List<String> dependencies) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

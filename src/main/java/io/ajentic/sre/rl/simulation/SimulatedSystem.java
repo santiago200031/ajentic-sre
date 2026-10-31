@@ -31,6 +31,7 @@ final class SimulatedSystem {
     SimulatedSystem(Scenario scenario, long seed) {
         this.scenario = scenario;
         this.random = RandomGeneratorFactory.of("L64X128MixRandom").create(seed);
+        scenario.topology();
         scenario.services().forEach(spec -> services.put(spec.name(), new ServiceState(spec)));
         scenario.faults().forEach(fault -> faults.add(new ActiveFault(fault)));
         scenario.services().forEach(spec -> deploys.add(
@@ -115,6 +116,9 @@ final class SimulatedSystem {
         return scenario.incidentSummary();
     }
 
+    /** Severity multiplier applied per hop when a fault degrades a dependent service. */
+    private static final double CASCADE_FACTOR = 0.5;
+
     private void applyFaultEffects(double scale) {
         for (ActiveFault active : faults) {
             if (active.resolved()) {
@@ -122,29 +126,32 @@ final class SimulatedSystem {
             }
             ServiceState service = requireService(active.fault().service());
             double severity = active.fault().severity() * scale;
-            switch (active.fault().kind()) {
-                case DB_POOL_EXHAUSTION -> {
-                    service.setErrorRate(service.errorRate() + 0.06 * severity);
-                    service.setP95LatencyMilliseconds(service.p95LatencyMilliseconds() + 70 * severity);
-                }
-                case MEMORY_LEAK -> {
-                    service.setMemoryUtilization(service.memoryUtilization() + 0.08 * severity);
-                    service.setErrorRate(service.errorRate() + 0.03 * severity);
-                }
-                case CERTIFICATE_EXPIRY -> service.setErrorRate(service.errorRate() + 0.14 * severity);
-                case DNS_FAILURE -> {
-                    service.setErrorRate(service.errorRate() + 0.16 * severity);
-                    service.setP95LatencyMilliseconds(service.p95LatencyMilliseconds() + 130 * severity);
-                }
-                case BAD_DEPLOYMENT -> {
-                    service.setErrorRate(service.errorRate() + 0.14 * severity);
-                    service.setP95LatencyMilliseconds(service.p95LatencyMilliseconds() + 90 * severity);
-                }
-                case DISK_PRESSURE -> {
-                    service.setDiskUtilization(service.diskUtilization() + 0.32 * severity);
-                    service.setErrorRate(service.errorRate() + 0.05 * severity);
+            FaultKind kind = active.fault().kind();
+            service.setErrorRate(service.errorRate() + kind.errorRateCoefficient() * severity);
+            service.setP95LatencyMilliseconds(service.p95LatencyMilliseconds() + kind.latencyCoefficient() * severity);
+            switch (kind) {
+                case MEMORY_LEAK -> service.setMemoryUtilization(service.memoryUtilization() + 0.08 * severity);
+                case DISK_PRESSURE -> service.setDiskUtilization(service.diskUtilization() + 0.32 * severity);
+                default -> {
                 }
             }
+            cascade(active, service, severity);
+        }
+    }
+
+    /**
+     * A fault on a service degrades every service that depends on it, upstream through the topology DAG, with the
+     * severity decayed by {@link #CASCADE_FACTOR} per edge. Only latency and error rate propagate: memory and disk
+     * pressure are local to the faulty service.
+     */
+    private void cascade(ActiveFault active, ServiceState source, double severity) {
+        List<String> ancestors = scenario.topology().ancestorsOf(source.name());
+        for (int depth = 0; depth < ancestors.size(); depth++) {
+            ServiceState ancestor = requireService(ancestors.get(depth));
+            double decayed = severity * Math.pow(CASCADE_FACTOR, depth + 1);
+            ancestor.setErrorRate(ancestor.errorRate() + active.fault().kind().errorRateCoefficient() * decayed);
+            ancestor.setP95LatencyMilliseconds(
+                    ancestor.p95LatencyMilliseconds() + active.fault().kind().latencyCoefficient() * decayed);
         }
     }
 

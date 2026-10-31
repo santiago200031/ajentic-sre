@@ -16,7 +16,7 @@ suite offline (`mvn test`, WireMock stubs, no model, no network), and targets Ja
 | 7 | `feat/prometheus-episode-metrics` | 1 | Micrometer counters/timers for episodes, tools, tokens | 2 | ✅ done |
 | 8 | `feat/local-docker-stack` | 1 | `docker-compose.yml`: app + Prometheus + Grafana | 7 | ✅ done |
 | 9 | `feat/scenario-packs` | 2 | External YAML/JSON scenario loading | 3 | ✅ done |
-| 10 | `feat/topology-cascading-failures` | 2 | Service DAG + downstream→upstream degradation | 3, 9 | ⬜ todo |
+| 10 | `feat/topology-cascading-failures` | 2 | Service DAG + downstream→upstream degradation | 3, 9 | ✅ done |
 | 11 | `feat/investigation-tools` | 2 | `inspect_recent_changes`, `correlate_anomalies`, topology tool | 10 | ⬜ todo |
 | 12 | `feat/stagnation-breaker` | 2 | Duplicate tool-call detection with synthetic hint | 2 | ✅ done |
 | 13 | `feat/token-usage-budget` | 2 | Cumulative usage in `Conversation`/`ChatResponse` | — | ✅ done |
@@ -248,15 +248,15 @@ overwrite each other's active episode unless every call passes `_episodeId`.
 
 ### 10. `feat/topology-cascading-failures`
 
-- [ ] Add `List<String> dependencies` to `ServiceSpec` and a validated `ServiceTopology` DAG (no cycles, all refs
+- [x] Add `List<String> dependencies` to `ServiceSpec` and a validated `ServiceTopology` DAG (no cycles, all refs
       resolve).
-- [ ] Propagate downstream latency/error-rate degradation upstream in `SimulatedSystem.applyFaultEffects`, with
+- [x] Propagate downstream latency/error-rate degradation upstream in `SimulatedSystem.applyFaultEffects`, with
       depth-decayed severity and a `cascadeFactor` per edge.
-- [ ] Extend `Scenario.services()` construction helpers so built-ins declare realistic graphs
+- [x] Extend `Scenario.services()` construction helpers so built-ins declare realistic graphs
       (edge-gateway → checkout-api → orders-db / redis-cache).
-- [ ] Add `@AgentTool(name = "get_service_topology")` and MCP resource `sre://topology/{scenarioId}`.
-- [ ] Test: fault on a leaf degrades all ancestors; cycles rejected at load; topology tool output matches the DAG.
-- [ ] Test: symptom-first alert appears on the edge service while the culprit is a leaf.
+- [x] Add `@AgentTool(name = "get_service_topology")` and MCP resource `sre://topology/{scenarioId}`.
+- [x] Test: fault on a leaf degrades all ancestors; cycles rejected at load; topology tool output matches the DAG.
+- [x] Test: symptom-first alert appears on the edge service while the culprit is a leaf.
 
 **Files.** `rl/simulation/ServiceSpec.java`, `Scenario.java`, `SimulatedSystem.java`,
 `agent/tool/builtin/BuiltInSreTools.java`, `agent/mcp/McpProtocolHandler.java`.
