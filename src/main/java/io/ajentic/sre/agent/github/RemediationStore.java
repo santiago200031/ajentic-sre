@@ -34,7 +34,7 @@ public class RemediationStore {
 
     public List<RemediationRecord> pending() {
         return records.values().stream()
-                .filter(r -> "PENDING".equalsIgnoreCase(r.ciStatus()))
+                .filter(r -> CiStatusKind.PENDING.value().equalsIgnoreCase(r.ciStatus()))
                 .toList();
     }
 

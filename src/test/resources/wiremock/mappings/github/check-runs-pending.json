@@ -1,0 +1,15 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPathPattern": "/repos/acme/checkout-service/commits/abc123/check-runs"
+  },
+  "response": {
+    "status": 200,
+    "jsonBody": {
+      "total_count": 1,
+      "check_runs": [
+        { "name": "build", "status": "in_progress", "conclusion": null, "html_url": "https://github.com/acme/checkout-service/check_runs/3" }
+      ]
+    }
+  }
+}

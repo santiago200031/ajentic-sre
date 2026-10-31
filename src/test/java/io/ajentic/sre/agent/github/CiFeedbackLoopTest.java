@@ -158,4 +158,75 @@ class CiFeedbackLoopTest {
                 new GitHubClient.CheckRun("test", "completed", "timed_out", "https://url")));
         assertEquals(CiStatusKind.FAILURE, CiFeedbackLoop.computeStatusKind(timedOut));
     }
+
+    @Test
+    void maxAttemptsExhaustedFlipsRecordToTimedOutAndEmitsNotification() {
+        List<IncidentSummary> notifications = new ArrayList<>();
+        NotificationChannel channel = notifications::add;
+
+        // Commit abc123 returns PENDING check runs in WireMock
+        RemediationRecord pending = new RemediationRecord(
+                "rec-timeout",
+                "acme/checkout-service",
+                "ajentic/fix-1234",
+                "abc123",
+                42,
+                "https://github.com/acme/checkout-service/pull/42",
+                "PENDING",
+                java.time.Instant.now(),
+                0);
+        store.record(pending);
+
+        // maxPollAttempts = 1 -> First poll increments attempts to 1 and immediately marks TIMED_OUT
+        CiFeedbackLoop loop = new CiFeedbackLoop(store, github, channel, 1);
+        int polled = loop.pollPending();
+
+        assertEquals(1, polled);
+        RemediationRecord updated = store.findById("rec-timeout").orElseThrow();
+        assertEquals(CiStatusKind.TIMED_OUT.value(), updated.ciStatus());
+        assertEquals(1, updated.pollAttempts());
+        assertTrue(updated.ciStatus().equals(CiStatusKind.TIMED_OUT.value()));
+        assertEquals(1, notifications.size());
+        assertTrue(notifications.getFirst().summary().contains("TIMED_OUT"));
+
+        // Next poll should do 0 because it's no longer pending
+        assertEquals(0, loop.pollPending());
+    }
+
+    @Test
+    void exceptionDuringPollIncrementsAttemptsAndReachesFailure() {
+        List<IncidentSummary> notifications = new ArrayList<>();
+        NotificationChannel channel = notifications::add;
+
+        // unknown-repo will throw an error against WireMock (404)
+        RemediationRecord pending = new RemediationRecord(
+                "rec-err",
+                "unknown-org/missing-repo",
+                "ajentic/fix-1234",
+                "abc123",
+                99,
+                "https://github.com/unknown-org/missing-repo/pull/99",
+                "PENDING",
+                java.time.Instant.now(),
+                0);
+        store.record(pending);
+
+        CiFeedbackLoop loop = new CiFeedbackLoop(store, github, channel, 2);
+        // Attempt 1: caught exception, increments attempt to 1, status stays PENDING
+        int polled = loop.pollPending();
+        assertEquals(1, polled);
+        RemediationRecord attempt1 = store.findById("rec-err").orElseThrow();
+        assertEquals(1, attempt1.pollAttempts());
+        assertEquals(CiStatusKind.PENDING.value(), attempt1.ciStatus());
+        assertTrue(notifications.isEmpty());
+
+        // Attempt 2: caught exception, increments attempt to 2 (= maxAttempts), transitions to FAILURE and notifies
+        polled = loop.pollPending();
+        assertEquals(1, polled);
+        RemediationRecord attempt2 = store.findById("rec-err").orElseThrow();
+        assertEquals(2, attempt2.pollAttempts());
+        assertEquals(CiStatusKind.FAILURE.value(), attempt2.ciStatus());
+        assertEquals(1, notifications.size());
+        assertTrue(notifications.getFirst().summary().contains("FAILURE"));
+    }
 }

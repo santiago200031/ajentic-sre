@@ -25,6 +25,29 @@ import java.util.Map;
 @Unremovable
 public class GitHubCodeTools {
 
+    public static final String TOOL_GITHUB_LIST_FILES = "github_list_files";
+    public static final String TOOL_GITHUB_READ_FILE = "github_read_file";
+    public static final String TOOL_GITHUB_CREATE_BRANCH = "github_create_branch";
+    public static final String TOOL_GITHUB_COMMIT_FILE = "github_commit_file";
+    public static final String TOOL_GITHUB_GET_CI_STATUS = "github_get_ci_status";
+    public static final String TOOL_GITHUB_CREATE_PULL_REQUEST = "github_create_pull_request";
+    public static final String TOOL_GITHUB_TRIGGER_WORKFLOW = "github_trigger_workflow";
+
+    public static final String PARAM_REPO = "repo";
+    public static final String PARAM_BRANCH = "branch";
+    public static final String PARAM_NEW_BRANCH = "newBranch";
+    public static final String PARAM_BASE_BRANCH = "baseBranch";
+    public static final String PARAM_PATH = "path";
+    public static final String PARAM_CONTENT = "content";
+    public static final String PARAM_MESSAGE = "message";
+    public static final String PARAM_EXISTING_SHA = "existingSha";
+    public static final String PARAM_TITLE = "title";
+    public static final String PARAM_BODY = "body";
+    public static final String PARAM_HEAD = "head";
+    public static final String PARAM_BASE = "base";
+    public static final String PARAM_WORKFLOW_ID = "workflowId";
+    public static final String PARAM_REF = "ref";
+
     private final GitHubClient github;
     private final boolean triggerWorkflowsEnabled;
 
@@ -41,7 +64,7 @@ public class GitHubCodeTools {
         this(github, false);
     }
 
-    @AgentTool(name = "github_list_files", description = "List the files in an external GitHub repository at a ref.",
+    @AgentTool(name = TOOL_GITHUB_LIST_FILES, description = "List the files in an external GitHub repository at a ref.",
             capability = Capability.READ)
     public ToolResult listFiles(
             @ToolParam("Repository as owner/name, for example acme/checkout-service.") String repo,
@@ -64,7 +87,7 @@ public class GitHubCodeTools {
         }
     }
 
-    @AgentTool(name = "github_read_file", description = "Read the decoded content of a file in an external repo.",
+    @AgentTool(name = TOOL_GITHUB_READ_FILE, description = "Read the decoded content of a file in an external repo.",
             capability = Capability.READ)
     public ToolResult readFile(
             @ToolParam("Repository as owner/name, for example acme/checkout-service.") String repo,
@@ -81,7 +104,7 @@ public class GitHubCodeTools {
         }
     }
 
-    @AgentTool(name = "github_get_ci_status",
+    @AgentTool(name = TOOL_GITHUB_GET_CI_STATUS,
             description = "Report the GitHub Actions check runs for a commit sha.", capability = Capability.READ)
     public ToolResult ciStatus(
             @ToolParam("Repository as owner/name, for example acme/checkout-service.") String repo,
@@ -101,7 +124,7 @@ public class GitHubCodeTools {
         }
     }
 
-    @AgentTool(name = "github_create_branch",
+    @AgentTool(name = TOOL_GITHUB_CREATE_BRANCH,
             description = "Create a fix branch from an existing branch or commit. Branch must start with ajentic/.",
             capability = Capability.MUTATE)
     public ToolResult createBranch(
@@ -120,7 +143,7 @@ public class GitHubCodeTools {
         }
     }
 
-    @AgentTool(name = "github_commit_file",
+    @AgentTool(name = TOOL_GITHUB_COMMIT_FILE,
             description = "Create or update a file on a branch with a commit message. Pass existingSha to update.",
             capability = Capability.MUTATE)
     public ToolResult commitFile(
@@ -143,7 +166,7 @@ public class GitHubCodeTools {
         }
     }
 
-    @AgentTool(name = "github_create_pull_request",
+    @AgentTool(name = TOOL_GITHUB_CREATE_PULL_REQUEST,
             description = "Open a Pull Request from a fix branch onto a base branch. Returns an existing open PR.",
             capability = Capability.MUTATE)
     public ToolResult createPullRequest(
@@ -164,7 +187,7 @@ public class GitHubCodeTools {
         }
     }
 
-    @AgentTool(name = "github_trigger_workflow",
+    @AgentTool(name = TOOL_GITHUB_TRIGGER_WORKFLOW,
             description = "Trigger a GitHub Actions workflow dispatch on a branch or ref.",
             capability = Capability.MUTATE)
     public ToolResult triggerWorkflow(

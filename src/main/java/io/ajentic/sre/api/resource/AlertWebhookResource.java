@@ -16,6 +16,7 @@ import io.ajentic.sre.agent.session.AgentSession;
 import io.ajentic.sre.agent.session.AgentSessionConfig;
 import io.ajentic.sre.agent.session.ChatTurnResult;
 import io.ajentic.sre.agent.session.SessionService;
+import io.ajentic.sre.agent.tool.builtin.GitHubCodeTools;
 import io.ajentic.sre.api.payload.AlertWebhookResponse;
 import io.ajentic.sre.rl.simulation.Scenario;
 import io.ajentic.sre.rl.simulation.ScenarioRepository;
@@ -55,6 +56,9 @@ public class AlertWebhookResource {
     public static final String STATUS_PROCESSED = "PROCESSED";
     public static final String STATUS_IGNORED = "IGNORED";
     public static final String CI_PENDING_LABEL = "CI pending";
+    public static final String DEFAULT_BRANCH_PREFIX = "ajentic/fix-";
+    public static final String DEFAULT_FALLBACK_FINGERPRINT = "12345678";
+    public static final String CI_STATUS_LABEL_PREFIX = "\nCI status: ";
 
     private static final int MAX_ITERATIONS = 8;
     private static final long DEFAULT_SEED = 42L;
@@ -143,9 +147,9 @@ public class AlertWebhookResource {
             String ciStatus = remediation != null ? remediation.ciStatus() : null;
             String answer = result.answer();
             if (remediation != null && answer != null
-                    && !answer.toLowerCase().contains("ci pending")
+                    && !answer.toLowerCase().contains(CI_PENDING_LABEL.toLowerCase())
                     && !answer.toLowerCase().contains("ci status")) {
-                answer = answer + "\nCI status: "
+                answer = answer + CI_STATUS_LABEL_PREFIX
                         + (CiStatusKind.PENDING.value().equalsIgnoreCase(ciStatus) ? CI_PENDING_LABEL : ciStatus);
             }
 
@@ -176,23 +180,23 @@ public class AlertWebhookResource {
         for (ChatMessage msg : session.conversation().messages()) {
             if (msg.toolCalls() != null) {
                 for (ToolCall tc : msg.toolCalls()) {
-                    if ("github_create_branch".equals(tc.name())) {
-                        Object b = tc.arguments().get("newBranch");
+                    if (GitHubCodeTools.TOOL_GITHUB_CREATE_BRANCH.equals(tc.name())) {
+                        Object b = tc.arguments().get(GitHubCodeTools.PARAM_NEW_BRANCH);
                         if (b != null) {
                             branch = b.toString();
                         }
-                    } else if ("github_commit_file".equals(tc.name())) {
-                        Object b = tc.arguments().get("branch");
+                    } else if (GitHubCodeTools.TOOL_GITHUB_COMMIT_FILE.equals(tc.name())) {
+                        Object b = tc.arguments().get(GitHubCodeTools.PARAM_BRANCH);
                         if (b != null && branch == null) {
                             branch = b.toString();
                         }
-                    } else if ("github_get_ci_status".equals(tc.name())) {
-                        Object r = tc.arguments().get("ref");
+                    } else if (GitHubCodeTools.TOOL_GITHUB_GET_CI_STATUS.equals(tc.name())) {
+                        Object r = tc.arguments().get(GitHubCodeTools.PARAM_REF);
                         if (r != null && commitSha == null) {
                             commitSha = r.toString();
                         }
-                    } else if ("github_create_pull_request".equals(tc.name())) {
-                        Object h = tc.arguments().get("head");
+                    } else if (GitHubCodeTools.TOOL_GITHUB_CREATE_PULL_REQUEST.equals(tc.name())) {
+                        Object h = tc.arguments().get(GitHubCodeTools.PARAM_HEAD);
                         if (h != null && branch == null) {
                             branch = h.toString();
                         }
@@ -236,8 +240,8 @@ public class AlertWebhookResource {
         }
         if (branch == null) {
             String fp8 = alert.fingerprint() != null && alert.fingerprint().length() >= 8
-                    ? alert.fingerprint().substring(0, 8) : "12345678";
-            branch = "ajentic/fix-" + fp8;
+                    ? alert.fingerprint().substring(0, 8) : DEFAULT_FALLBACK_FINGERPRINT;
+            branch = DEFAULT_BRANCH_PREFIX + fp8;
         }
 
         // 3. Single non-blocking snapshot call to get initial CI status
