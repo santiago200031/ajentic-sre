@@ -62,6 +62,7 @@ class McpProtocolEndToEndTest {
         assertNotNull(toolManager.getTool("declare_diagnosis"));
         assertNotNull(toolManager.getTool("list_scenarios"));
         assertNotNull(toolManager.getTool("start_episode"));
+        assertNotNull(toolManager.getTool("start_simulation"));
         assertNotNull(toolManager.getTool("run_incident_drill"));
     }
 

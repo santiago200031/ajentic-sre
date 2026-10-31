@@ -35,7 +35,7 @@
       "strokeWidth": 2,
       "text": "Credential-Isolated Sidecar Architecture",
       "textAlign": "left",
-      "updated": 1793465439618,
+      "updated": 1793466896188,
       "version": 1,
       "versionNonce": 420483429,
       "verticalAlign": "top"
@@ -72,7 +72,7 @@
       "strokeWidth": 2,
       "text": "Zero-Credential Agent Isolation | HMAC-SHA256 Wire Protocol | Strict Anti-Replay Guardrails",
       "textAlign": "left",
-      "updated": 1793465439618,
+      "updated": 1793466896188,
       "version": 1,
       "versionNonce": 1162747127,
       "verticalAlign": "top"
@@ -112,7 +112,7 @@
       "strokeColor": "#e03131",
       "strokeStyle": "solid",
       "strokeWidth": 2,
-      "updated": 1793465439618,
+      "updated": 1793466896188,
       "version": 1,
       "versionNonce": 1680553220
     },
@@ -155,7 +155,7 @@
       "strokeColor": "#e8590c",
       "strokeStyle": "solid",
       "strokeWidth": 2,
-      "updated": 1793465439618,
+      "updated": 1793466896188,
       "version": 1,
       "versionNonce": 995858772
     },
@@ -194,7 +194,7 @@
       "strokeColor": "#2f9e44",
       "strokeStyle": "solid",
       "strokeWidth": 2,
-      "updated": 1793465439618,
+      "updated": 1793466896188,
       "version": 1,
       "versionNonce": 1586233322
     },
@@ -250,7 +250,7 @@
       "strokeColor": "#e03131",
       "strokeStyle": "solid",
       "strokeWidth": 3,
-      "updated": 1793465439618,
+      "updated": 1793466896188,
       "version": 1,
       "versionNonce": 1608475379
     },
@@ -306,7 +306,7 @@
       "strokeColor": "#2f9e44",
       "strokeStyle": "solid",
       "strokeWidth": 3,
-      "updated": 1793465439618,
+      "updated": 1793466896188,
       "version": 1,
       "versionNonce": 122766982
     },
@@ -342,7 +342,7 @@
       "strokeWidth": 1,
       "text": "Ajentic-SRE Agent Container\n(Zero-Trust Application Tier)\n\n❌ ZERO Cloud Credentials (AWS/Azure)\n❌ ZERO Kubeconfig / Cluster Keys\n❌ ZERO GitHub Write Tokens\n\n🔑 Holds ONLY: Shared Secret Key\n(ajentic.sidecar.hmac-secret)\n\nComputes SHA-256 HMAC over\nPayload + Timestamp + Nonce",
       "textAlign": "center",
-      "updated": 1793465439618,
+      "updated": 1793466896188,
       "version": 1,
       "versionNonce": 1966403103,
       "verticalAlign": "middle"
@@ -379,7 +379,7 @@
       "strokeWidth": 1,
       "text": "Cryptographic Wire Boundary\n(Anti-Replay Verification)\n\nHeaders on HTTP Request:\n• X-Ajentic-Signature: <hex-mac>\n• X-Ajentic-Timestamp: <unix-ms>\n• X-Ajentic-Nonce: <uuid>\n\n🛡️ Replay Protection Rules:\n• Timestamp drift ≤ 30 seconds\n• Nonce cache rejects duplicates\n• Constant-time HMAC comparison",
       "textAlign": "center",
-      "updated": 1793465439618,
+      "updated": 1793466896188,
       "version": 1,
       "versionNonce": 3792679,
       "verticalAlign": "middle"
@@ -416,7 +416,7 @@
       "strokeWidth": 1,
       "text": "Credentialed Sidecar Daemon\n(Isolated Execution Proxy)\n\n✅ Validates HMAC + Freshness\n✅ Injects Target Credentials:\n   - AWS_SECRET_ACCESS_KEY\n   - KUBECONFIG Cluster Context\n   - GITHUB_TOKEN for PR creation\n\n📝 Emits Tamper-Evident Audit Log:\n{timestamp, caller, action, result, traceId}",
       "textAlign": "center",
-      "updated": 1793465439618,
+      "updated": 1793466896188,
       "version": 1,
       "versionNonce": 2090044591,
       "verticalAlign": "middle"

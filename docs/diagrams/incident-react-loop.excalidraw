@@ -35,7 +35,7 @@
       "strokeWidth": 2,
       "text": "Autonomous Incident Remediation — ReAct Decision Cycle",
       "textAlign": "left",
-      "updated": 1793465437360,
+      "updated": 1793466893477,
       "version": 1,
       "versionNonce": 420483429,
       "verticalAlign": "top"
@@ -72,7 +72,7 @@
       "strokeWidth": 2,
       "text": "Zero Human Intervention on Safe Fixes | Bounded Turns | Operator Approval Gates",
       "textAlign": "left",
-      "updated": 1793465437360,
+      "updated": 1793466893477,
       "version": 1,
       "versionNonce": 1162747127,
       "verticalAlign": "top"
@@ -112,7 +112,7 @@
       "strokeColor": "#e03131",
       "strokeStyle": "solid",
       "strokeWidth": 2,
-      "updated": 1793465437360,
+      "updated": 1793466893477,
       "version": 1,
       "versionNonce": 1671805349
     },
@@ -155,7 +155,7 @@
       "strokeColor": "#e8590c",
       "strokeStyle": "solid",
       "strokeWidth": 2,
-      "updated": 1793465437360,
+      "updated": 1793466893477,
       "version": 1,
       "versionNonce": 1674243794
     },
@@ -198,7 +198,7 @@
       "strokeColor": "#f59f00",
       "strokeStyle": "solid",
       "strokeWidth": 2,
-      "updated": 1793465437360,
+      "updated": 1793466893477,
       "version": 1,
       "versionNonce": 1743162381
     },
@@ -245,7 +245,7 @@
       "strokeColor": "#9c36b5",
       "strokeStyle": "solid",
       "strokeWidth": 2,
-      "updated": 1793465437360,
+      "updated": 1793466893477,
       "version": 1,
       "versionNonce": 1480650378
     },
@@ -292,7 +292,7 @@
       "strokeColor": "#2f9e44",
       "strokeStyle": "solid",
       "strokeWidth": 2,
-      "updated": 1793465437360,
+      "updated": 1793466893477,
       "version": 1,
       "versionNonce": 1135154323
     },
@@ -331,7 +331,7 @@
       "strokeColor": "#1971c2",
       "strokeStyle": "solid",
       "strokeWidth": 2,
-      "updated": 1793465437360,
+      "updated": 1793466893477,
       "version": 1,
       "versionNonce": 1293040526
     },
@@ -374,7 +374,7 @@
       "strokeColor": "#868e96",
       "strokeStyle": "solid",
       "strokeWidth": 2,
-      "updated": 1793465437360,
+      "updated": 1793466893477,
       "version": 1,
       "versionNonce": 194427175
     },
@@ -430,7 +430,7 @@
       "strokeColor": "#e03131",
       "strokeStyle": "solid",
       "strokeWidth": 2,
-      "updated": 1793465437360,
+      "updated": 1793466893478,
       "version": 1,
       "versionNonce": 712218479
     },
@@ -486,7 +486,7 @@
       "strokeColor": "#e8590c",
       "strokeStyle": "solid",
       "strokeWidth": 2,
-      "updated": 1793465437360,
+      "updated": 1793466893478,
       "version": 1,
       "versionNonce": 850074880
     },
@@ -542,7 +542,7 @@
       "strokeColor": "#f59f00",
       "strokeStyle": "solid",
       "strokeWidth": 2,
-      "updated": 1793465437360,
+      "updated": 1793466893478,
       "version": 1,
       "versionNonce": 1308133227
     },
@@ -598,7 +598,7 @@
       "strokeColor": "#9c36b5",
       "strokeStyle": "solid",
       "strokeWidth": 2,
-      "updated": 1793465437360,
+      "updated": 1793466893478,
       "version": 1,
       "versionNonce": 3895594
     },
@@ -654,7 +654,7 @@
       "strokeColor": "#2f9e44",
       "strokeStyle": "solid",
       "strokeWidth": 2,
-      "updated": 1793465437360,
+      "updated": 1793466893478,
       "version": 1,
       "versionNonce": 1181479331
     },
@@ -710,7 +710,7 @@
       "strokeColor": "#868e96",
       "strokeStyle": "dashed",
       "strokeWidth": 2,
-      "updated": 1793465437360,
+      "updated": 1793466893478,
       "version": 1,
       "versionNonce": 2090041206
     },
@@ -766,7 +766,7 @@
       "strokeColor": "#868e96",
       "strokeStyle": "dashed",
       "strokeWidth": 2,
-      "updated": 1793465437360,
+      "updated": 1793466893478,
       "version": 1,
       "versionNonce": 402035939
     },
@@ -802,7 +802,7 @@
       "strokeWidth": 1,
       "text": "1. Inbound Alert\nCloudWatch, Azure,\nAlertmanager webhook\nPOST /webhooks/alerts",
       "textAlign": "center",
-      "updated": 1793465437360,
+      "updated": 1793466893477,
       "version": 1,
       "versionNonce": 385869472,
       "verticalAlign": "middle"
@@ -839,7 +839,7 @@
       "strokeWidth": 1,
       "text": "2. Triage & Normalize\nMap to standard severity:\nINFO < WARN < ERR < CRIT\nFilter low severity (202)",
       "textAlign": "center",
-      "updated": 1793465437360,
+      "updated": 1793466893477,
       "version": 1,
       "versionNonce": 595757225,
       "verticalAlign": "middle"
@@ -876,7 +876,7 @@
       "strokeWidth": 1,
       "text": "3. Redaction & Context\nSecretScrubber (Tokens)\nPIIMasker (IPs/Emails)\nContextBudgetManager",
       "textAlign": "center",
-      "updated": 1793465437360,
+      "updated": 1793466893477,
       "version": 1,
       "versionNonce": 273601010,
       "verticalAlign": "middle"
@@ -913,7 +913,7 @@
       "strokeWidth": 1,
       "text": "4. ReAct Reasoning\nLLM Thought + Tool Call\nFetch logs, describe pods,\nanalyze root cause",
       "textAlign": "center",
-      "updated": 1793465437360,
+      "updated": 1793466893477,
       "version": 1,
       "versionNonce": 1768492577,
       "verticalAlign": "middle"
@@ -950,7 +950,7 @@
       "strokeWidth": 1,
       "text": "5. Policy & Gate\nInspect reads: allowed\nMutating writes: gate\nallow | deny | approval\nApprovalGate Registry",
       "textAlign": "center",
-      "updated": 1793465437360,
+      "updated": 1793466893477,
       "version": 1,
       "versionNonce": 437561628,
       "verticalAlign": "middle"
@@ -987,7 +987,7 @@
       "strokeWidth": 1,
       "text": "6. Remediate & PR\nExecute via HMAC sidecar\nCreate git branch & PR\nUpdate durable state",
       "textAlign": "center",
-      "updated": 1793465437360,
+      "updated": 1793466893477,
       "version": 1,
       "versionNonce": 1357354419,
       "verticalAlign": "middle"
@@ -1024,7 +1024,7 @@
       "strokeWidth": 1,
       "text": "Observation Feedback Loop (Bounded to 5 turns)\nAgent evaluates tool execution output, refines hypothesis, or finishes",
       "textAlign": "center",
-      "updated": 1793465437360,
+      "updated": 1793466893477,
       "version": 1,
       "versionNonce": 1282206240,
       "verticalAlign": "middle"

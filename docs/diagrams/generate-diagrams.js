@@ -127,7 +127,7 @@ function buildSystemOverview() {
             strokeColor: '#1971c2',
             fillStyle: 'solid',
             roundness: { type: 3 },
-            text: 'JAX-RS REST API\n/scenarios, /simulate,\n/agent/ask, /schedules'
+            text: 'JAX-RS REST API\n/scenarios, /simulations,\n/agent/ask, /schedules'
         },
         inCron: {
             id: 'in-cron',

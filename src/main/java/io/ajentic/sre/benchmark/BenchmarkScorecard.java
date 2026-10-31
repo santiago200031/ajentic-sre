@@ -27,6 +27,14 @@ public record BenchmarkScorecard(
             double p95LatencyMs,
             long promptTokens,
             long completionTokens) {
+
+        public String playbook() {
+            return policy;
+        }
+
+        public int simulations() {
+            return episodes;
+        }
     }
 
     public String toFormattedReport() {

@@ -48,6 +48,27 @@ class BenchmarkRunnerEndToEndTest {
         assertEquals("Unknown policy: NOPE", exception.getMessage());
     }
 
+    @Test
+    void scorecardSupportsLlmPlaybookOffline() {
+        BenchmarkScorecard scorecard = benchmark.run(List.of("orders-bad-deployment"), 1, List.of("LLM"), null);
+        assertEquals(1, scorecard.policies().size());
+        BenchmarkScorecard.PolicyScore llmScore = scorecard.policies().getFirst();
+        assertEquals("LLM", llmScore.policy());
+        assertEquals("LLM", llmScore.playbook());
+        assertEquals(1, llmScore.episodes());
+        assertEquals(1, llmScore.simulations());
+    }
+
+    @Test
+    @org.junit.jupiter.api.condition.EnabledIfSystemProperty(named = "ajentic.llm.live", matches = "true")
+    void liveLlmBenchmarkEvaluatesModelPerformance() {
+        List<String> scenarios = List.of("orders-bad-deployment");
+        BenchmarkScorecard scorecard = benchmark.run(scenarios, 1, List.of("LLM"), null);
+        System.out.println(scorecard.toFormattedReport());
+        assertEquals(1, scorecard.policies().size());
+        assertEquals("LLM", scorecard.policies().getFirst().policy());
+    }
+
     private List<String> summary(BenchmarkScorecard card) {
         return card.policies().stream()
                 .map(score -> score.policy() + ":" + score.episodes() + ":" + score.solved()

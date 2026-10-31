@@ -269,6 +269,14 @@ public class BuiltInSreTools {
         return ToolResponse.success("Started episode " + handle.id() + " for scenario " + target + ". episodeId: " + handle.id());
     }
 
+    @Tool(name = "start_simulation", description = "Start an isolated simulation for a scenario and make it the active simulation.")
+    public ToolResponse startSimulation(
+            @ToolArg(name = "scenarioId", description = "Scenario to start; defaults to the configured scenario.", required = false) String scenarioId,
+            @ToolArg(name = "seed", description = "Deterministic seed; defaults to 42.", required = false) Long seed,
+            McpConnection connection) {
+        return startEpisode(scenarioId, seed, connection);
+    }
+
     @Tool(name = "run_incident_drill", description = "Run the heuristic policy end to end against a scenario and report the result.")
     public ToolResponse runIncidentDrill(
             @ToolArg(name = "scenarioId", description = "Scenario to drill.") String scenarioId) {

@@ -5,4 +5,8 @@ public record StepResult(Observation observation, double reward, TerminationReas
     public boolean done() {
         return reason != TerminationReason.NONE;
     }
+
+    public double score() {
+        return reward;
+    }
 }

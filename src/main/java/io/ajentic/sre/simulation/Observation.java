@@ -42,4 +42,12 @@ public record Observation(
                 serviceHealth,
                 reward);
     }
+
+    public double score() {
+        return cumulativeReward;
+    }
+
+    public Observation withCumulativeScore(double score) {
+        return withCumulativeReward(score);
+    }
 }

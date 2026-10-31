@@ -2,10 +2,10 @@ package io.ajentic.sre.api.resource;
 
 import io.ajentic.sre.api.mapper.ActionMapper;
 import io.ajentic.sre.api.payload.ActionRequest;
-import io.ajentic.sre.api.payload.CreateEpisodeRequest;
-import io.ajentic.sre.api.payload.EpisodeView;
-import io.ajentic.sre.api.payload.RunEpisodeRequest;
+import io.ajentic.sre.api.payload.CreateSimulationRequest;
+import io.ajentic.sre.api.payload.RunSimulationRequest;
 import io.ajentic.sre.api.payload.SimulateRequest;
+import io.ajentic.sre.api.payload.SimulationView;
 import io.ajentic.sre.api.payload.StepResultView;
 import io.ajentic.sre.simulation.StepResult;
 import io.ajentic.sre.simulation.drill.SimulationHandle;
@@ -55,10 +55,10 @@ public class SimulationResource {
     @ResponseStatus(201)
     @Operation(summary = "Start a simulation", description = "Initialises a simulation for a scenario and seed.")
     @APIResponse(responseCode = "201", description = "Started simulation")
-    public EpisodeView start(@Valid CreateEpisodeRequest request) {
+    public SimulationView start(@Valid CreateSimulationRequest request) {
         long seed = request.seed() == null ? 42L : request.seed();
         SimulationHandle handle = simulations.start(request.scenarioId(), seed);
-        return EpisodeView.from(handle);
+        return SimulationView.from(handle);
     }
 
     @GET
@@ -66,8 +66,8 @@ public class SimulationResource {
     @Operation(summary = "Get a simulation", description = "Returns the simulation and its current state.")
     @APIResponse(responseCode = "200", description = "The simulation")
     @APIResponse(responseCode = "404", description = "Unknown simulation")
-    public EpisodeView get(@RestPath String id) {
-        return EpisodeView.from(require(id));
+    public SimulationView get(@RestPath String id) {
+        return SimulationView.from(require(id));
     }
 
     @POST
@@ -85,9 +85,9 @@ public class SimulationResource {
     @Operation(summary = "Run a simulation", description = "Runs the simulation to completion against a named playbook.")
     @APIResponse(responseCode = "200", description = "The simulation result")
     @APIResponse(responseCode = "404", description = "Unknown simulation")
-    public SimulationResult run(@RestPath String id, RunEpisodeRequest request) {
+    public SimulationResult run(@RestPath String id, RunSimulationRequest request) {
         require(id);
-        return simulations.run(id, playbooks.byName(request == null ? null : request.policy()));
+        return simulations.run(id, playbooks.byName(request == null ? null : request.playbook()));
     }
 
     @POST
@@ -98,7 +98,7 @@ public class SimulationResource {
         long seed = request.seed() == null ? 42L : request.seed();
         SimulationHandle handle = simulations.start(request.scenarioId(), seed);
         try {
-            return simulations.run(handle.id(), playbooks.byName(request.policy()));
+            return simulations.run(handle.id(), playbooks.byName(request.playbook()));
         } finally {
             simulations.delete(handle.id());
         }

@@ -1,5 +1,7 @@
 package io.ajentic.sre.api.payload;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotNull;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
 
@@ -11,6 +13,8 @@ import java.util.List;
 @Schema(description = "Request to apply a single manual action to an episode environment.")
 public record ActionRequest(
         @NotNull
+        @JsonAlias({"type", "kind"})
+        @JsonProperty("type")
         @Schema(description = "Action type: inspect, alert, remediate, or diagnose.", example = "remediate")
         String type,
 

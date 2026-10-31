@@ -17,6 +17,7 @@ import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasItems;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.blankOrNullString;
 
 @QuarkusTest
@@ -339,6 +340,85 @@ class ApiEndToEndTest {
                 .statusCode(200)
                 .body("scenarioId", is("checkout-latency-db-pool"))
                 .body("solved", is(true));
+    }
+
+    @Test
+    void runsSimulationThroughModernSimulationsApi() {
+        String simId = given()
+                .contentType("application/json")
+                .body(Map.of("scenarioId", "payments-memory-leak", "seed", 42))
+                .when().post("/api/v1/simulations")
+                .then()
+                .statusCode(201)
+                .body("id", not(blankOrNullString()))
+                .body("observation.scenarioId", is("payments-memory-leak"))
+                .extract().path("id");
+
+        given()
+                .when().get("/api/v1/simulations/" + simId)
+                .then()
+                .statusCode(200)
+                .body("id", is(simId))
+                .body("completed", is(false));
+
+        given()
+                .contentType("application/json")
+                .body("""
+                        {
+                          "type": "query_telemetry",
+                          "service": "payments-api",
+                          "signal": "METRICS"
+                        }
+                        """)
+                .when().post("/api/v1/simulations/" + simId + "/actions")
+                .then()
+                .statusCode(200)
+                .body("observation", notNullValue());
+
+        given()
+                .contentType("application/json")
+                .body(Map.of("playbook", "heuristic"))
+                .when().post("/api/v1/simulations/" + simId + "/run")
+                .then()
+                .statusCode(200)
+                .body("solved", is(true))
+                .body("resolved", is(true));
+
+        given()
+                .when().delete("/api/v1/simulations/" + simId)
+                .then()
+                .statusCode(204);
+
+        given()
+                .when().get("/api/v1/simulations/" + simId)
+                .then()
+                .statusCode(404);
+    }
+
+    @Test
+    void runsOneShotSimulationUsingPlaybookPropertyName() {
+        given()
+                .contentType("application/json")
+                .body(Map.of(
+                        "scenarioId", "checkout-latency-db-pool",
+                        "playbook", "heuristic"))
+                .when().post("/api/v1/simulations/simulate")
+                .then()
+                .statusCode(200)
+                .body("scenarioId", is("checkout-latency-db-pool"))
+                .body("solved", is(true));
+
+        // When sending idle playbook, it must NOT default to heuristic
+        given()
+                .contentType("application/json")
+                .body(Map.of(
+                        "scenarioId", "checkout-latency-db-pool",
+                        "playbook", "idle"))
+                .when().post("/api/v1/simulations/simulate")
+                .then()
+                .statusCode(200)
+                .body("scenarioId", is("checkout-latency-db-pool"))
+                .body("solved", is(false));
     }
 
     @Test

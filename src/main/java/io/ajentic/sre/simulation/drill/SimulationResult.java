@@ -41,4 +41,12 @@ public record SimulationResult(
     public SimulationResult {
         trajectory = trajectory == null ? List.of() : List.copyOf(trajectory);
     }
+
+    public String simulationId() {
+        return episodeId;
+    }
+
+    public double score() {
+        return totalReward;
+    }
 }

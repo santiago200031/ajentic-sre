@@ -79,6 +79,23 @@ class ServerStartupTest {
     }
 
     @Test
+    void simulatesScenarioOverSimulationsEndpoint() {
+        given()
+                .contentType(ContentType.JSON)
+                .body("""
+                        {
+                          "scenarioId": "orders-bad-deployment",
+                          "playbook": "heuristic",
+                          "seed": 42
+                        }
+                        """)
+                .when().post("/api/v1/simulations/simulate")
+                .then()
+                .statusCode(200)
+                .body("solved", equalTo(true));
+    }
+
+    @Test
     void asksAgentOverHttp() {
         given()
                 .contentType(ContentType.JSON)

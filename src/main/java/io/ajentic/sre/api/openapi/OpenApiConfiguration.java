@@ -22,7 +22,8 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
         servers = {@Server(url = "/", description = "Default Server")},
         tags = {
                 @Tag(name = "Agent", description = "Autonomous ReAct investigation agent and interactive sessions"),
-                @Tag(name = "Episodes", description = "Deterministic incident simulation and RL policy evaluation"),
+                @Tag(name = "Simulations", description = "Deterministic chaos simulation and incident response playbooks"),
+                @Tag(name = "Episodes", description = "Legacy incident simulation endpoint (backwards-compatible alias)"),
                 @Tag(name = "Scenarios", description = "Incident scenario definitions and operational runbooks"),
                 @Tag(name = "Schedules", description = "Versioned cron scheduler for recurring and manual drills"),
                 @Tag(name = "Tools", description = "Registered SRE tool catalog"),

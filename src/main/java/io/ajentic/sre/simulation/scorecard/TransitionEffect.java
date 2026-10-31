@@ -22,4 +22,8 @@ public enum TransitionEffect {
     public double rewardDelta() {
         return rewardDelta;
     }
+
+    public double scoreDelta() {
+        return rewardDelta;
+    }
 }

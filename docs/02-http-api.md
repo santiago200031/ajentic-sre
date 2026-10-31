@@ -41,7 +41,7 @@ Simulate a scenario using the deterministic heuristic playbook:
 ```bash
 curl -s -X POST http://localhost:8080/api/v1/simulations/simulate \
   -H 'Content-Type: application/json' \
-  -d '{"scenarioId": "orders-bad-deployment", "policy": "heuristic", "seed": 42}' | jq .
+  -d '{"scenarioId": "orders-bad-deployment", "playbook": "heuristic", "seed": 42}' | jq .
 ```
 
 ### 3. Ask the Agent to Investigate
