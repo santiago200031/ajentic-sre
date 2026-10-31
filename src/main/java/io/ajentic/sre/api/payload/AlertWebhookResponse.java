@@ -1,5 +1,6 @@
 package io.ajentic.sre.api.payload;
 
+import io.ajentic.sre.agent.github.RemediationRecord;
 import io.ajentic.sre.agent.llm.TokenUsage;
 import io.ajentic.sre.agent.llm.ToolCall;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
@@ -8,7 +9,7 @@ import java.util.List;
 
 /**
  * Response for an alert webhook submission: the outcome status (PROCESSED or IGNORED), severity,
- * repository, session id, answer, tool calls, and token usage.
+ * repository, session id, answer, tool calls, token usage, optional remediation record, and CI status.
  */
 @Schema(description = "Response for an alert webhook submission.")
 public record AlertWebhookResponse(
@@ -31,13 +32,25 @@ public record AlertWebhookResponse(
         List<ToolCall> toolCalls,
 
         @Schema(description = "Token usage consumed by the turn.")
-        TokenUsage usage) {
+        TokenUsage usage,
+
+        @Schema(description = "Remediation record if a PR was opened.")
+        RemediationRecord remediation,
+
+        @Schema(description = "CI snapshot status: PENDING, SUCCESS, FAILURE, or null.", example = "PENDING")
+        String ciStatus) {
 
     public AlertWebhookResponse {
         toolCalls = toolCalls == null ? List.of() : List.copyOf(toolCalls);
     }
 
+    public AlertWebhookResponse(String status, String severity, String repository, String sessionId,
+                                String answer, List<ToolCall> toolCalls, TokenUsage usage) {
+        this(status, severity, repository, sessionId, answer, toolCalls, usage, null, null);
+    }
+
     public static AlertWebhookResponse ignored(String severity, String repository, String reason) {
-        return new AlertWebhookResponse("IGNORED", severity, repository, null, reason, List.of(), TokenUsage.empty());
+        return new AlertWebhookResponse("IGNORED", severity, repository, null, reason, List.of(), TokenUsage.empty(),
+                null, null);
     }
 }

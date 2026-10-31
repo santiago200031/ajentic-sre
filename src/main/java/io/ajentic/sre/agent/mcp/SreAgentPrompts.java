@@ -70,8 +70,8 @@ public class SreAgentPrompts {
                 3. State the root cause in one concise paragraph.
                 4. Use github_create_branch to create branch %s from %s.
                 5. Use github_commit_file to commit the minimal fix AND a regression test to %s.
-                6. Use github_get_ci_status to check CI status on the new commit.
-                7. Use github_create_pull_request to open a PR into %s with the root cause, diff summary, and CI status.
+                6. Use github_create_pull_request to open a PR immediately into %s with the root cause and diff summary.
+                7. Use github_get_ci_status to check the initial CI snapshot on the new commit (report CI pending if not started yet).
 
                 Strict constraints:
                 - Do NOT touch unrelated files.

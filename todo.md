@@ -34,7 +34,7 @@ suite offline (`mvn test`, WireMock stubs, no model, no network), and targets Ja
 | 25 | `feat/swagger-openapi-first` | 3 | Always-on Swagger UI + OpenAPI annotations + one-shot ask/simulate; CLI narrowed to open Swagger | — | ✅ done |
 | 26 | `feat/github-code-tools` | 4 | Zero-clone GitHub REST client + `@ToolBox` code tools + PAT masking | 25 | ✅ done |
 | 27 | `feat/alert-webhook-code-fix` | 4 | Multi-cloud alert normalizer + `POST /webhooks/alerts` code-fix turn | 26 | ✅ done |
-| 28 | `feat/ci-feedback-loop` | 4 | Non-blocking CI status/PR follow-up + remediation report | 27 | ⬜ todo |
+| 28 | `feat/ci-feedback-loop` | 4 | Non-blocking CI status/PR follow-up + remediation report | 27 | ✅ done |
 | 29 | `feat/chatops-channels` | 5 | Slack/Teams/Google Chat/Discord/Telegram + OpenAI-compatible chat API | 19, 22 | ⬜ todo |
 | 30 | `feat/cloud-provider-adapters` | 5 | AWS / Azure / GCP read-only adapters (SigV4, OAuth2, SA-JWT), zero SDK | 17, 21 | ⬜ todo |
 | 31 | `feat/local-cloud-emulation` | 5 | LocalStack + Azurite + fake-gcs/PubSub + monitor stubs in compose | 30 | ⬜ todo |
@@ -647,19 +647,19 @@ an `ERROR` alert produces a committed fix + test, CI status and PR link in one H
 
 ### 28. `feat/ci-feedback-loop`
 
-- [ ] Resolve the blocking-PR question: **open the PR immediately** and never poll for minutes inside the HTTP turn.
+- [x] Resolve the blocking-PR question: **open the PR immediately** and never poll for minutes inside the HTTP turn.
       Record `(repository, branch, commitSha, prNumber, prUrl, ciStatus)` as a `RemediationRecord` and answer with the
       snapshot from one `github_get_ci_status` call (plus "CI pending" when checks have not started yet).
-- [ ] Optional follow-up: `@Scheduled` (or virtual-thread task with a bounded queue) re-checks pending remediations a
+- [x] Optional follow-up: `@Scheduled` (or virtual-thread task with a bounded queue) re-checks pending remediations a
       few times with backoff, updates the record, and posts the final verdict through the existing
       `NotificationChannel` (this is also where branch 19's dedupe/persistence lands).
-- [ ] New READ tool `github_trigger_workflow` (`POST /actions/workflows/{id}/dispatches`) plus an `@AgentTool`
+- [x] New READ tool `github_trigger_workflow` (`POST /actions/workflows/{id}/dispatches`) plus an `@AgentTool`
       wrapper, gated by a config flag, so a repo without `on: push` can still be validated; keep it MUTATE.
-- [ ] Config: `ajentic.github.ci.poll-attempts` (default 0 = single snapshot), `ajentic.github.ci.poll-interval`,
+- [x] Config: `ajentic.github.ci.poll-attempts` (default 0 = single snapshot), `ajentic.github.ci.poll-interval`,
       `ajentic.github.ci.trigger-workflows=false`.
-- [ ] Tests: pending check-run yields `PROCESSED` with `ciStatus=PENDING` and no long wait; a second poll flips the
+- [x] Tests: pending check-run yields `PROCESSED` with `ciStatus=PENDING` and no long wait; a second poll flips the
       record to `FAILURE` and emits one notification; disabled polling does nothing.
-- [ ] Document the CI contract (workflow must run on `push` to `ajentic/**`, or enable the trigger flag) in
+- [x] Document the CI contract (workflow must run on `push` to `ajentic/**`, or enable the trigger flag) in
       `README.md`.
 
 **Files.** new `agent/github/RemediationRecord.java` + store, `agent/github/GitHubClient.java`

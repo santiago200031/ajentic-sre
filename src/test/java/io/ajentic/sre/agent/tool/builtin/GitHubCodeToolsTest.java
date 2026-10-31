@@ -167,4 +167,29 @@ class GitHubCodeToolsTest {
         assertTrue(readOnlyAuth.isAuthorized(readTool));
         assertFalse(readOnlyAuth.isAuthorized(mutateTool));
     }
+
+    @Test
+    void triggerWorkflowFailsWhenDisabled() {
+        ToolResult result = tools.triggerWorkflow("acme/checkout-service", "ci.yml", "main");
+        assertFalse(result.success());
+        assertTrue(result.content().contains("Workflow triggering is disabled"));
+    }
+
+    @Test
+    void triggerWorkflowSucceedsWhenEnabled() {
+        GitHubCodeTools enabledTools = new GitHubCodeTools(github, true);
+        ToolResult result = enabledTools.triggerWorkflow("acme/checkout-service", "ci.yml", "main");
+        assertTrue(result.success());
+        assertTrue(result.content().contains("Dispatched workflow ci.yml"));
+    }
+
+    @Test
+    void triggerWorkflowFailsWithoutToken() {
+        GitHubClient noTokenClient = new GitHubClient(new ObjectMapper(),
+                "http://localhost:" + GitHubTestResource.server().port(), "", Duration.ofSeconds(30));
+        GitHubCodeTools unauthedEnabledTools = new GitHubCodeTools(noTokenClient, true);
+        ToolResult result = unauthedEnabledTools.triggerWorkflow("acme/checkout-service", "ci.yml", "main");
+        assertFalse(result.success());
+        assertTrue(result.content().contains("token not configured"));
+    }
 }

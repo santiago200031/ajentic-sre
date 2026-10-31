@@ -10,6 +10,8 @@ import io.ajentic.sre.agent.tool.ToolResult;
 import io.quarkus.arc.Unremovable;
 import jakarta.inject.Inject;
 
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
 import java.util.List;
 import java.util.Map;
 
@@ -24,10 +26,19 @@ import java.util.Map;
 public class GitHubCodeTools {
 
     private final GitHubClient github;
+    private final boolean triggerWorkflowsEnabled;
 
     @Inject
-    public GitHubCodeTools(GitHubClient github) {
+    public GitHubCodeTools(
+            GitHubClient github,
+            @ConfigProperty(name = "ajentic.github.ci.trigger-workflows", defaultValue = "false")
+            boolean triggerWorkflowsEnabled) {
         this.github = github;
+        this.triggerWorkflowsEnabled = triggerWorkflowsEnabled;
+    }
+
+    public GitHubCodeTools(GitHubClient github) {
+        this(github, false);
     }
 
     @AgentTool(name = "github_list_files", description = "List the files in an external GitHub repository at a ref.",
@@ -152,4 +163,28 @@ public class GitHubCodeTools {
             return ToolResult.error(error.getMessage());
         }
     }
+
+    @AgentTool(name = "github_trigger_workflow",
+            description = "Trigger a GitHub Actions workflow dispatch on a branch or ref.",
+            capability = Capability.MUTATE)
+    public ToolResult triggerWorkflow(
+            @ToolParam("Repository as owner/name, for example acme/checkout-service.") String repo,
+            @ToolParam("Workflow file name or ID, for example ci.yml or 123456.") String workflowId,
+            @ToolParam(value = "Branch or ref to dispatch on; defaults to main.", required = false, defaultValue = "main")
+            String ref) {
+        if (!triggerWorkflowsEnabled) {
+            return ToolResult.error("Workflow triggering is disabled; set ajentic.github.ci.trigger-workflows=true to enable.");
+        }
+        if (!github.hasToken()) {
+            return ToolResult.error("GitHub token not configured; set ajentic.github.token to trigger workflows.");
+        }
+        try {
+            github.triggerWorkflow(repo, workflowId, ref);
+            return ToolResult.ok("Dispatched workflow " + workflowId + " on " + ref + " in " + repo + ".",
+                    Map.of("repo", repo, "workflow", workflowId, "ref", ref));
+        } catch (GitHubException error) {
+            return ToolResult.error(error.getMessage());
+        }
+    }
 }
+
