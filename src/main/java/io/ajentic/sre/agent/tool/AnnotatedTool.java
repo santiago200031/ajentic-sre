@@ -124,6 +124,9 @@ final class AnnotatedTool implements Tool {
         if (type == Boolean.class || type == boolean.class) {
             return Map.of("type", "boolean", "description", binding.description());
         }
+        if (type == List.class) {
+            return ToolSchemas.stringArray(binding.description());
+        }
         return ToolSchemas.string(binding.description());
     }
 

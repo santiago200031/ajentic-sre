@@ -2,7 +2,9 @@ package io.ajentic.sre.rl.simulation;
 
 import io.ajentic.sre.rl.action.AgentAction;
 import io.ajentic.sre.rl.action.ApplyRemediation;
+import io.ajentic.sre.rl.action.CorrelateAnomalies;
 import io.ajentic.sre.rl.action.DeclareDiagnosis;
+import io.ajentic.sre.rl.action.InspectRecentChanges;
 import io.ajentic.sre.rl.reward.TransitionEffect;
 import io.ajentic.sre.rl.Environment;
 import io.ajentic.sre.rl.EnvironmentSpec;
@@ -93,6 +95,13 @@ public final class SimulatedProductionEnvironment implements Environment {
                 feedback = "Returned %d %s sample(s) for %s."
                         .formatted(signals.size(), query.signal(), query.service());
             }
+            case InspectRecentChanges inspect -> {
+                signals = system.recentChanges(inspect.service(), inspect.windowMinutes());
+                feedback = "Returned %d recent change(s) for %s within %dm."
+                        .formatted(signals.size(), inspect.service(), inspect.windowMinutes());
+            }
+            case CorrelateAnomalies correlate ->
+                    feedback = system.correlateAnomalies(correlate.services(), correlate.window());
             case ReadRunbook runbook -> feedback = "Opened runbook " + runbook.runbookId() + ".";
             case ListRemediations ignored -> feedback = "Listed the available remediations.";
             case ApplyRemediation remediation -> {

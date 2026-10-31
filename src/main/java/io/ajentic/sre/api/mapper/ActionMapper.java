@@ -5,12 +5,16 @@ import io.ajentic.sre.rl.TelemetrySignal;
 import io.ajentic.sre.rl.action.ActionKind;
 import io.ajentic.sre.rl.action.AgentAction;
 import io.ajentic.sre.rl.action.ApplyRemediation;
+import io.ajentic.sre.rl.action.CorrelateAnomalies;
 import io.ajentic.sre.rl.action.DeclareDiagnosis;
 import io.ajentic.sre.rl.action.Idle;
+import io.ajentic.sre.rl.action.InspectRecentChanges;
 import io.ajentic.sre.rl.action.ListRemediations;
 import io.ajentic.sre.rl.action.QueryTelemetry;
 import io.ajentic.sre.rl.action.ReadRunbook;
 import io.ajentic.sre.rl.action.RemediationKind;
+
+import java.util.List;
 
 public final class ActionMapper {
 
@@ -33,6 +37,12 @@ public final class ActionMapper {
             case DECLARE_DIAGNOSIS -> new DeclareDiagnosis(
                     required(request.service(), "service"),
                     required(request.rootCause(), "rootCause"));
+            case INSPECT_RECENT_CHANGES -> new InspectRecentChanges(
+                    required(request.service(), "service"),
+                    request.window() == null ? 1440 : request.window());
+            case CORRELATE_ANOMALIES -> new CorrelateAnomalies(
+                    request.services() == null ? List.of() : request.services(),
+                    request.window() == null ? 2 : request.window());
             case IDLE -> new Idle();
         };
     }

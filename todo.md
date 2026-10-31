@@ -17,7 +17,7 @@ suite offline (`mvn test`, WireMock stubs, no model, no network), and targets Ja
 | 8 | `feat/local-docker-stack` | 1 | `docker-compose.yml`: app + Prometheus + Grafana | 7 | ✅ done |
 | 9 | `feat/scenario-packs` | 2 | External YAML/JSON scenario loading | 3 | ✅ done |
 | 10 | `feat/topology-cascading-failures` | 2 | Service DAG + downstream→upstream degradation | 3, 9 | ✅ done |
-| 11 | `feat/investigation-tools` | 2 | `inspect_recent_changes`, `correlate_anomalies`, topology tool | 10 | ⬜ todo |
+| 11 | `feat/investigation-tools` | 2 | `inspect_recent_changes`, `correlate_anomalies`, topology tool | 10 | ✅ done |
 | 12 | `feat/stagnation-breaker` | 2 | Duplicate tool-call detection with synthetic hint | 2 | ✅ done |
 | 13 | `feat/token-usage-budget` | 2 | Cumulative usage in `Conversation`/`ChatResponse` | — | ✅ done |
 | 14 | `feat/llm-policy-adapter` | 2 | `@PolicyModel(LLM)` ReAct policy | 2, 13 | ⬜ todo |
@@ -263,14 +263,14 @@ overwrite each other's active episode unless every call passes `_episodeId`.
 
 ### 11. `feat/investigation-tools`
 
-- [ ] Add `inspect_recent_changes(service, window)` backed by `DeployRecord` plus new config/flag/quota change
+- [x] Add `inspect_recent_changes(service, window)` backed by `DeployRecord` plus new config/flag/quota change
       records; return git-style diffs, feature-flag flips, and quota changes.
-- [ ] Add `correlate_anomalies(services[], window)` ranking metric shifts across dependent services (z-score or
+- [x] Add `correlate_anomalies(services[], window)` ranking metric shifts across dependent services (z-score or
       relative delta) using the topology from branch 10.
-- [ ] Make both READ-capability, step-counted (branch 2), and deterministic per seed.
-- [ ] Test: a deploy-correlated scenario where the right change is discoverable; correlation ranks the culprit
+- [x] Make both READ-capability, step-counted (branch 2), and deterministic per seed.
+- [x] Test: a deploy-correlated scenario where the right change is discoverable; correlation ranks the culprit
       service first.
-- [ ] Test: tools respect `maxSteps` and reward penalties.
+- [x] Test: tools respect `maxSteps` and reward penalties.
 
 **Files.** `rl/simulation/DeployRecord.java`, `rl/simulation/SimulatedSystem.java`,
 `agent/tool/builtin/BuiltInSreTools.java`, `rl/TelemetrySignal.java` (if a new signal type is warranted).

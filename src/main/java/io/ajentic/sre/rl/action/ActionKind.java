@@ -16,6 +16,8 @@ public enum ActionKind {
     QUERY_TELEMETRY(Capability.READ),
     READ_RUNBOOK(Capability.READ),
     LIST_REMEDIATIONS(Capability.READ),
+    INSPECT_RECENT_CHANGES(Capability.READ),
+    CORRELATE_ANOMALIES(Capability.READ),
     APPLY_REMEDIATION(Capability.MUTATE),
     DECLARE_DIAGNOSIS(Capability.MUTATE),
     IDLE(Capability.READ);

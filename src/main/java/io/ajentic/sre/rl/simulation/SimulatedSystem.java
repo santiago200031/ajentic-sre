@@ -6,16 +6,31 @@ import io.ajentic.sre.rl.TelemetrySignal;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.random.RandomGenerator;
+import java.util.stream.Collectors;
 import java.util.random.RandomGeneratorFactory;
 
 final class SimulatedSystem {
 
     private static final Instant BASE_TIME = Instant.parse("2026-01-01T00:00:00Z");
+
+    /** One simulated minute of incident time per step. */
+    private static final Duration TICK = Duration.ofMinutes(1);
+
+    /** Seeded config/flag/quota change templates so every service has inspectable history. */
+    private static final String[][] CHANGE_TEMPLATES = {
+            {DeployRecord.KIND_CONFIG, "adjusted rate limit", "- rate_limit_rps: 100\n+ rate_limit_rps: 120"},
+            {DeployRecord.KIND_FEATURE_FLAG, "enabled feature flag search-caching",
+                    "- search-caching: off\n+ search-caching: on"},
+            {DeployRecord.KIND_QUOTA, "raised egress quota", "- egress_quota_gb: 100\n+ egress_quota_gb: 120"},
+    };
 
     private final Scenario scenario;
     private final RandomGenerator random;
@@ -35,11 +50,22 @@ final class SimulatedSystem {
         scenario.services().forEach(spec -> services.put(spec.name(), new ServiceState(spec)));
         scenario.faults().forEach(fault -> faults.add(new ActiveFault(fault)));
         scenario.services().forEach(spec -> deploys.add(
-                new DeployRecord(spec.name(), "v1.0.0", BASE_TIME.minus(Duration.ofDays(14)))));
+                new DeployRecord(spec.name(), DeployRecord.KIND_DEPLOY, "v1.0.0", BASE_TIME.minus(Duration.ofDays(14)))));
         scenario.faults().stream()
                 .filter(fault -> fault.kind() == FaultKind.BAD_DEPLOYMENT)
                 .forEach(fault -> deploys.add(
-                        new DeployRecord(fault.service(), "v2.1.0", BASE_TIME.minus(Duration.ofMinutes(18)))));
+                        new DeployRecord(fault.service(), DeployRecord.KIND_DEPLOY, "v2.1.0",
+                                BASE_TIME.minus(Duration.ofMinutes(18)), "- v1.0.0\n+ v2.1.0")));
+        scenario.services().forEach(spec -> {
+            int count = random.nextInt(3);
+            for (int i = 0; i < count; i++) {
+                String[] template = CHANGE_TEMPLATES[random.nextInt(CHANGE_TEMPLATES.length)];
+                Instant at = BASE_TIME
+                        .minus(1 + random.nextInt(13), ChronoUnit.DAYS)
+                        .minus(random.nextInt(720), ChronoUnit.MINUTES);
+                deploys.add(new DeployRecord(spec.name(), template[0], template[1], at, template[2]));
+            }
+        });
         applyFaultEffects(1.0);
     }
 
@@ -214,18 +240,84 @@ final class SimulatedSystem {
     }
 
     private List<ObservedSignal> deploys(ServiceState service) {
+        return recentChanges(service.name(), Integer.MAX_VALUE);
+    }
+
+    /** Recent deploys, config edits, flag flips and quota changes for one service, newest within the window. */
+    List<ObservedSignal> recentChanges(String serviceName, int windowMinutes) {
+        ServiceState service = requireService(serviceName);
+        Instant cutoff = now().minus(windowMinutes, ChronoUnit.MINUTES);
         List<ObservedSignal> signals = new ArrayList<>();
-        for (DeployRecord deploy : deploys) {
-            if (!deploy.service().equals(service.name())) {
+        for (DeployRecord change : deploys) {
+            if (!change.service().equals(service.name()) || change.occurredAt().isBefore(cutoff)) {
                 continue;
             }
             signals.add(new ObservedSignal(
                     TelemetrySignal.DEPLOYS,
                     service.name(),
-                    "deployed %s at %s".formatted(deploy.version(), deploy.deployedAt()),
-                    Map.of("version", deploy.version(), "deployedAt", deploy.deployedAt().toString())));
+                    "%s %s at %s%s".formatted(
+                            change.kind(),
+                            change.summary(),
+                            change.occurredAt(),
+                            change.diff().isEmpty() ? "" : "\n" + change.diff().lines()
+                                    .map(line -> "  " + line)
+                                    .collect(Collectors.joining("\n"))),
+                    Map.of(
+                            "kind", change.kind(),
+                            "summary", change.summary(),
+                            "occurredAt", change.occurredAt().toString(),
+                            "diff", change.diff())));
         }
         return signals;
+    }
+
+    /**
+     * Ranks metric anomalies across the requested services plus their topology neighborhood within {@code window}
+     * hops. Score is the absolute error-rate delta plus a tenth of the relative p95 latency growth over baseline,
+     * so the faulted service ranks first and degraded dependents follow in decay order.
+     */
+    String correlateAnomalies(List<String> requested, int window) {
+        Set<String> neighborhood = new LinkedHashSet<>();
+        for (String name : requested.isEmpty() ? List.of(scenario.alertingService()) : requested) {
+            requireService(name);
+            neighborhood.add(name);
+            List<String> frontier = List.of(name);
+            for (int hop = 0; hop < window; hop++) {
+                List<String> next = new ArrayList<>();
+                for (String service : frontier) {
+                    next.addAll(scenario.topology().dependenciesOf(service));
+                }
+                next.forEach(neighborhood::add);
+                frontier = next;
+                if (frontier.isEmpty()) {
+                    break;
+                }
+            }
+            scenario.topology().ancestorsOf(name).stream().limit(window).forEach(neighborhood::add);
+        }
+        List<String> ranked = neighborhood.stream()
+                .sorted((a, b) -> Double.compare(anomalyScore(requireService(b)), anomalyScore(requireService(a))))
+                .toList();
+        return ranked.stream()
+                .map(name -> {
+                    ServiceState service = requireService(name);
+                    return "%d. %s: error_rate=%.2f p95_latency_ms=%.0f (depends on: %s)".formatted(
+                            ranked.indexOf(name) + 1,
+                            name,
+                            service.errorRate(),
+                            service.p95LatencyMilliseconds(),
+                            scenario.topology().dependenciesOf(name));
+                })
+                .collect(Collectors.joining("\n"));
+    }
+
+    private double anomalyScore(ServiceState service) {
+        double latencyGrowth = Math.max(0.0, (service.p95LatencyMilliseconds() - service.baseLatency()) / service.baseLatency());
+        return service.errorRate() + 0.1 * latencyGrowth;
+    }
+
+    Instant now() {
+        return BASE_TIME.plus((long) step * TICK.toMinutes(), ChronoUnit.MINUTES);
     }
 
     private ServiceState requireService(String name) {

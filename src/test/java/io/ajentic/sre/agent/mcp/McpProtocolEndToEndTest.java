@@ -70,6 +70,30 @@ class McpProtocolEndToEndTest {
     }
 
     @Test
+    void exposesInvestigationTools() {
+        String tools = handler.handle("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}");
+        assertTrue(tools.contains("inspect_recent_changes"), tools);
+        assertTrue(tools.contains("correlate_anomalies"), tools);
+
+        handler.handle("""
+                {"jsonrpc":"2.0","id":2,"method":"tools/call","params":
+                {"name":"start_episode","arguments":{"scenarioId":"orders-bad-deployment"}}}""", "investigator");
+
+        String changes = handler.handle("""
+                {"jsonrpc":"2.0","id":3,"method":"tools/call","params":
+                {"name":"inspect_recent_changes","arguments":{"service":"orders-api","window":60}}}""", "investigator");
+        assertTrue(changes.contains("\"isError\":false"), changes);
+        assertTrue(changes.contains("v2.1.0"), changes);
+        assertTrue(changes.contains("- v1.0.0"), changes);
+
+        String correlation = handler.handle("""
+                {"jsonrpc":"2.0","id":4,"method":"tools/call","params":
+                {"name":"correlate_anomalies","arguments":{"services":["edge-gateway"],"window":2}}}""", "investigator");
+        assertTrue(correlation.contains("\"isError\":false"), correlation);
+        assertTrue(correlation.contains("1. orders-api"), correlation);
+    }
+
+    @Test
     void listsAndReadsTopologyResources() {
         String list = handler.handle("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"resources/list\"}");
         assertTrue(list.contains("sre://topology/checkout-latency-db-pool"), list);

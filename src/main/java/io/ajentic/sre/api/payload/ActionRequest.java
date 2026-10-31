@@ -3,6 +3,8 @@ package io.ajentic.sre.api.payload;
 import jakarta.validation.constraints.NotNull;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
 
+import java.util.List;
+
 /**
  * Request to apply a single manual action to an episode environment.
  */
@@ -25,5 +27,11 @@ public record ActionRequest(
         String remediation,
 
         @Schema(description = "Diagnosed root cause.", example = "Database connection pool saturated")
-        String rootCause) {
+        String rootCause,
+
+        @Schema(description = "Lookback window in minutes (inspect_recent_changes) or hop radius (correlate_anomalies).")
+        Integer window,
+
+        @Schema(description = "Service names for correlate_anomalies.")
+        List<String> services) {
 }

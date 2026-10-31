@@ -13,7 +13,9 @@ import io.ajentic.sre.rl.ObservedSignal;
 import io.ajentic.sre.rl.StepResult;
 import io.ajentic.sre.rl.TelemetrySignal;
 import io.ajentic.sre.rl.action.ApplyRemediation;
+import io.ajentic.sre.rl.action.CorrelateAnomalies;
 import io.ajentic.sre.rl.action.DeclareDiagnosis;
+import io.ajentic.sre.rl.action.InspectRecentChanges;
 import io.ajentic.sre.rl.action.ListRemediations;
 import io.ajentic.sre.rl.action.QueryTelemetry;
 import io.ajentic.sre.rl.action.ReadRunbook;
@@ -77,6 +79,29 @@ public class BuiltInSreTools {
             return ToolResult.ok("No " + signal + " samples for " + service + ".");
         }
         return ToolResult.ok(ToolText.format(signals), Map.of("signal", signal.name(), "count", signals.size()));
+    }
+
+    @AgentTool(name = "inspect_recent_changes", description = "List recent deploys, config edits, flag flips and quota changes for a service.")
+    public ToolResult inspectRecentChanges(
+            @ToolParam("Service name to inspect.") String service,
+            @ToolParam("Lookback window in minutes. Default 1440.") Integer window,
+            ToolContext context) {
+        StepResult result = context.environment().step(new InspectRecentChanges(service, window == null ? 1440 : window));
+        List<ObservedSignal> signals = result.observation().signals();
+        if (signals.isEmpty()) {
+            return ToolResult.ok("No recent changes for " + service + ".");
+        }
+        return ToolResult.ok(ToolText.format(signals), Map.of("service", service, "count", signals.size()));
+    }
+
+    @AgentTool(name = "correlate_anomalies", description = "Rank metric anomalies across a service's topology neighborhood.")
+    public ToolResult correlateAnomalies(
+            @ToolParam("Service names to correlate; empty uses the alerting service.") List<String> services,
+            @ToolParam("Neighborhood radius in hops. Default 2.") Integer window,
+            ToolContext context) {
+        StepResult result = context.environment().step(
+                new CorrelateAnomalies(services == null ? List.of() : services, window == null ? 2 : window));
+        return ToolResult.ok(result.observation().feedback());
     }
 
     @AgentTool(name = "read_runbook", description = "Read an operational runbook that matches the incident.")

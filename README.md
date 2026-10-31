@@ -209,6 +209,7 @@ and `prompts/get`. `POST` takes one request or a batch array, and malformed JSON
 `GET` returns discovery metadata; `DELETE` clears the active episode.
 
 - Lifecycle tools: `list_scenarios`, `start_episode`, `run_incident_drill`.
+- Investigation tools: `query_telemetry`, `inspect_recent_changes`, `correlate_anomalies`, `get_service_topology`, `read_runbook`, `list_remediations` (READ) and `apply_remediation`, `declare_diagnosis`, `post_incident_summary` (MUTATE).
 - GitHub code tools: `github_list_files`, `github_read_file`, `github_get_ci_status` (READ) and `github_create_branch`, `github_commit_file`, `github_create_pull_request` (MUTATE).
 - Resources: `sre://scenarios/{scenarioId}`, `sre://topology/{scenarioId}`, and `sre://runbooks/{scenarioId}/{runbookId}`.
 - Prompts: `investigate-incident` and `summarize-postmortem`.

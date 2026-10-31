@@ -27,4 +27,8 @@ public final class ToolSchemas {
     public static Map<String, Object> enumeration(String description, List<String> values) {
         return Map.of("type", "string", "description", description, "enum", values);
     }
+
+    public static Map<String, Object> stringArray(String description) {
+        return Map.of("type", "array", "description", description, "items", Map.of("type", "string"));
+    }
 }
