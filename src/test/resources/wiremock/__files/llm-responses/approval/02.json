@@ -1,0 +1,20 @@
+{
+  "id": "c2",
+  "object": "chat.completion",
+  "model": "wm-approval",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "The restart is pending operator approval; read-only checks kept running in the meantime."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 55,
+    "completion_tokens": 10,
+    "total_tokens": 65
+  }
+}

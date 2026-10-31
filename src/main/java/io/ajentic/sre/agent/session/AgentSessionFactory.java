@@ -11,6 +11,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import java.time.Duration;
 import java.util.UUID;
 
 @ApplicationScoped
@@ -25,6 +26,7 @@ public class AgentSessionFactory {
     private final int maxTokens;
     private final int stagnationThreshold;
     private final int stagnationEscalateAfter;
+    private final Duration approvalTtl;
 
     @Inject
     public AgentSessionFactory(
@@ -38,7 +40,8 @@ public class AgentSessionFactory {
             @ConfigProperty(name = "ajentic.agent.stagnation.threshold", defaultValue = "2")
             int stagnationThreshold,
             @ConfigProperty(name = "ajentic.agent.stagnation.escalate-after", defaultValue = "3")
-            int stagnationEscalateAfter) {
+            int stagnationEscalateAfter,
+            @ConfigProperty(name = "ajentic.approval.ttl", defaultValue = "10m") Duration approvalTtl) {
         this.llm = llm;
         this.tools = tools;
         this.environments = environments;
@@ -48,6 +51,7 @@ public class AgentSessionFactory {
         this.maxTokens = maxTokens;
         this.stagnationThreshold = stagnationThreshold;
         this.stagnationEscalateAfter = stagnationEscalateAfter;
+        this.approvalTtl = approvalTtl;
     }
 
     public AgentSession create(AgentSessionConfig config) {
@@ -61,7 +65,8 @@ public class AgentSessionFactory {
                 systemPrompt(environment),
                 authorization,
                 masker.newSession(),
-                meters);
+                meters,
+                approvalTtl);
     }
 
     private static String systemPrompt(Environment environment) {

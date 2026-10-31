@@ -157,7 +157,7 @@ class GitHubCodeToolsTest {
     @Test
     void mutationGateBlocksMutatingToolsWhenDisabled() {
         io.ajentic.sre.agent.tool.DefaultToolAuthorization readOnlyAuth =
-                new io.ajentic.sre.agent.tool.DefaultToolAuthorization(false);
+                new io.ajentic.sre.agent.tool.DefaultToolAuthorization(java.util.Optional.empty(), false);
 
         io.ajentic.sre.agent.tool.ToolDescriptor readTool =
                 new io.ajentic.sre.agent.tool.ToolDescriptor("github_list_files", "desc", Map.of(), io.ajentic.sre.agent.tool.Capability.READ);

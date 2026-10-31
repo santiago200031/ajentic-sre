@@ -1,5 +1,7 @@
 package io.ajentic.sre.agent.session;
 
+import io.ajentic.sre.agent.approval.ApprovalOutcome;
+import io.ajentic.sre.agent.approval.PendingApproval;
 import io.ajentic.sre.agent.context.AgentExecutionContext;
 import io.ajentic.sre.agent.llm.ChatMessage;
 import io.ajentic.sre.agent.llm.LlmClient;
@@ -8,6 +10,7 @@ import io.ajentic.sre.agent.llm.LlmResponse;
 import io.ajentic.sre.agent.llm.ToolCall;
 import io.ajentic.sre.agent.masking.MaskingSession;
 import io.ajentic.sre.agent.masking.SensitiveDataMasker;
+import io.ajentic.sre.agent.tool.AuthorizationDecision;
 import io.ajentic.sre.agent.tool.Capability;
 import io.ajentic.sre.agent.tool.Tool;
 import io.ajentic.sre.agent.tool.ToolAuthorization;
@@ -18,10 +21,12 @@ import io.ajentic.sre.rl.Environment;
 import io.micrometer.core.instrument.MeterRegistry;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -42,7 +47,11 @@ public final class AgentSession {
     private final ToolAuthorization authorization;
     private final MaskingSession maskingSession;
     private final MeterRegistry meters;
+    private final Duration approvalTtl;
     private final Conversation conversation = new Conversation();
+    private final Map<String, PendingApproval> pendingApprovals = new ConcurrentHashMap<>();
+    private final Map<String, ApprovalOutcome> decidedApprovals = new ConcurrentHashMap<>();
+    private final Map<String, PendingApproval> pendingThisTurn = new ConcurrentHashMap<>();
 
     public AgentSession(
             String id,
@@ -51,7 +60,7 @@ public final class AgentSession {
             ToolRegistry tools,
             Environment environment,
             String systemPrompt) {
-        this(id, config, llm, tools, environment, systemPrompt, tool -> true);
+        this(id, config, llm, tools, environment, systemPrompt, tool -> AuthorizationDecision.ALLOW);
     }
 
     public AgentSession(
@@ -88,6 +97,21 @@ public final class AgentSession {
             ToolAuthorization authorization,
             MaskingSession maskingSession,
             MeterRegistry meters) {
+        this(id, config, llm, tools, environment, systemPrompt, authorization, maskingSession, meters,
+                Duration.ofMinutes(10));
+    }
+
+    public AgentSession(
+            String id,
+            AgentSessionConfig config,
+            LlmClient llm,
+            ToolRegistry tools,
+            Environment environment,
+            String systemPrompt,
+            ToolAuthorization authorization,
+            MaskingSession maskingSession,
+            MeterRegistry meters,
+            Duration approvalTtl) {
         this.id = id;
         this.config = config;
         this.llm = llm;
@@ -96,6 +120,7 @@ public final class AgentSession {
         this.authorization = authorization;
         this.maskingSession = maskingSession;
         this.meters = meters;
+        this.approvalTtl = approvalTtl;
         if (systemPrompt != null && !systemPrompt.isBlank()) {
             conversation.add(ChatMessage.system(systemPrompt));
         }
@@ -127,6 +152,7 @@ public final class AgentSession {
     }
 
     private ChatTurnResult chatScoped(String userMessage, TurnListener listener, BooleanSupplier cancelled) {
+        expirePendingApprovals();
         conversation.add(ChatMessage.user(userMessage));
         List<ToolCall> lastToolCalls = List.of();
         Map<String, Integer> repeats = new ConcurrentHashMap<>();
@@ -177,6 +203,7 @@ public final class AgentSession {
             for (int index = 0; index < response.toolCalls().size(); index++) {
                 listener.onEvent(TurnEvent.toolResult(response.toolCalls().get(index).name(), results[index]));
             }
+            registerPendingApprovals(response.toolCalls());
 
             if (environment.isTerminal()) {
                 break;
@@ -303,9 +330,13 @@ public final class AgentSession {
     }
 
     private String invoke(Tool tool, ToolCall call) {
-        if (!authorization.isAuthorized(tool.descriptor())) {
+        AuthorizationDecision decision = authorization.decide(tool.descriptor());
+        if (decision == AuthorizationDecision.DENY) {
             return "Tool '%s' requires the %s capability and is not authorized."
                     .formatted(call.name(), tool.descriptor().capability());
+        }
+        if (decision == AuthorizationDecision.REQUIRE_APPROVAL) {
+            return deferForApproval(call);
         }
         ToolContext context = AgentExecutionContext.toolContext();
         if (context == null) {
@@ -324,6 +355,103 @@ public final class AgentSession {
                         "capability", tool.descriptor().capability().name()).increment();
             }
         }
+    }
+
+    private String deferForApproval(ToolCall call) {
+        Instant now = Instant.now();
+        PendingApproval approval = new PendingApproval(
+                UUID.randomUUID().toString(), id, -1, call.id(), call.name(), call.arguments(), now,
+                now.plus(approvalTtl));
+        pendingThisTurn.put(call.id(), approval);
+        return "PENDING_APPROVAL: " + call.name() + " is deferred behind operator approval (approval id "
+                + approval.approvalId() + ", expires " + approval.expiresAt() + "). "
+                + "Approve or deny it via POST /agent/sessions/" + id + "/approve; READ tools remain available.";
+    }
+
+    private void registerPendingApprovals(List<ToolCall> toolCalls) {
+        int base = conversation.messages().size() - toolCalls.size();
+        for (int index = 0; index < toolCalls.size(); index++) {
+            PendingApproval approval = pendingThisTurn.remove(toolCalls.get(index).id());
+            if (approval != null) {
+                pendingApprovals.put(approval.approvalId(), approval.withIndex(base + index));
+            }
+        }
+    }
+
+    private void expirePendingApprovals() {
+        Instant now = Instant.now();
+        synchronized (pendingApprovals) {
+            for (PendingApproval approval : pendingApprovals.entrySet().stream()
+                    .map(Map.Entry::getValue).toList()) {
+                if (approval.expiresAt().isBefore(now)) {
+                    pendingApprovals.remove(approval.approvalId());
+                    conversation.replace(approval.conversationIndex(),
+                            ChatMessage.tool(approval.toolCallId(), "Approval expired before it was decided."));
+                    decidedApprovals.put(approval.approvalId(),
+                            new ApprovalOutcome(approval.approvalId(), false, false, "Approval expired before it was decided.", null));
+                }
+            }
+        }
+    }
+
+    /**
+     * Decides a pending approval exactly once. Repeated decisions are idempotent and return the stored outcome.
+     */
+    public ApprovalOutcome decideApproval(String approvalId, boolean approve, String note) {
+        synchronized (pendingApprovals) {
+            PendingApproval approval = pendingApprovals.remove(approvalId);
+            if (approval == null) {
+                return decidedApprovals.get(approvalId);
+            }
+            boolean expired = approval.expiresAt().isBefore(Instant.now());
+            boolean executed = false;
+            String result;
+            if (approve && !expired) {
+                result = executeDeferred(approval);
+                executed = true;
+            } else {
+                result = expired
+                        ? "Approval expired before it was decided."
+                        : "Denied by operator" + (note == null || note.isBlank() ? "." : ": " + note.trim() + ".");
+            }
+            conversation.replace(approval.conversationIndex(), ChatMessage.tool(approval.toolCallId(), result));
+            ApprovalOutcome outcome = new ApprovalOutcome(approval.approvalId(), approve, executed, result, note);
+            decidedApprovals.put(approvalId, outcome);
+            return outcome;
+        }
+    }
+
+    private String executeDeferred(PendingApproval approval) {
+        Tool tool = tools.find(approval.toolName()).orElse(null);
+        if (tool == null) {
+            return "Unknown tool: " + approval.toolName();
+        }
+        ToolCall call = new ToolCall(approval.toolCallId(), approval.toolName(), approval.arguments());
+        ToolContext context = AgentExecutionContext.toolContext();
+        if (context == null) {
+            context = new ToolContext(id, environment);
+        }
+        long start = System.nanoTime();
+        try {
+            var result = tool.invoke(new ToolInvocation(approval.toolName(), approval.arguments()), context);
+            return result.success() ? result.content() : "Tool error: " + result.content();
+        } finally {
+            if (meters != null) {
+                meters.timer("ajentic.tool.latency", "tool", approval.toolName())
+                        .record(Duration.ofNanos(System.nanoTime() - start));
+                meters.counter("ajentic.tool.invocations",
+                        "tool", approval.toolName(),
+                        "capability", tool.descriptor().capability().name()).increment();
+            }
+        }
+    }
+
+    /**
+     * The approvals that are still awaiting an operator decision.
+     */
+    public List<PendingApproval> pendingApprovals() {
+        expirePendingApprovals();
+        return List.copyOf(pendingApprovals.values());
     }
 
     private String finalizeAnswer() {

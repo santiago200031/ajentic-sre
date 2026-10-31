@@ -46,7 +46,9 @@ Surefire is configured with `<skipITs>true</skipITs>`, so failsafe integration t
   points the real `OpenAiCompatibleLlmClient` at it. Set `-Dajentic.llm.live=true` (or `-Plive-llm`) to go live
   instead.
 - Test HTTP port is 8081 (`quarkus.http.test-port`); dev/prod port is 8080.
-- Mutating tools are gated by `ajentic.tools.allow-mutations=true` (default on).
+- Mutating tools are gated by `ajentic.tools.mutation-policy` (`allow` | `deny` | `require-approval`); the legacy
+  `ajentic.tools.allow-mutations` boolean is the fallback alias. With `require-approval`, mutating calls defer to
+  operator approval (`ApprovalGateEndToEndTest`, `ApprovalExpiryEndToEndTest`), covered offline by WireMock.
 - Live telemetry backends (`local-container` / `cloud-live`) are tested offline: `LiveTelemetryEnvironmentTest`
   stubs Prometheus/Loki with a programmatic WireMock on a dynamic port; no external services needed.
 

@@ -11,6 +11,7 @@ import io.ajentic.sre.agent.session.AgentSession;
 import io.ajentic.sre.agent.session.AgentSessionConfig;
 import io.ajentic.sre.agent.session.ChatTurnResult;
 import io.ajentic.sre.agent.session.Goal;
+import io.ajentic.sre.agent.tool.AuthorizationDecision;
 import io.ajentic.sre.agent.tool.Capability;
 import io.ajentic.sre.agent.tool.ToolRegistry;
 import io.ajentic.sre.rl.Environment;
@@ -208,7 +209,7 @@ class AgentSessionEndToEndTest {
                 tools,
                 environments.create("orders-bad-deployment", 3L),
                 "You are a test SRE agent.",
-                tool -> tool.capability() == Capability.READ);
+                tool -> tool.capability() == Capability.READ ? AuthorizationDecision.ALLOW : AuthorizationDecision.DENY);
 
         ChatTurnResult result = session.chat("Fix the incident.");
 

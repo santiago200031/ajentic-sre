@@ -237,6 +237,30 @@ curl -N -s -X POST localhost:8080/api/v1/agent/sessions/$SESSION/chat/stream \
   -d '{"message":"Why is orders-api slow?"}'
 ```
 
+## Approval gate
+
+With `ajentic.tools.mutation-policy=require-approval`, every MUTATE call is deferred behind an operator decision:
+the tool result is a `PENDING_APPROVAL` placeholder carrying an approval id and an expiry, and READ tools keep
+working in the meantime. The operator decides via `POST /api/v1/agent/sessions/{id}/approve`
+(`{"approvalId":...,"decision":"approve"|"deny","note":...}`) and can list pending calls at
+`GET /api/v1/agent/sessions/{id}/pending`. Approval executes the deferred call exactly once and appends the real
+tool result to the conversation; denial or expiry appends a denied result and never executes it. Decisions are
+single-use and idempotent — repeats return the stored outcome.
+
+```bash
+SESSION=$(curl -s -X POST localhost:8080/api/v1/agent/sessions \
+  -H 'content-type: application/json' \
+  -d '{"scenarioId":"orders-bad-deployment","seed":1}' | jq -r .id)
+
+curl -s -X POST localhost:8080/api/v1/agent/sessions/$SESSION/chat \
+  -H 'content-type: application/json' -d '{"message":"Fix the incident."}'
+
+APPROVAL=$(curl -s localhost:8080/api/v1/agent/sessions/$SESSION/pending | jq -r '.[0].approvalId')
+
+curl -s -X POST localhost:8080/api/v1/agent/sessions/$SESSION/approve \
+  -H 'content-type: application/json' -d "{\"approvalId\":\"$APPROVAL\",\"decision\":\"approve\"}"
+```
+
 ## Alert webhooks
 
 `POST /api/v1/webhooks/alertmanager`, `/pagerduty`, and `/cloudwatch-sns` accept provider payloads, normalize
@@ -335,7 +359,9 @@ sends `Authorization: Bearer <key>`, unless `ajentic.llm.api-key-header` says ot
 | `ajentic.llm.api-key-header`              |                                   | Override the auth header                                                        |
 | `ajentic.llm.fallback-enabled`            | `false`                           | Enable ordered LLM endpoint failover                                            |
 | `ajentic.llm.fallback-endpoints`          |                                   | Ordered endpoints: `base-url\|model\|api-key\|api-version\|api-key-header`, comma-separated |
-| `ajentic.tools.allow-mutations`           | `true`                            | Gate for mutating tools                                                         |
+| `ajentic.tools.mutation-policy`           |                                   | Mutating-tool gate: `allow` \| `deny` \| `require-approval`; wins over `allow-mutations` |
+| `ajentic.tools.allow-mutations`           | `true`                            | Legacy boolean gate for mutating tools when `mutation-policy` is unset           |
+| `ajentic.approval.ttl`                    | `10m`                             | How long a pending mutating call waits for a decision before auto-deny          |
 | `ajentic.agent.max-tokens`                | `0`                               | Cumulative session token budget; `0` disables the hard stop                     |
 | `ajentic.agent.stagnation.threshold`      | `2`                               | Repeated identical tool call count that yields a "try something else" hint      |
 | `ajentic.agent.stagnation.escalate-after` | `3`                               | Repeated identical tool call count that stops the loop with a diagnostic answer |

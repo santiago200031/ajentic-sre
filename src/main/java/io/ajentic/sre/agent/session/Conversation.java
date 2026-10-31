@@ -23,6 +23,14 @@ public final class Conversation {
         usage = usage.plus(used);
     }
 
+    /**
+     * Replaces the message at {@code index} (used to swap a pending-approval placeholder for the real tool
+     * result once the operator decides).
+     */
+    public synchronized void replace(int index, ChatMessage message) {
+        messages.set(index, message);
+    }
+
     public synchronized TokenUsage usage() {
         return usage;
     }

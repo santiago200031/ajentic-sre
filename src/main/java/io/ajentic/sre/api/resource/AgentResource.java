@@ -8,6 +8,7 @@ import io.ajentic.sre.agent.session.TurnEvent;
 import io.ajentic.sre.agent.session.TurnListener;
 import io.ajentic.sre.agent.session.UnknownSessionException;
 import io.ajentic.sre.api.payload.AskRequest;
+import io.ajentic.sre.api.payload.ApprovalRequest;
 import io.ajentic.sre.api.payload.ChatRequest;
 import io.ajentic.sre.api.payload.ChatResponse;
 import io.ajentic.sre.api.payload.CreateSessionRequest;
@@ -143,6 +144,35 @@ public class AgentResource {
     }
 
     @POST
+    @Path("/sessions/{id}/approve")
+    @Operation(summary = "Approve or deny a pending mutating tool call",
+            description = "Executes the deferred call exactly once on approval; denies or expired approvals append a denied result. Repeats are idempotent.")
+    @APIResponse(responseCode = "200", description = "The decision outcome")
+    @APIResponse(responseCode = "404", description = "Unknown session or approval id")
+    @APIResponse(responseCode = "400", description = "Unknown decision value")
+    public Response approve(@RestPath String id, @Valid ApprovalRequest request) {
+        AgentSession session = require(id);
+        String decision = request.decision().trim().toLowerCase(java.util.Locale.ROOT);
+        if (!decision.equals("approve") && !decision.equals("deny")) {
+            return error(400, "decision must be 'approve' or 'deny'.");
+        }
+        var outcome = session.decideApproval(request.approvalId(), decision.equals("approve"), request.note());
+        if (outcome == null) {
+            return error(404, "Unknown approval id: " + request.approvalId());
+        }
+        return Response.ok(outcome).build();
+    }
+
+    @GET
+    @Path("/sessions/{id}/pending")
+    @Operation(summary = "List pending approvals", description = "The mutating tool calls still awaiting an operator decision.")
+    @APIResponse(responseCode = "200", description = "Pending approvals (empty list when none)")
+    @APIResponse(responseCode = "404", description = "Unknown session")
+    public java.util.List<io.ajentic.sre.agent.approval.PendingApproval> pending(@RestPath String id) {
+        return require(id).pendingApprovals();
+    }
+
+    @POST
     @Path("/ask")
     @Operation(summary = "One-shot investigation", description = "Runs the agent against a scenario for a single question and returns the answer and token usage. No session is retained.")
     @APIResponse(responseCode = "200", description = "The agent's answer and token usage")
@@ -180,5 +210,9 @@ public class AgentResource {
 
     private AgentSession require(String id) {
         return sessions.find(id).orElseThrow(() -> new UnknownSessionException(id));
+    }
+
+    private static Response error(int status, String message) {
+        return Response.status(status).entity(java.util.Map.of("error", message)).build();
     }
 }

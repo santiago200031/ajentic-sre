@@ -28,7 +28,7 @@ suite offline (`mvn test`, WireMock stubs, no model, no network), and targets Ja
 | 19 | `feat/alert-webhooks` | 3 | Alertmanager/PagerDuty/SNS intake | 16, 18 | ✅ done |
 | 20 | `feat/llm-fallback-router` | 3 | Local-first composite LLM client | 13 | ✅ done |
 | 21 | `feat/multicloud-identifier-masking` | 3 | GCP/Azure/K8s/Bearer categories | 1 | ✅ done |
-| 22 | `feat/approval-gates` | 3 | `ALLOW \| DENY \| REQUIRE_APPROVAL` | 18 | ⬜ todo |
+| 22 | `feat/approval-gates` | 3 | `ALLOW \| DENY \| REQUIRE_APPROVAL` | 18 | ✅ done |
 | 23 | `feat/episodic-memory` | 3 | `search_past_incidents` + `.ajentic/incidents.jsonl` | 6, 22 | ⬜ todo |
 | 24 | `feat/file-state-store` | 3 | Durable schedules/drills/episodes | 6 | ⬜ todo |
 | 25 | `feat/swagger-openapi-first` | 3 | Always-on Swagger UI + OpenAPI annotations + one-shot ask/simulate; CLI narrowed to open Swagger | — | ✅ done |
@@ -431,17 +431,18 @@ new `agent/session/TurnListener.java`.
 
 ### 22. `feat/approval-gates`
 
-- [ ] Replace boolean `allow-mutations` with `ALLOW | DENY | REQUIRE_APPROVAL` in `DefaultToolAuthorization` while
-      keeping `ajentic.tools.allow-mutations` as a backward-compatible alias.
-- [ ] Model a pending approval: `invoke` returns a `PENDING_APPROVAL` tool result containing an approval id; the
+- [x] Replace boolean `allow-mutations` with `ALLOW | DENY | REQUIRE_APPROVAL` in `DefaultToolAuthorization` while
+      keeping `ajentic.tools.allow-mutations` as a backward-compatible alias (`ajentic.tools.mutation-policy` wins).
+- [x] Model a pending approval: `invoke` returns a `PENDING_APPROVAL` tool result containing an approval id; the
       agent may continue with READ tools.
-- [ ] Add `POST /api/v1/agent/sessions/{id}/approve` (approve/deny, optional note, expiry, single-use) and a
+- [x] Add `POST /api/v1/agent/sessions/{id}/approve` (approve/deny, optional note, expiry, single-use) and a
       `GET .../pending` listing.
-- [ ] On approval, execute the deferred mutating call and append the real tool result to `Conversation`;
+- [x] On approval, execute the deferred mutating call and append the real tool result to `Conversation`;
       on denial/expiry, append a denied result.
-- [ ] Test: `REQUIRE_APPROVAL` blocks `apply_remediation`, READ tools still work, approve executes exactly once,
-      deny/expiry never executes.
-- [ ] Test: concurrent approvals are idempotent.
+- [x] Test: `REQUIRE_APPROVAL` blocks `apply_remediation`, READ tools still work, approve executes exactly once,
+      deny/expiry never executes (`ApprovalGateEndToEndTest`, `ApprovalExpiryEndToEndTest`, `AuthorizationPolicyTest`).
+- [x] Test: concurrent approvals are idempotent (idempotent repeat returns the stored outcome; `decideApproval` is
+      synchronized and single-use).
 
 **Files.** `agent/tool/DefaultToolAuthorization.java`, `agent/tool/ToolAuthorization.java`,
 `agent/session/AgentSession.java`, `api/resource/AgentResource.java`, new `agent/approval/*`.

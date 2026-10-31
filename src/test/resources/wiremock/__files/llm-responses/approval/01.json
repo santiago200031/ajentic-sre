@@ -1,0 +1,38 @@
+{
+  "id": "c1",
+  "object": "chat.completion",
+  "model": "wm-approval",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "The database pool is exhausted; I will check the metrics and restart orders-api.",
+        "tool_calls": [
+          {
+            "id": "call_read_1",
+            "type": "function",
+            "function": {
+              "name": "query_telemetry",
+              "arguments": "{\"signal\":\"METRICS\",\"service\":\"orders-api\"}"
+            }
+          },
+          {
+            "id": "call_mute_1",
+            "type": "function",
+            "function": {
+              "name": "apply_remediation",
+              "arguments": "{\"remediation\":\"ROLLBACK_DEPLOY\",\"service\":\"orders-api\"}"
+            }
+          }
+        ]
+      },
+      "finish_reason": "tool_calls"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 40,
+    "completion_tokens": 14,
+    "total_tokens": 54
+  }
+}
