@@ -193,8 +193,12 @@ class ApiEndToEndTest {
     void initializesMcpOverHttp() {
         given()
                 .contentType("application/json")
-                .body(Map.of("jsonrpc", "2.0", "id", 1, "method", "initialize", "params", Map.of()))
-                .when().post("/api/v1/mcp")
+                .header("Accept", "application/json, text/event-stream")
+                .body(Map.of("jsonrpc", "2.0", "id", 1, "method", "initialize", "params", Map.of(
+                        "protocolVersion", "2024-11-05",
+                        "capabilities", Map.of(),
+                        "clientInfo", Map.of("name", "test-client", "version", "1.0"))))
+                .when().post("/mcp")
                 .then()
                 .statusCode(200)
                 .body("result.protocolVersion", not(blankOrNullString()))
@@ -203,97 +207,85 @@ class ApiEndToEndTest {
 
     @Test
     void listsAndCallsMcpToolsOverHttp() {
+        String sessionId = given()
+                .contentType("application/json")
+                .header("Accept", "application/json, text/event-stream")
+                .body(Map.of("jsonrpc", "2.0", "id", 1, "method", "initialize", "params", Map.of(
+                        "protocolVersion", "2024-11-05",
+                        "capabilities", Map.of(),
+                        "clientInfo", Map.of("name", "test-client", "version", "1.0"))))
+                .when().post("/mcp")
+                .then()
+                .statusCode(200)
+                .extract().header("Mcp-Session-Id");
+
         given()
                 .contentType("application/json")
-                .body(Map.of("jsonrpc", "2.0", "id", 2, "method", "tools/list"))
-                .when().post("/api/v1/mcp")
+                .header("Accept", "application/json, text/event-stream")
+                .header("Mcp-Session-Id", sessionId)
+                .body(Map.of("jsonrpc", "2.0", "id", 2, "method", "tools/list", "params", Map.of()))
+                .when().post("/mcp")
                 .then()
                 .statusCode(200)
                 .body("result.tools.size()", greaterThanOrEqualTo(6));
 
         given()
                 .contentType("application/json")
+                .header("Accept", "application/json, text/event-stream")
+                .header("Mcp-Session-Id", sessionId)
                 .body(Map.of(
                         "jsonrpc", "2.0",
                         "id", 3,
                         "method", "tools/call",
                         "params", Map.of(
-                                "name", "query_telemetry",
-                                "arguments", Map.of("signal", "LOGS", "service", "checkout-api"))))
-                .when().post("/api/v1/mcp")
+                                "name", "list_scenarios",
+                                "arguments", Map.of())))
+                .when().post("/mcp")
                 .then()
                 .statusCode(200)
-                .body("result.isError", is(false))
-                .body("result.content[0].text", not(blankOrNullString()));
+                .body("result.content[0].text", containsString("checkout-latency-db-pool"));
     }
 
     @Test
-    void acceptsMcpNotificationsWithNoContent() {
+    void readsMcpResourcesOverHttp() {
+        String sessionId = given()
+                .contentType("application/json")
+                .header("Accept", "application/json, text/event-stream")
+                .body(Map.of("jsonrpc", "2.0", "id", 1, "method", "initialize", "params", Map.of(
+                        "protocolVersion", "2024-11-05",
+                        "capabilities", Map.of(),
+                        "clientInfo", Map.of("name", "test-client", "version", "1.0"))))
+                .when().post("/mcp")
+                .then()
+                .statusCode(200)
+                .extract().header("Mcp-Session-Id");
+
         given()
                 .contentType("application/json")
-                .body(Map.of("jsonrpc", "2.0", "method", "notifications/initialized"))
-                .when().post("/api/v1/mcp")
-                .then()
-                .statusCode(202);
-    }
-
-    @Test
-    void describesMcpOverHttpGet() {
-        given()
-                .when().get("/api/v1/mcp")
+                .header("Accept", "application/json, text/event-stream")
+                .header("Mcp-Session-Id", sessionId)
+                .body(Map.of(
+                        "jsonrpc", "2.0",
+                        "id", 9,
+                        "method", "resources/read",
+                        "params", Map.of("uri", "sre://scenarios/checkout-latency-db-pool")))
+                .when().post("/mcp")
                 .then()
                 .statusCode(200)
-                .body("server", is("ajentic-sre"))
-                .body("protocolVersion", not(blankOrNullString()))
-                .body("capabilities", hasItems("tools", "resources", "prompts"));
-    }
-
-    @Test
-    void resetsTheActiveEpisodeOverHttpDelete() {
-        given()
-                .when().delete("/api/v1/mcp")
-                .then()
-                .statusCode(204);
-    }
-
-    @Test
-    void handlesMcpBatchesOverHttp() {
-        given()
-                .contentType("application/json")
-                .body("["
-                        + "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"ping\"},"
-                        + "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}]")
-                .when().post("/api/v1/mcp")
-                .then()
-                .statusCode(200)
-                .body("size()", is(2))
-                .body("[1].result.tools.size()", greaterThanOrEqualTo(9));
+                .body("result.contents[0].mimeType", is("application/json"))
+                .body("result.contents[0].text", containsString("checkout-latency-db-pool"));
     }
 
     @Test
     void recoversFromMalformedMcpJson() {
         given()
                 .contentType("application/json")
+                .header("Accept", "application/json, text/event-stream")
                 .body("{ this is not json")
-                .when().post("/api/v1/mcp")
+                .when().post("/mcp")
                 .then()
                 .statusCode(200)
                 .body("error.code", is(-32700));
-    }
-
-    @Test
-    void readsMcpResourcesOverHttp() {
-        given()
-                .contentType("application/json")
-                .body(Map.of(
-                        "jsonrpc", "2.0",
-                        "id", 9,
-                        "method", "resources/read",
-                        "params", Map.of("uri", "sre://scenarios/checkout-latency-db-pool")))
-                .when().post("/api/v1/mcp")
-                .then()
-                .statusCode(200)
-                .body("result.contents[0].mimeType", is("application/json"));
     }
 
     @Test

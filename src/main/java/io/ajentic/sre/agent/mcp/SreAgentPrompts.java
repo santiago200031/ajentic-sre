@@ -2,13 +2,16 @@ package io.ajentic.sre.agent.mcp;
 
 import io.ajentic.sre.rl.simulation.Scenario;
 import io.ajentic.sre.rl.simulation.ScenarioRepository;
+import io.quarkiverse.mcp.server.Prompt;
+import io.quarkiverse.mcp.server.PromptArg;
+import io.quarkiverse.mcp.server.PromptMessage;
+import io.quarkiverse.mcp.server.PromptResponse;
 import io.quarkus.arc.Unremovable;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 /**
- * The reusable prompt templates the MCP server publishes. Each method is discovered through {@link AgentPrompt},
- * so the protocol handler never hardcodes prompt text or argument handling.
+ * The reusable prompt templates the MCP server publishes.
  */
 @ApplicationScoped
 @Unremovable
@@ -21,30 +24,35 @@ public class SreAgentPrompts {
         this.scenarios = scenarios;
     }
 
-    @AgentPrompt(name = "investigate-incident", description = "Bootstrap an investigation of a scenario.")
-    public String investigateIncident(@PromptParam("Scenario identifier.") String scenarioId) {
+    @Prompt(name = "investigate-incident", description = "Bootstrap an investigation of a scenario.")
+    public PromptResponse investigateIncident(
+            @PromptArg(name = "scenarioId", description = "Scenario identifier.", required = true) String scenarioId) {
         Scenario scenario = require(scenarioId);
-        return ("Investigate the '%s' incident (%s). Query metrics, logs, traces and "
+        String text = ("Investigate the '%s' incident (%s). Query metrics, logs, traces and "
                 + "deployments, identify the root cause, apply the correct remediation, and record a diagnosis.")
                 .formatted(scenario.id(), scenario.incidentSummary());
+        return PromptResponse.withMessages(PromptMessage.withUserRole(text));
     }
 
-    @AgentPrompt(name = "summarize-postmortem", description = "Draft a postmortem summary for a scenario.")
-    public String summarizePostmortem(@PromptParam("Scenario identifier.") String scenarioId) {
+    @Prompt(name = "summarize-postmortem", description = "Draft a postmortem summary for a scenario.")
+    public PromptResponse summarizePostmortem(
+            @PromptArg(name = "scenarioId", description = "Scenario identifier.", required = true) String scenarioId) {
         Scenario scenario = require(scenarioId);
-        return ("Write a concise postmortem for the '%s' incident. Cover impact, root "
+        String text = ("Write a concise postmortem for the '%s' incident. Cover impact, root "
                 + "cause, remediation, and follow-up actions.").formatted(scenario.id());
+        return PromptResponse.withMessages(PromptMessage.withUserRole(text));
     }
 
-    @AgentPrompt(name = "code-remediation", description = "Bootstrap automated code fix and pull request for an alert.")
-    public String codeRemediation(
-            @PromptParam("Repository owner and name.") String repository,
-            @PromptParam("Target branch name.") String branch,
-            @PromptParam("Alert title.") String title,
-            @PromptParam("Alert message.") String message,
-            @PromptParam("Stack trace if available.") String stackTrace,
-            @PromptParam("Alert fingerprint.") String fingerprint) {
-        return buildCodeRemediationPrompt(repository, branch, title, message, stackTrace, fingerprint);
+    @Prompt(name = "code-remediation", description = "Bootstrap automated code fix and pull request for an alert.")
+    public PromptResponse codeRemediation(
+            @PromptArg(name = "repository", description = "Repository owner and name.", required = true) String repository,
+            @PromptArg(name = "branch", description = "Target branch name.", required = false) String branch,
+            @PromptArg(name = "title", description = "Alert title.", required = true) String title,
+            @PromptArg(name = "message", description = "Alert message.", required = true) String message,
+            @PromptArg(name = "stackTrace", description = "Stack trace if available.", required = false) String stackTrace,
+            @PromptArg(name = "fingerprint", description = "Alert fingerprint.", required = false) String fingerprint) {
+        String text = buildCodeRemediationPrompt(repository, branch, title, message, stackTrace, fingerprint);
+        return PromptResponse.withMessages(PromptMessage.withUserRole(text));
     }
 
     public static String buildCodeRemediationPrompt(
