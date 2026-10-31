@@ -21,6 +21,7 @@ mvn -v                # confirm Maven 3.10 + JDK 25+
 |------|---------|
 | Full offline test suite | `mvn test` |
 | One test class | `mvn test -Dtest=CliEndToEndTest` |
+| Benchmark policies | `java -jar target/quarkus-app/quarkus-run.jar benchmark --scenarios all --seeds 2 --policy all` (offline by default) |
 | Compile + test + package | `mvn package` |
 | Full validation | `mvn verify` |
 | Dev server (live reload) | `mvn quarkus:dev`  → http://localhost:8080 |
@@ -49,8 +50,8 @@ Surefire is configured with `<skipITs>true</skipITs>`, so failsafe integration t
 
 ## Entrypoints & layout
 
-- CLI: `io.ajentic.sre.cli.AjenticCommand` (picocli). Subcommands: `scenarios`, `simulate`, `ask`, `schedules`,
-  `serve`, `swagger`, `mcp`.
+- CLI: `io.ajentic.sre.cli.AjenticCommand` (picocli). Subcommands: `scenarios`, `simulate`, `benchmark`, `ask`,
+  `schedules`, `serve`, `swagger`, `mcp`.
 - `mvn quarkus:dev -Dquarkus.args="mcp"` runs the MCP stdio bridge.
 - REST surface under `/api/v1`; OpenAPI at `/q/openapi`, Swagger UI at `/q/swagger-ui`, health at `/q/health`.
 - Packages under `io.ajentic.sre`:

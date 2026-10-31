@@ -9,7 +9,7 @@ import picocli.CommandLine.Command;
         name = "ajentic-sre",
         mixinStandardHelpOptions = true,
         description = "Open reinforcement learning environment and agent harness for infrastructure incident response.",
-        subcommands = {ScenariosCommand.class, SimulateCommand.class, AskCommand.class, SchedulesCommand.class, ServeCommand.class, McpStdioCommand.class, SwaggerCommand.class})
+        subcommands = {ScenariosCommand.class, SimulateCommand.class, AskCommand.class, SchedulesCommand.class, ServeCommand.class, McpStdioCommand.class, SwaggerCommand.class, BenchmarkCommand.class})
 public class AjenticCommand implements Runnable {
 
     @Override

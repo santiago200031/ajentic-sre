@@ -33,6 +33,17 @@ class CliEndToEndTest {
     }
 
     @Test
+    @Launch({"benchmark", "--scenarios", "orders-bad-deployment,checkout-latency-db-pool",
+            "--seeds", "2", "--policy", "heuristic,random", "--json"})
+    void benchmarkEmitsAScorecard(LaunchResult result) {
+        assertEquals(0, result.exitCode());
+        String output = result.getOutput();
+        assertTrue(output.contains("\"policy\" : \"HEURISTIC\""), output);
+        assertTrue(output.contains("\"policy\" : \"RANDOM\""), output);
+        assertTrue(output.contains("scorecard written to .ajentic/benchmarks/"), output);
+    }
+
+    @Test
     void onlyServeStartsTheHttpListener() {
         assertTrue(CliMain.headless("scenarios"));
         assertTrue(CliMain.headless("mcp"));

@@ -322,13 +322,13 @@ overwrite each other's active episode unless every call passes `_episodeId`.
 
 ### 15. `feat/benchmark-cli`
 
-- [ ] Add `benchmark` subcommand: `--scenarios all|<ids> --seeds N --model <id> --policy HEURISTIC|RANDOM|LLM`.
-- [ ] Run every (scenario, seed) pair, collect solve rate, diagnosis accuracy, steps to resolution, prompt/completion
+- [x] Add `benchmark` subcommand: `--scenarios all|<ids> --seeds N --model <id> --policy HEURISTIC|RANDOM|LLM`.
+- [x] Run every (scenario, seed) pair, collect solve rate, diagnosis accuracy, steps to resolution, prompt/completion
       tokens, and p95 latency; emit a table plus `--json` output.
-- [ ] Compare HEURISTIC, RANDOM, and one or more LLMs side by side; write results to `.ajentic/benchmarks/<ts>.json`.
-- [ ] Keep it offline by default against `scripted`; `-Plive-llm` or `--model` opts into a live endpoint.
-- [ ] Test: a 2-scenario × 2-seed run produces a deterministic scorecard for HEURISTIC/RANDOM.
-- [ ] Document sample invocations in `README.md` and `AGENTS.md` command table.
+- [x] Compare HEURISTIC, RANDOM, and one or more LLMs side by side; write results to `.ajentic/benchmarks/<ts>.json`.
+- [x] Keep it offline by default against `scripted`; `-Plive-llm` or `--model` opts into a live endpoint.
+- [x] Test: a 2-scenario × 2-seed run produces a deterministic scorecard for HEURISTIC/RANDOM.
+- [x] Document sample invocations in `README.md` and `AGENTS.md` command table.
 
 **Files.** new `cli/BenchmarkCommand.java`, `cli/AjenticCommand.java`, new `benchmark/` package.
 
