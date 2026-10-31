@@ -1,0 +1,32 @@
+{
+  "service": "checkout-api",
+  "baseline": {
+    "errorRate": 0.005,
+    "p95LatencyMs": 95.0,
+    "replicas": 3,
+    "status": "HEALTHY"
+  },
+  "injectedFaults": [
+    {
+      "kind": "LATENCY_SPIKE",
+      "target": "checkout-api",
+      "metricDeltaMs": 350.0,
+      "summary": "Downstream DB connection pool exhaustion causing p95 spike"
+    },
+    {
+      "kind": "ERROR_RATE_INCREASE",
+      "target": "checkout-api",
+      "metricDeltaRate": 0.12,
+      "summary": "5xx HTTP error rate increase due to unhandled NullPointerException in checkout controller"
+    }
+  ],
+  "recentEvents": [
+    {
+      "kind": "DEPLOY",
+      "service": "checkout-api",
+      "summary": "Deployment v1.4.2 applied to checkout-api fleet",
+      "occurredAt": "2026-01-01T00:00:00Z",
+      "diff": "--- a/checkout.yaml\n+++ b/checkout.yaml\n@@ -10,1 +10,1 @@\n-  image: checkout:1.4.1\n+  image: checkout:1.4.2"
+    }
+  ]
+}

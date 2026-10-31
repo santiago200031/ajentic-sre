@@ -7,6 +7,9 @@ services:
       - "8080:8080"
     environment:
       AJENTIC_LLM_BASE_URL: ${AJENTIC_LLM_BASE_URL:-http://host.docker.internal:9931/v1}
+      AJENTIC_AWS_ENDPOINT_URL: ${AJENTIC_AWS_ENDPOINT_URL:-http://localstack:4566}
+      AJENTIC_AZURE_ENDPOINT_URL: ${AJENTIC_AZURE_ENDPOINT_URL:-http://azure-monitor-stub:8080}
+      AJENTIC_GCP_ENDPOINT_URL: ${AJENTIC_GCP_ENDPOINT_URL:-http://gcp-monitor-stub:8080}
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
@@ -30,3 +33,47 @@ services:
       - ./src/main/docker/grafana/provisioning:/etc/grafana/provisioning:ro
     depends_on:
       - prometheus
+
+  # Multi-Cloud Emulation Stack (profile: cloud)
+  localstack:
+    image: localstack/localstack:3.8
+    profiles:
+      - cloud
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=cloudwatch,logs,events,ecs,sns,sqs
+      - DOCKER_HOST=unix:///var/run/docker.sock
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.33.0
+    profiles:
+      - cloud
+    ports:
+      - "10000:10000"
+
+  azure-monitor-stub:
+    image: wiremock/wiremock:3.13.2
+    profiles:
+      - cloud
+    ports:
+      - "10080:8080"
+    volumes:
+      - ./src/test/resources/wiremock/azure:/home/wiremock/mappings:ro
+
+  fake-gcs-server:
+    image: fsouza/fake-gcs-server:1.52.2
+    profiles:
+      - cloud
+    ports:
+      - "4443:4443"
+    command: -scheme http
+
+  gcp-monitor-stub:
+    image: wiremock/wiremock:3.13.2
+    profiles:
+      - cloud
+    ports:
+      - "10081:8080"
+    volumes:
+      - ./src/test/resources/wiremock/gcp:/home/wiremock/mappings:ro
