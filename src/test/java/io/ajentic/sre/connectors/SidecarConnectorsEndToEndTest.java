@@ -3,17 +3,17 @@ package io.ajentic.sre.connectors;
 import io.ajentic.sre.agent.integration.IncidentSummary;
 import io.ajentic.sre.agent.integration.SidecarClient;
 import io.ajentic.sre.agent.integration.SidecarNotificationChannel;
-import io.ajentic.sre.rl.ObservedSignal;
-import io.ajentic.sre.rl.StepResult;
-import io.ajentic.sre.rl.TelemetrySignal;
-import io.ajentic.sre.rl.action.ApplyRemediation;
-import io.ajentic.sre.rl.action.InspectRecentChanges;
-import io.ajentic.sre.rl.action.QueryTelemetry;
-import io.ajentic.sre.rl.action.RemediationKind;
-import io.ajentic.sre.rl.environment.sidecar.SidecarEnvironment;
-import io.ajentic.sre.rl.reward.IncidentRewardFunction;
-import io.ajentic.sre.rl.simulation.Scenario;
-import io.ajentic.sre.rl.simulation.ScenarioLibrary;
+import io.ajentic.sre.simulation.ObservedSignal;
+import io.ajentic.sre.simulation.StepResult;
+import io.ajentic.sre.simulation.TelemetrySignal;
+import io.ajentic.sre.simulation.action.ApplyRemediation;
+import io.ajentic.sre.simulation.action.InspectRecentChanges;
+import io.ajentic.sre.simulation.action.QueryTelemetry;
+import io.ajentic.sre.simulation.action.RemediationKind;
+import io.ajentic.sre.simulation.environment.sidecar.SidecarEnvironment;
+import io.ajentic.sre.simulation.scorecard.IncidentScorecard;
+import io.ajentic.sre.simulation.Scenario;
+import io.ajentic.sre.simulation.ScenarioLibrary;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.WebApplicationException;
@@ -132,7 +132,7 @@ class SidecarConnectorsEndToEndTest {
     void sidecarEnvironmentStepsAndQueriesTelemetry() {
         SidecarEnvironment env = new SidecarEnvironment(
                 scenario,
-                new IncidentRewardFunction(),
+                new IncidentScorecard(),
                 sidecarClient,
                 "aws",
                 true);
@@ -175,7 +175,7 @@ class SidecarConnectorsEndToEndTest {
         SidecarClient mockClient = new SidecarClient(failingClient, "sec");
         SidecarEnvironment env = new SidecarEnvironment(
                 scenario,
-                new IncidentRewardFunction(),
+                new IncidentScorecard(),
                 mockClient,
                 "aws",
                 true);

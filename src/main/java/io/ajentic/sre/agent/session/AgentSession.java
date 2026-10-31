@@ -17,7 +17,7 @@ import io.ajentic.sre.agent.tool.ToolAuthorization;
 import io.ajentic.sre.agent.tool.ToolContext;
 import io.ajentic.sre.agent.tool.ToolInvocation;
 import io.ajentic.sre.agent.tool.ToolRegistry;
-import io.ajentic.sre.rl.Environment;
+import io.ajentic.sre.simulation.Environment;
 import io.micrometer.core.instrument.MeterRegistry;
 
 import java.time.Duration;

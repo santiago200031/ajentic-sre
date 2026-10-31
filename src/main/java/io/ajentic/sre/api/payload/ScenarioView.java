@@ -1,8 +1,8 @@
 package io.ajentic.sre.api.payload;
 
-import io.ajentic.sre.rl.simulation.Fault;
-import io.ajentic.sre.rl.simulation.Scenario;
-import io.ajentic.sre.rl.simulation.ServiceSpec;
+import io.ajentic.sre.simulation.Fault;
+import io.ajentic.sre.simulation.Scenario;
+import io.ajentic.sre.simulation.ServiceSpec;
 
 import java.util.List;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;

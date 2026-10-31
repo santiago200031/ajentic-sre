@@ -2,7 +2,7 @@ package io.ajentic.sre.agent.session;
 
 import io.ajentic.sre.agent.llm.TokenUsage;
 import io.ajentic.sre.agent.llm.ToolCall;
-import io.ajentic.sre.rl.Observation;
+import io.ajentic.sre.simulation.Observation;
 
 import java.util.List;
 

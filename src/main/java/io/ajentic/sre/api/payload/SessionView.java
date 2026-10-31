@@ -1,7 +1,7 @@
 package io.ajentic.sre.api.payload;
 
 import io.ajentic.sre.agent.session.AgentSession;
-import io.ajentic.sre.rl.Observation;
+import io.ajentic.sre.simulation.Observation;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
 
 /**

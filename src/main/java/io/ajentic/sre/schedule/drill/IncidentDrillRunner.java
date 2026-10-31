@@ -1,11 +1,11 @@
 package io.ajentic.sre.schedule.drill;
 
 import io.ajentic.sre.schedule.engine.ScheduledJob;
-import io.ajentic.sre.rl.Environment;
-import io.ajentic.sre.rl.episode.EpisodeResult;
-import io.ajentic.sre.rl.episode.EpisodeRunner;
-import io.ajentic.sre.rl.policy.PolicyFactory;
-import io.ajentic.sre.rl.simulation.EnvironmentFactory;
+import io.ajentic.sre.simulation.Environment;
+import io.ajentic.sre.simulation.drill.SimulationResult;
+import io.ajentic.sre.simulation.drill.SimulationRunner;
+import io.ajentic.sre.simulation.playbook.PlaybookFactory;
+import io.ajentic.sre.simulation.EnvironmentFactory;
 import io.ajentic.sre.state.InMemoryStateStore;
 import io.ajentic.sre.state.StateStore;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -21,38 +21,38 @@ public class IncidentDrillRunner {
     private static final int HISTORY_LIMIT = 50;
 
     private final EnvironmentFactory environments;
-    private final EpisodeRunner runner;
-    private final PolicyFactory policies;
+    private final SimulationRunner runner;
+    private final PlaybookFactory policies;
     private final StateStore stateStore;
-    private final List<EpisodeResult> history = new CopyOnWriteArrayList<>();
+    private final List<SimulationResult> history = new CopyOnWriteArrayList<>();
 
-    public IncidentDrillRunner(EnvironmentFactory environments, EpisodeRunner runner, PolicyFactory policies) {
+    public IncidentDrillRunner(EnvironmentFactory environments, SimulationRunner runner, PlaybookFactory policies) {
         this(environments, runner, policies, new InMemoryStateStore());
     }
 
     @Inject
     public IncidentDrillRunner(
             EnvironmentFactory environments,
-            EpisodeRunner runner,
-            PolicyFactory policies,
+            SimulationRunner runner,
+            PlaybookFactory policies,
             StateStore stateStore) {
         this.environments = environments;
         this.runner = runner;
         this.policies = policies;
         this.stateStore = stateStore;
-        List<EpisodeResult> loaded = stateStore.loadDrills();
+        List<SimulationResult> loaded = stateStore.loadDrills();
         if (loaded != null && !loaded.isEmpty()) {
             history.addAll(loaded);
         }
     }
 
-    public EpisodeResult drill(String scenarioId) {
+    public SimulationResult drill(String scenarioId) {
         return drill(scenarioId, null);
     }
 
-    public EpisodeResult drill(String scenarioId, EpisodeRunner.StepListener listener) {
+    public SimulationResult drill(String scenarioId, SimulationRunner.StepListener listener) {
         Environment environment = environments.create(scenarioId, 42L);
-        EpisodeResult result = runner.run(
+        SimulationResult result = runner.run(
                 UUID.randomUUID().toString(), environment, policies.byName("heuristic"), listener);
         history.add(result);
         while (history.size() > HISTORY_LIMIT) {
@@ -66,7 +66,7 @@ public class IncidentDrillRunner {
         return context -> drill(scenarioId);
     }
 
-    public List<EpisodeResult> recent() {
+    public List<SimulationResult> recent() {
         return List.copyOf(history);
     }
 }

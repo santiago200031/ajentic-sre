@@ -71,7 +71,7 @@ public class ChatWebhookResource {
     private static final int DEFAULT_MAX_ITERATIONS = 8;
 
     private final SessionService sessions;
-    private final io.ajentic.sre.rl.episode.EpisodeService episodeService;
+    private final io.ajentic.sre.simulation.drill.SimulationService episodeService;
     private final RemediationStore remediationStore;
     private final GitHubClient github;
     private final ObjectMapper mapper;
@@ -89,7 +89,7 @@ public class ChatWebhookResource {
     @Inject
     public ChatWebhookResource(
             SessionService sessions,
-            io.ajentic.sre.rl.episode.EpisodeService episodeService,
+            io.ajentic.sre.simulation.drill.SimulationService episodeService,
             RemediationStore remediationStore,
             GitHubClient github,
             ObjectMapper mapper,
@@ -438,10 +438,10 @@ public class ChatWebhookResource {
                     session.pendingApprovals().size());
         }
 
-        // 2. Search episode by ID in EpisodeService
-        Optional<io.ajentic.sre.rl.episode.EpisodeHandle> episodeOpt = episodeService.find(target);
+        // 2. Search episode by ID in SimulationService
+        Optional<io.ajentic.sre.simulation.drill.SimulationHandle> episodeOpt = episodeService.find(target);
         if (episodeOpt.isPresent()) {
-            io.ajentic.sre.rl.episode.EpisodeHandle ep = episodeOpt.get();
+            io.ajentic.sre.simulation.drill.SimulationHandle ep = episodeOpt.get();
             boolean resolved = ep.environment().observe().resolved();
             return String.format("Episode %s: status=%s, terminal=%s",
                     ep.id(),

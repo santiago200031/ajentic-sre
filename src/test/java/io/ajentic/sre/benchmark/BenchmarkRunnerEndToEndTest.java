@@ -36,6 +36,9 @@ class BenchmarkRunnerEndToEndTest {
         assertEquals(4, random.episodes());
         assertEquals(0.0, random.solveRate(), "random never diagnoses or remediates");
         assertEquals(0, random.diagnosed());
+
+        // Emit formatted performance scorecard (speed, latencies, tokens, accuracy)
+        System.out.println(a.toFormattedReport());
     }
 
     @Test

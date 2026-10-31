@@ -26,7 +26,6 @@ mvn -v                # confirm Maven 3.10 + JDK 25+
 | Dev server (live reload) | `mvn quarkus:dev`  → http://localhost:8080 |
 | Packaged server | `java -jar target/quarkus-app/quarkus-run.jar` (after `mvn package`) |
 | Docker image | `mvn package && docker build -f src/main/docker/Dockerfile.jvm -t ajentic-sre .` |
-| Thin wrappers | `make dev \| test \| verify \| package \| lab-up \| cloud-up` |
 
 `mvn test` needs `-Dtest` to run a single class; without it the whole `@QuarkusTest` suite runs.
 Surefire is configured with `<skipITs>true</skipITs>`, so failsafe integration tests are skipped by default.
@@ -34,6 +33,8 @@ Surefire is configured with `<skipITs>true</skipITs>`, so failsafe integration t
 ## Profiles
 
 - `mvn test -Pjdk27-preview`: Java 27 preview (`--release 27 --enable-preview`); full suite passes.
+- `mvn test -Pbenchmark`: executes the benchmark runner offline, printing speed, tokens, latency, and accuracy metrics.
+- `mvn test -Pbenchmark-live`: executes the benchmark runner against the live LLM endpoint, measuring live model performance.
 - `mvn test -Plive-llm`: bypasses WireMock and calls a live OpenAI-compatible endpoint. Requires a model +
   network; override with `AJENTIC_LLM_BASE_URL` / `AJENTIC_LLM_MODEL`. Treat as a smoke test. The default run
   stays offline via `%test.ajentic.llm.provider=scripted` in `application.properties`.
@@ -58,26 +59,26 @@ Surefire is configured with `<skipITs>true</skipITs>`, so failsafe integration t
 - Root redirect: `GET /` redirects (303) directly to Swagger UI at `/q/swagger-ui`.
 - REST surface under `/api/v1`; OpenAPI at `/q/openapi`, Swagger UI at `/q/swagger-ui`, health at `/q/health`.
   - Scenarios: `GET /api/v1/scenarios`
-  - Simulation: `POST /api/v1/episodes/simulate`
+  - Simulation: `POST /api/v1/simulations/simulate` (legacy alias: `POST /api/v1/episodes/simulate`)
   - Agent ask: `POST /api/v1/agent/ask`
-  - Benchmarks: `POST /api/v1/benchmarks`
   - Schedules: `GET /api/v1/schedules`, `POST /api/v1/schedules`, `POST /api/v1/schedules/{id}/run`
   - Alert webhook: `POST /api/v1/webhooks/alerts` accepts CloudWatch, Azure Monitor, Alertmanager, or direct JSON.
     Normalizes severity (`INFO < WARNING < ERROR < CRITICAL`), ignores below `ajentic.alerts.min-severity` (`202 Accepted`),
     and executes a bounded code-remediation turn (`200 OK`) opening a branch and PR on GitHub (offline stubbed in tests).
 - MCP protocol: Quarkiverse MCP Server stdio and HTTP (`/mcp`) transports.
 - Packages under `io.ajentic.sre`:
-  - `rl`: environment contracts, rewards, episodes, policies, simulation
+  - `simulation`: scenario library, environment contracts, incident scorecards, drills, and playbooks
   - `agent/{llm,session,mcp,tool,masking,context,alerts,github,integration}`: ReAct loop, LLM clients, MCP handler, tool registry, alert normalizer, GitHub client, sidecar client
   - `connectors`: credential-isolated sidecar security (HMAC-SHA256, anti-replay) and audit logging
   - `schedule/{cron,drill,engine,store}`: versioned cron scheduler
   - `state`: file-backed durable state store (`.ajentic/state.json`) with concurrency locks
+  - `benchmark`: performance evaluation runner and scorecard metrics (invoked in dev via `-Pbenchmark` / `-Pbenchmark-live`)
   - `api`: JAX-RS resources, mappers, payloads
   - `health`
 
 ## Conventions
 
 - `.editorconfig`: UTF-8, LF, final newline, trimmed trailing whitespace, 4-space indent (2-space for
-  yml/yaml/json/toml; tabs for Makefile).
+  yml/yaml/json/toml).
 - Config lives in `src/main/resources/application.properties`; LLM settings are `ajentic.llm.*`.
 - Default LLM provider `openai-compatible` points at `http://127.0.0.1:9931/v1` (local llama.cpp router).

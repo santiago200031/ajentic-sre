@@ -1,7 +1,7 @@
 package io.ajentic.sre.agent.mcp;
 
-import io.ajentic.sre.rl.simulation.Scenario;
-import io.ajentic.sre.rl.simulation.ScenarioRepository;
+import io.ajentic.sre.simulation.Scenario;
+import io.ajentic.sre.simulation.ScenarioRepository;
 import io.quarkiverse.mcp.server.Prompt;
 import io.quarkiverse.mcp.server.PromptArg;
 import io.quarkiverse.mcp.server.PromptMessage;

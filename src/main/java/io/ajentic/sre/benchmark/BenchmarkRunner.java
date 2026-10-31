@@ -5,12 +5,12 @@ import io.ajentic.sre.agent.masking.SensitiveDataMasker;
 import io.ajentic.sre.agent.session.AgentSessionConfig;
 import io.ajentic.sre.agent.tool.ToolAuthorization;
 import io.ajentic.sre.agent.tool.ToolRegistry;
-import io.ajentic.sre.rl.episode.EpisodeResult;
-import io.ajentic.sre.rl.episode.EpisodeRunner;
-import io.ajentic.sre.rl.policy.LlmPolicy;
-import io.ajentic.sre.rl.policy.Policy;
-import io.ajentic.sre.rl.policy.PolicyFactory;
-import io.ajentic.sre.rl.simulation.EnvironmentFactory;
+import io.ajentic.sre.simulation.drill.SimulationResult;
+import io.ajentic.sre.simulation.drill.SimulationRunner;
+import io.ajentic.sre.simulation.playbook.LlmPlaybook;
+import io.ajentic.sre.simulation.playbook.Playbook;
+import io.ajentic.sre.simulation.playbook.PlaybookFactory;
+import io.ajentic.sre.simulation.EnvironmentFactory;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Meter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -23,7 +23,7 @@ import java.util.Comparator;
 import java.util.List;
 
 /**
- * Runs every (scenario, seed) pair per policy through the shared {@link EpisodeRunner} and rolls the results up
+ * Runs every (scenario, seed) pair per policy through the shared {@link SimulationRunner} and rolls the results up
  * into a {@link BenchmarkScorecard}. HEURISTIC and RANDOM are fully deterministic per seed; LLM runs against
  * whatever {@code LlmClient} is configured, so the default {@code scripted} provider keeps the benchmark offline.
  */
@@ -33,8 +33,8 @@ public final class BenchmarkRunner {
     private static final String TOKEN_COUNTER = "ajentic.llm.tokens";
 
     private final EnvironmentFactory environments;
-    private final EpisodeRunner runner;
-    private final PolicyFactory policies;
+    private final SimulationRunner runner;
+    private final PlaybookFactory policies;
     private final LlmClient llm;
     private final ToolRegistry tools;
     private final ToolAuthorization authorization;
@@ -44,8 +44,8 @@ public final class BenchmarkRunner {
     @Inject
     public BenchmarkRunner(
             EnvironmentFactory environments,
-            EpisodeRunner runner,
-            PolicyFactory policies,
+            SimulationRunner runner,
+            PlaybookFactory policies,
             LlmClient llm,
             ToolRegistry tools,
             ToolAuthorization authorization,
@@ -80,9 +80,9 @@ public final class BenchmarkRunner {
         int episode = 0;
         for (String scenarioId : scenarioIds) {
             for (int seed = 1; seed <= seeds; seed++) {
-                Policy policy = policyFor(name, scenarioId, model);
+                Playbook policy = policyFor(name, scenarioId, model);
                 long start = System.nanoTime();
-                EpisodeResult result = runner.run(
+                SimulationResult result = runner.run(
                         name + "-" + scenarioId + "-seed" + seed,
                         environments.create(scenarioId, seed),
                         policy);
@@ -109,11 +109,11 @@ public final class BenchmarkRunner {
                 totalTokens("completion") - completionBefore);
     }
 
-    private Policy policyFor(String name, String scenarioId, String model) {
+    private Playbook policyFor(String name, String scenarioId, String model) {
         return switch (name.toUpperCase()) {
             case "HEURISTIC" -> policies.byName("heuristic");
             case "RANDOM" -> policies.byName("random");
-            case "LLM" -> new LlmPolicy(
+            case "LLM" -> new LlmPlaybook(
                     llm,
                     tools,
                     authorization,

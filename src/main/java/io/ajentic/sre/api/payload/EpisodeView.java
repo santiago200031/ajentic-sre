@@ -1,8 +1,8 @@
 package io.ajentic.sre.api.payload;
 
-import io.ajentic.sre.rl.episode.EpisodeHandle;
-import io.ajentic.sre.rl.episode.EpisodeResult;
-import io.ajentic.sre.rl.Observation;
+import io.ajentic.sre.simulation.drill.SimulationHandle;
+import io.ajentic.sre.simulation.drill.SimulationResult;
+import io.ajentic.sre.simulation.Observation;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
 
 /**
@@ -20,9 +20,9 @@ public record EpisodeView(
         boolean completed,
 
         @Schema(description = "The final episode result, present once the episode completes.")
-        EpisodeResult result) {
+        SimulationResult result) {
 
-    public static EpisodeView from(EpisodeHandle handle) {
+    public static EpisodeView from(SimulationHandle handle) {
         return new EpisodeView(
                 handle.id(),
                 handle.environment().observe(),

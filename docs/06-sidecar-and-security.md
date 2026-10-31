@@ -6,6 +6,8 @@
 
 To prevent prompt injection attacks or rogue agent behavior from compromising cloud credentials, `ajentic-sre` implements a **credential-isolated sidecar connector architecture**.
 
+![Sidecar Security Architecture Model](diagrams/sidecar-security-model.svg)
+
 ```mermaid
 flowchart LR
     subgraph Agent Pod

@@ -1,18 +1,18 @@
 package io.ajentic.sre.api.mapper;
 
 import io.ajentic.sre.api.payload.ActionRequest;
-import io.ajentic.sre.rl.TelemetrySignal;
-import io.ajentic.sre.rl.action.ActionKind;
-import io.ajentic.sre.rl.action.AgentAction;
-import io.ajentic.sre.rl.action.ApplyRemediation;
-import io.ajentic.sre.rl.action.CorrelateAnomalies;
-import io.ajentic.sre.rl.action.DeclareDiagnosis;
-import io.ajentic.sre.rl.action.Idle;
-import io.ajentic.sre.rl.action.InspectRecentChanges;
-import io.ajentic.sre.rl.action.ListRemediations;
-import io.ajentic.sre.rl.action.QueryTelemetry;
-import io.ajentic.sre.rl.action.ReadRunbook;
-import io.ajentic.sre.rl.action.RemediationKind;
+import io.ajentic.sre.simulation.TelemetrySignal;
+import io.ajentic.sre.simulation.action.ActionKind;
+import io.ajentic.sre.simulation.action.AgentAction;
+import io.ajentic.sre.simulation.action.ApplyRemediation;
+import io.ajentic.sre.simulation.action.CorrelateAnomalies;
+import io.ajentic.sre.simulation.action.DeclareDiagnosis;
+import io.ajentic.sre.simulation.action.Idle;
+import io.ajentic.sre.simulation.action.InspectRecentChanges;
+import io.ajentic.sre.simulation.action.ListRemediations;
+import io.ajentic.sre.simulation.action.QueryTelemetry;
+import io.ajentic.sre.simulation.action.ReadRunbook;
+import io.ajentic.sre.simulation.action.RemediationKind;
 
 import java.util.List;
 

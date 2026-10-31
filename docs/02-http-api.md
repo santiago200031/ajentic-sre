@@ -14,18 +14,17 @@
 | `GET` | `/api/v1/scenarios` | Lists all built-in and external scenarios |
 | `GET` | `/api/v1/scenarios/{id}` | Fetches scenario details, topology, and runbooks |
 | `GET` | `/api/v1/tools` | Discovers available agent tool definitions |
-| `POST` | `/api/v1/episodes` | Initiates a new incident episode |
-| `GET` | `/api/v1/episodes/{id}` | Inspects current episode state and history |
-| `POST` | `/api/v1/episodes/{id}/actions` | Submits a single action to the environment |
-| `POST` | `/api/v1/episodes/{id}/run` | Executes a policy until episode completion |
-| `POST` | `/api/v1/episodes/simulate` | One-shot simulation without creating persistent sessions |
-| `DELETE` | `/api/v1/episodes/{id}` | Discards an episode |
+| `POST` | `/api/v1/simulations` | Initiates a new incident simulation drill (alias: `/api/v1/episodes`) |
+| `GET` | `/api/v1/simulations/{id}` | Inspects current simulation state and trajectory |
+| `POST` | `/api/v1/simulations/{id}/actions` | Submits a single action to the environment |
+| `POST` | `/api/v1/simulations/{id}/run` | Executes a playbook until simulation completion |
+| `POST` | `/api/v1/simulations/simulate` | One-shot simulation without creating persistent sessions (alias: `/api/v1/episodes/simulate`) |
+| `DELETE` | `/api/v1/simulations/{id}` | Discards a simulation |
 | `POST` | `/api/v1/agent/sessions` | Creates an LLM agent interactive session |
 | `GET` | `/api/v1/agent/sessions/{id}` | Retrieves session transcript and status |
 | `POST` | `/api/v1/agent/sessions/{id}/chat` | Executes a single ReAct loop turn |
 | `POST` | `/api/v1/agent/sessions/{id}/chat/stream` | Streams ReAct thoughts and tool calls via SSE |
 | `POST` | `/api/v1/agent/ask` | High-level one-shot question investigation |
-| `POST` | `/api/v1/benchmarks` | Executes comparative benchmark sweeps |
 | `GET` | `/api/v1/schedules` | Lists cron-scheduled incident drills |
 | `POST` | `/api/v1/schedules` | Creates a versioned recurring drill schedule |
 | `POST` | `/api/v1/schedules/{id}/run` | Triggers immediate drill execution |
@@ -38,9 +37,9 @@ curl -s http://localhost:8080/api/v1/scenarios | jq .
 ```
 
 ### 2. Run a One-Shot Simulation
-Simulate a scenario using the deterministic heuristic policy:
+Simulate a scenario using the deterministic heuristic playbook:
 ```bash
-curl -s -X POST http://localhost:8080/api/v1/episodes/simulate \
+curl -s -X POST http://localhost:8080/api/v1/simulations/simulate \
   -H 'Content-Type: application/json' \
   -d '{"scenarioId": "orders-bad-deployment", "policy": "heuristic", "seed": 42}' | jq .
 ```
@@ -56,16 +55,14 @@ curl -s -X POST http://localhost:8080/api/v1/agent/ask \
   }' | jq .
 ```
 
-### 4. Benchmark Policies
-Evaluate policies across multiple seeds and scenarios:
+### 4. Development Benchmarks (Maven Profiles)
+To keep production surfaces lean and secure, benchmarking is isolated to the development environment and executed via dedicated Maven profiles:
 ```bash
-curl -s -X POST http://localhost:8080/api/v1/benchmarks \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "scenarios": ["orders-bad-deployment", "checkout-latency-db-pool"],
-    "seeds": 3,
-    "policies": ["HEURISTIC", "RANDOM"]
-  }' | jq .
+# Offline benchmark sweep measuring speed, accuracy, and steps across scenarios:
+mvn test -Pbenchmark
+
+# Live LLM benchmark sweep measuring tokens, latency, and solve rates against real models:
+mvn test -Pbenchmark-live
 ```
 
 ### 5. Stream ReAct Events via Server-Sent Events (SSE)

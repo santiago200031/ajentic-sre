@@ -1,8 +1,8 @@
 package io.ajentic.sre.api.payload;
 
-import io.ajentic.sre.rl.Observation;
-import io.ajentic.sre.rl.StepResult;
-import io.ajentic.sre.rl.TerminationReason;
+import io.ajentic.sre.simulation.Observation;
+import io.ajentic.sre.simulation.StepResult;
+import io.ajentic.sre.simulation.TerminationReason;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
 
 /**

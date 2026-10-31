@@ -2,8 +2,8 @@ package io.ajentic.sre.api.mapper;
 
 import io.ajentic.sre.agent.session.UnknownSessionException;
 import io.ajentic.sre.api.webhook.WebhookException;
-import io.ajentic.sre.rl.episode.UnknownEpisodeException;
-import io.ajentic.sre.rl.simulation.UnknownScenarioException;
+import io.ajentic.sre.simulation.drill.UnknownSimulationException;
+import io.ajentic.sre.simulation.UnknownScenarioException;
 import io.ajentic.sre.schedule.cron.InvalidCronException;
 import io.ajentic.sre.schedule.store.DuplicateScheduleException;
 import io.ajentic.sre.schedule.store.ScheduleNotFoundException;
@@ -26,7 +26,7 @@ public class ApiExceptionMappers {
         return error(Response.Status.BAD_REQUEST, exception);
     }
 
-    @ServerExceptionMapper({UnknownScenarioException.class, UnknownEpisodeException.class,
+    @ServerExceptionMapper({UnknownScenarioException.class, UnknownSimulationException.class,
             UnknownSessionException.class, ScheduleNotFoundException.class})
     public Response notFound(RuntimeException exception) {
         return error(Response.Status.NOT_FOUND, exception);

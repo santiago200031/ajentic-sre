@@ -1,6 +1,6 @@
 package io.ajentic.sre.health;
 
-import io.ajentic.sre.rl.simulation.ScenarioRepository;
+import io.ajentic.sre.simulation.ScenarioRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.health.HealthCheck;

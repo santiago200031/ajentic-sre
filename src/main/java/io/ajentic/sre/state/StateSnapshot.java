@@ -1,6 +1,6 @@
 package io.ajentic.sre.state;
 
-import io.ajentic.sre.rl.episode.EpisodeResult;
+import io.ajentic.sre.simulation.drill.SimulationResult;
 import io.ajentic.sre.schedule.store.ScheduleDefinition;
 
 import java.util.List;
@@ -11,7 +11,7 @@ import java.util.List;
 public record StateSnapshot(
         int schemaVersion,
         List<ScheduleDefinition> schedules,
-        List<EpisodeResult> drills) {
+        List<SimulationResult> drills) {
 
     public static final int CURRENT_SCHEMA_VERSION = 1;
 

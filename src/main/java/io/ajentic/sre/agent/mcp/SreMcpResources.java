@@ -1,9 +1,9 @@
 package io.ajentic.sre.agent.mcp;
 
-import io.ajentic.sre.rl.simulation.Runbook;
-import io.ajentic.sre.rl.simulation.Scenario;
-import io.ajentic.sre.rl.simulation.ScenarioRepository;
-import io.ajentic.sre.rl.simulation.ServiceSpec;
+import io.ajentic.sre.simulation.Runbook;
+import io.ajentic.sre.simulation.Scenario;
+import io.ajentic.sre.simulation.ScenarioRepository;
+import io.ajentic.sre.simulation.ServiceSpec;
 import io.quarkiverse.mcp.server.ResourceManager;
 import io.quarkiverse.mcp.server.ResourceResponse;
 import io.quarkiverse.mcp.server.TextResourceContents;

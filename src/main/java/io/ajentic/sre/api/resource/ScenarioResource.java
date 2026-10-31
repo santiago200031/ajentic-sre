@@ -1,8 +1,8 @@
 package io.ajentic.sre.api.resource;
 
 import io.ajentic.sre.api.payload.ScenarioView;
-import io.ajentic.sre.rl.simulation.ScenarioRepository;
-import io.ajentic.sre.rl.simulation.UnknownScenarioException;
+import io.ajentic.sre.simulation.ScenarioRepository;
+import io.ajentic.sre.simulation.UnknownScenarioException;
 import io.smallrye.common.annotation.RunOnVirtualThread;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;

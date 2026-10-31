@@ -1,6 +1,6 @@
 package io.ajentic.sre.schedule.engine;
 
-import io.ajentic.sre.rl.episode.EpisodeResult;
+import io.ajentic.sre.simulation.drill.SimulationResult;
 import io.ajentic.sre.schedule.cron.CronExpression;
 import io.ajentic.sre.schedule.drill.IncidentDrillRunner;
 import io.ajentic.sre.schedule.store.ScheduleDefinition;
@@ -72,7 +72,7 @@ public class Scheduler {
         return definition;
     }
 
-    public EpisodeResult runNow(String id) {
+    public SimulationResult runNow(String id) {
         ScheduleDefinition definition = store.byId(id).orElseThrow(() -> new ScheduleNotFoundException(id));
         if (definition.scenarioId() != null) {
             return drills.drill(definition.scenarioId());

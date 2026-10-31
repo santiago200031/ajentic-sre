@@ -2,46 +2,49 @@
 
 ---
 
-# Architecture & Reinforcement Learning Model
+# Architecture & Incident Simulation Model
 
-`ajentic-sre` models infrastructure incident triage and remediation as a reinforcement learning (RL) environment driven by a ReAct (Reasoning + Acting) loop.
+`ajentic-sre` models infrastructure incident triage and remediation as a deterministic simulation environment driven by an autonomous ReAct (Reasoning + Acting) loop.
+
+![System Architecture Overview](diagrams/system-overview.svg)
 
 ## The Incident Loop
 
-An episode represents a single incident. A scenario defines the failure condition, and the environment exposes the resulting system symptoms. The agent acts sequentially until the incident is resolved, its budget is exhausted, or it triggers an unrecoverable failure:
+A simulation drill represents a single staged incident. A scenario defines the failure condition, and the environment exposes the resulting system symptoms. The agent acts sequentially until the incident is resolved, its budget is exhausted, or it triggers an unrecoverable failure:
 
-1. **`reset()`**: St解读ages the scenario failure, seeds initial telemetry, and returns the alert and available action space.
+1. **`reset()`**: Stages the scenario failure, seeds initial telemetry, and returns the alert and available action space.
 2. **Investigation**: The agent executes read-only tools (`query_telemetry`, `read_runbook`, `list_remediations`, `correlate_anomalies`).
 3. **Diagnosis & Remediation**: The agent records root causes via `declare_diagnosis` and executes mitigation via `apply_remediation`.
-4. **`step()`**: Evaluates the transition, applies state changes, calculates reward, and checks termination conditions.
-5. **Outcome**: The episode terminates with flags for `solved`, `resolved`, and `diagnosed`, alongside cumulative reward and step trajectory.
+4. **`step()`**: Evaluates the transition, applies state changes, calculates scorecard delta, and checks termination conditions.
+5. **Outcome**: The simulation terminates with flags for `solved`, `resolved`, and `diagnosed`, alongside cumulative score and step trajectory.
 
 ```mermaid
 flowchart TD
     A["Alert Triggered (reset)"] --> B["Agent ReAct Loop"]
-    B --> C{"Action Kind"}
+    C{"Action Kind"}
+    B --> C
     C -->|Read-Only| D["query_telemetry / read_runbook"]
     C -->|Diagnosis| E["declare_diagnosis"]
     C -->|Mutation| F["apply_remediation"]
-    D --> G["Environment step() & Reward Calculation"]
+    D --> G["Environment step() & Scorecard Evaluation"]
     E --> G
     F --> G
     G --> H{"Resolved or Terminal?"}
     H -->|No| B
-    H -->|Yes| I["Episode Completed (Record & Audit)"]
+    H -->|Yes| I["Simulation Completed (Record & Audit)"]
 ```
 
-## RL Interface Components
+## Simulation Core Components
 
 | Type | Responsibility |
 |---|---|
 | `Environment` | Contract for `reset()`, `step()`, `observe()`, `spec()`, and terminal state queries |
 | `Observation` | Encapsulates active incident, telemetry snapshot, service health, and available action space |
 | `AgentAction` | Sealed action hierarchy: telemetry queries, runbook lookup, remediation, diagnosis, idle |
-| `StepResult` | Returns next observation, step reward, and termination status |
-| `RewardFunction` | Evaluates transitions into scalar rewards (credits correct fix, charges step cost, penalizes mistakes) |
-| `Policy` | Strategy choosing actions from observations (heuristic, random, or LLM-driven) |
-| `EpisodeRunner` | Manages episode lifecycle and compiles `EpisodeResult` |
+| `StepResult` | Returns next observation, step scorecard score, and termination status |
+| `Scorecard` | Evaluates transitions into scalar scores (credits correct fix, charges step cost, penalizes mistakes) |
+| `Playbook` | Strategy choosing actions from observations (heuristic, random, or LLM-driven) |
+| `SimulationRunner` | Manages simulation drill lifecycle and compiles `SimulationResult` |
 
 ## Built-in Scenarios
 

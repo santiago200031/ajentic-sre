@@ -13,7 +13,7 @@ public record SimulateRequest(
         @Schema(description = "Scenario ID to simulate.", example = "checkout-latency-db-pool")
         String scenarioId,
 
-        @Schema(description = "Policy name: heuristic or idle.", example = "heuristic")
+        @Schema(description = "Playbook name: heuristic or idle.", example = "heuristic")
         String policy,
 
         @Schema(description = "Deterministic seed.", example = "42")

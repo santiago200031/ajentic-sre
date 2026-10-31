@@ -51,10 +51,10 @@ A complete local observability stack is pre-configured via `docker-compose.yml`:
 
 ```bash
 # Start application + Prometheus (:9090) + Grafana (:3000)
-make lab-up
+docker compose up -d ajentic-sre prometheus grafana
 
 # Tear down stack
-make lab-down
+docker compose down
 ```
 
 - **Application:** `http://localhost:8080`
@@ -68,9 +68,15 @@ make lab-down
 To spin up local cloud emulation (LocalStack, Azurite, and stubbed telemetry endpoints):
 
 ```bash
-make cloud-up
-make cloud-seed
-make cloud-down
+# Build and spin up the multi-cloud emulation stack
+mvn package -DskipTests
+docker compose --profile cloud up --build -d
+
+# Seed simulated cloud state and fleets
+bash src/main/docker/seed/seed-clouds.sh
+
+# Tear down the cloud emulation stack
+docker compose --profile cloud down
 ```
 
 ---

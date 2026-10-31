@@ -105,21 +105,17 @@ class ServerStartupTest {
     }
 
     @Test
-    void runsBenchmarkOverHttp() {
+    void benchmarkEndpointIsNotExposedInProductionRest() {
         given()
                 .contentType(ContentType.JSON)
                 .body("""
                         {
-                          "scenarios": ["orders-bad-deployment", "checkout-latency-db-pool"],
-                          "seeds": 2,
-                          "policies": ["HEURISTIC", "RANDOM"]
+                          "scenarios": ["orders-bad-deployment"]
                         }
                         """)
                 .when().post("/api/v1/benchmarks")
                 .then()
-                .statusCode(200)
-                .body("policies", not(empty()))
-                .body("policies.policy", hasItems("HEURISTIC", "RANDOM"));
+                .statusCode(404);
     }
 
     @Test

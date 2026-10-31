@@ -7,12 +7,12 @@ import io.ajentic.sre.api.payload.EpisodeView;
 import io.ajentic.sre.api.payload.RunEpisodeRequest;
 import io.ajentic.sre.api.payload.SimulateRequest;
 import io.ajentic.sre.api.payload.StepResultView;
-import io.ajentic.sre.rl.StepResult;
-import io.ajentic.sre.rl.episode.EpisodeHandle;
-import io.ajentic.sre.rl.episode.EpisodeResult;
-import io.ajentic.sre.rl.episode.EpisodeService;
-import io.ajentic.sre.rl.episode.UnknownEpisodeException;
-import io.ajentic.sre.rl.policy.PolicyFactory;
+import io.ajentic.sre.simulation.StepResult;
+import io.ajentic.sre.simulation.drill.SimulationHandle;
+import io.ajentic.sre.simulation.drill.SimulationResult;
+import io.ajentic.sre.simulation.drill.SimulationService;
+import io.ajentic.sre.simulation.drill.UnknownSimulationException;
+import io.ajentic.sre.simulation.playbook.PlaybookFactory;
 import io.smallrye.common.annotation.RunOnVirtualThread;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -42,11 +42,11 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 @RunOnVirtualThread
 public class EpisodeResource {
 
-    private final EpisodeService episodes;
-    private final PolicyFactory policies;
+    private final SimulationService episodes;
+    private final PlaybookFactory policies;
 
     @Inject
-    public EpisodeResource(EpisodeService episodes, PolicyFactory policies) {
+    public EpisodeResource(SimulationService episodes, PlaybookFactory policies) {
         this.episodes = episodes;
         this.policies = policies;
     }
@@ -57,7 +57,7 @@ public class EpisodeResource {
     @APIResponse(responseCode = "201", description = "Started episode")
     public EpisodeView start(@Valid CreateEpisodeRequest request) {
         long seed = request.seed() == null ? 42L : request.seed();
-        EpisodeHandle handle = episodes.start(request.scenarioId(), seed);
+        SimulationHandle handle = episodes.start(request.scenarioId(), seed);
         return EpisodeView.from(handle);
     }
 
@@ -85,7 +85,7 @@ public class EpisodeResource {
     @Operation(summary = "Run an episode", description = "Runs the episode to completion against a named policy.")
     @APIResponse(responseCode = "200", description = "The episode result")
     @APIResponse(responseCode = "404", description = "Unknown episode")
-    public EpisodeResult run(@RestPath String id, RunEpisodeRequest request) {
+    public SimulationResult run(@RestPath String id, RunEpisodeRequest request) {
         require(id);
         return episodes.run(id, policies.byName(request == null ? null : request.policy()));
     }
@@ -94,9 +94,9 @@ public class EpisodeResource {
     @Path("/simulate")
     @Operation(summary = "One-shot simulation", description = "Starts an episode for a scenario, runs it to completion against a policy, and returns the result. No episode is retained.")
     @APIResponse(responseCode = "200", description = "The episode result")
-    public EpisodeResult simulate(@Valid SimulateRequest request) {
+    public SimulationResult simulate(@Valid SimulateRequest request) {
         long seed = request.seed() == null ? 42L : request.seed();
-        EpisodeHandle handle = episodes.start(request.scenarioId(), seed);
+        SimulationHandle handle = episodes.start(request.scenarioId(), seed);
         try {
             return episodes.run(handle.id(), policies.byName(request.policy()));
         } finally {
@@ -115,7 +115,7 @@ public class EpisodeResource {
         episodes.delete(id);
     }
 
-    private EpisodeHandle require(String id) {
-        return episodes.find(id).orElseThrow(() -> new UnknownEpisodeException(id));
+    private SimulationHandle require(String id) {
+        return episodes.find(id).orElseThrow(() -> new UnknownSimulationException(id));
     }
 }

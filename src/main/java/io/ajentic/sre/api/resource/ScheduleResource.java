@@ -2,7 +2,7 @@ package io.ajentic.sre.api.resource;
 
 import io.ajentic.sre.api.payload.CreateScheduleRequest;
 import io.ajentic.sre.api.payload.ScheduleView;
-import io.ajentic.sre.rl.episode.EpisodeResult;
+import io.ajentic.sre.simulation.drill.SimulationResult;
 import io.ajentic.sre.schedule.drill.IncidentDrillRunner;
 import io.ajentic.sre.schedule.engine.Scheduler;
 import io.ajentic.sre.schedule.engine.TickReport;
@@ -85,12 +85,12 @@ public class ScheduleResource {
     @Path("/{id}/run")
     @Operation(summary = "Run a schedule now", description = "Executes a schedule immediately; 204 when nothing ran.")
     @APIResponse(responseCode = "200", description = "The drill result",
-            content = @Content(schema = @Schema(implementation = EpisodeResult.class)))
+            content = @Content(schema = @Schema(implementation = SimulationResult.class)))
     @APIResponse(responseCode = "204", description = "Nothing ran")
     @APIResponse(responseCode = "404", description = "Unknown schedule")
     public Response run(@RestPath String id) {
         require(id);
-        EpisodeResult result = scheduler.runNow(id);
+        SimulationResult result = scheduler.runNow(id);
         return result == null ? Response.noContent().build() : Response.ok(result).build();
     }
 
@@ -106,8 +106,8 @@ public class ScheduleResource {
     @Path("/drills")
     @Operation(summary = "List recent drills", description = "Returns the most recent scheduled drill runs.")
     @APIResponse(responseCode = "200", description = "The drill results",
-            content = @Content(schema = @Schema(implementation = EpisodeResult.class)))
-    public List<EpisodeResult> drills() {
+            content = @Content(schema = @Schema(implementation = SimulationResult.class)))
+    public List<SimulationResult> drills() {
         return drills.recent();
     }
 

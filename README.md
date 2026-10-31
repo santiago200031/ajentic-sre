@@ -40,11 +40,18 @@ flowchart LR
     B --> G["ChatOps Fan-Out<br>(Slack, Teams, Discord)"]
 ```
 
+![ajentic-sre System Architecture](docs/diagrams/system-overview.svg)
+
 - **ReAct Incident Engine:** Multi-turn autonomous investigation using sealed action spaces, step budgets, and reward grading.
 - **Service Dependency Graph:** Validated DAG topologies with cascading failure attenuation across service dependencies.
 - **Automated PR Remediation:** Ingests alerts, inspects code, commits fixes, and opens GitHub pull requests with CI validation.
 - **OpenAI-Compatible Facade:** Drop-in `/v1/chat/completions` API to power Open WebUI, LibreChat, or Continue.dev.
 - **Operator Approval Gates:** Human-in-the-loop authorization policy (`require-approval`) for mutating operational changes.
+
+> **Excalidraw Diagrams:** Visual architecture diagrams are maintained in [`docs/diagrams/`](docs/diagrams/):
+> - [System Architecture Overview](docs/diagrams/system-overview.svg) ([`.excalidraw`](docs/diagrams/system-overview.excalidraw), [`.png`](docs/diagrams/system-overview.png))
+> - [Incident Remediation ReAct Loop](docs/diagrams/incident-react-loop.svg) ([`.excalidraw`](docs/diagrams/incident-react-loop.excalidraw), [`.png`](docs/diagrams/incident-react-loop.png))
+> - [Credential-Isolated Sidecar Model](docs/diagrams/sidecar-security-model.svg) ([`.excalidraw`](docs/diagrams/sidecar-security-model.excalidraw), [`.png`](docs/diagrams/sidecar-security-model.png))
 
 ---
 
@@ -54,7 +61,7 @@ Detailed documentation is organized into topic-specific guides:
 
 | Guide | Description |
 |---|---|
-| [**01. Architecture & RL Model**](docs/01-architecture.md) | Episode lifecycle, ReAct reasoning loop, reward functions, and scenario DAG topologies. |
+| [**01. Architecture & Incident Simulation**](docs/01-architecture.md) | Simulation lifecycle, ReAct reasoning loop, incident scorecards, and scenario DAG topologies. |
 | [**02. HTTP API & Cookbook**](docs/02-http-api.md) | Complete REST endpoint reference, OpenAPI/Swagger discovery, and cURL recipes for simulation & SSE chat. |
 | [**03. Model Context Protocol (MCP)**](docs/03-mcp.md) | Quarkiverse MCP server setup, stdio and streamable HTTP transports, tool catalogs, resources, and prompts. |
 | [**04. ChatOps & OpenAI Facade**](docs/04-chatops-and-facade.md) | Outbound notification fan-out (Slack, Teams, Discord), inbound chat commands, and OpenAI `/v1` compatibility. |
@@ -71,7 +78,7 @@ Detailed documentation is organized into topic-specific guides:
 
 ```
 io.ajentic.sre
-├── rl                  # Environment contracts, rewards, episodes, policies, simulation
+├── simulation          # Scenario library, environment contracts, incident scorecards, drills, and playbooks
 ├── agent
 │   ├── alerts          # Multi-cloud alert normalizer and automated remediation
 │   ├── context         # Java 25 ScopedValue execution context for virtual threads
@@ -80,10 +87,13 @@ io.ajentic.sre
 │   ├── llm             # LangChain4j model integration and endpoint failover
 │   ├── masking         # Sensitive data masking and unmasking interceptors
 │   ├── mcp             # Quarkiverse MCP resources and prompt templates
+│   ├── memory          # Incident memory store and past context retrieval
 │   ├── session         # ReAct session state, conversation history, and transcript
 │   └── tool            # Tool contract, CDI toolboxes, built-in investigation tools
 ├── connectors          # Credential-isolated sidecar security (HMAC-SHA256) and audit logging
 ├── schedule            # 5-field cron engine, versioned store, and drill runner
+├── state               # File-backed durable state store (.ajentic/state.json) and concurrency locks
+├── benchmark           # Dev-only benchmark runner and performance profiler (-Pbenchmark)
 ├── api                 # JAX-RS resources, SSE event sinks, and OpenAI facade
 └── health              # SmallRye health liveness and readiness checks
 ```

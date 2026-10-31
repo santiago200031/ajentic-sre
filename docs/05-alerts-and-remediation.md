@@ -27,6 +27,8 @@ Configured by `ajentic.alerts.min-severity` (default `ERROR`):
 
 ## Automated GitHub Remediation Flow
 
+![Incident Remediation ReAct Loop](diagrams/incident-react-loop.svg)
+
 ```mermaid
 sequenceDiagram
     participant M as Monitoring (CloudWatch / Alertmanager)

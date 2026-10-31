@@ -1,6 +1,6 @@
 package io.ajentic.sre.agent.tool.builtin;
 
-import io.ajentic.sre.rl.ObservedSignal;
+import io.ajentic.sre.simulation.ObservedSignal;
 
 import java.util.List;
 import java.util.stream.Collectors;

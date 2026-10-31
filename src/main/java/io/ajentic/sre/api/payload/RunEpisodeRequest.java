@@ -7,6 +7,6 @@ import org.eclipse.microprofile.openapi.annotations.media.Schema;
  */
 @Schema(description = "Request to run an episode to completion against a named policy.")
 public record RunEpisodeRequest(
-        @Schema(description = "Policy name: heuristic or idle.", example = "heuristic")
+        @Schema(description = "Playbook name: heuristic or idle.", example = "heuristic")
         String policy) {
 }

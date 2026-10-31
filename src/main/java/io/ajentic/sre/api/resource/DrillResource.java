@@ -1,10 +1,10 @@
 package io.ajentic.sre.api.resource;
 
-import io.ajentic.sre.rl.episode.EpisodeResult;
-import io.ajentic.sre.rl.episode.StepRecord;
+import io.ajentic.sre.simulation.drill.SimulationResult;
+import io.ajentic.sre.simulation.drill.StepRecord;
 import io.ajentic.sre.schedule.drill.IncidentDrillRunner;
-import io.ajentic.sre.rl.simulation.ScenarioRepository;
-import io.ajentic.sre.rl.simulation.UnknownScenarioException;
+import io.ajentic.sre.simulation.ScenarioRepository;
+import io.ajentic.sre.simulation.UnknownScenarioException;
 import io.smallrye.common.annotation.RunOnVirtualThread;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -62,7 +62,7 @@ public class DrillResource {
         scenarios.byId(request.scenarioId()).orElseThrow(() -> new UnknownScenarioException(request.scenarioId()));
         send(sink, "start", Map.of("scenarioId", request.scenarioId()));
         try {
-            EpisodeResult result = drills.drill(request.scenarioId(), (step, observation) ->
+            SimulationResult result = drills.drill(request.scenarioId(), (step, observation) ->
                     send(sink, "step", Map.of(
                             "index", step.index(),
                             "action", step.action(),

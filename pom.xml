@@ -181,6 +181,46 @@
             </properties>
         </profile>
         <profile>
+            <id>benchmark</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <includes>
+                                <include>**/BenchmarkRunner*Test.java</include>
+                            </includes>
+                            <systemPropertyVariables>
+                                <ajentic.benchmark.enabled>true</ajentic.benchmark.enabled>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>benchmark-live</id>
+            <properties>
+                <ajentic.llm.live>true</ajentic.llm.live>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <includes>
+                                <include>**/BenchmarkRunner*Test.java</include>
+                            </includes>
+                            <systemPropertyVariables>
+                                <ajentic.benchmark.enabled>true</ajentic.benchmark.enabled>
+                                <ajentic.llm.live>true</ajentic.llm.live>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
             <id>jdk27-preview</id>
             <properties>
                 <maven.compiler.release>27</maven.compiler.release>

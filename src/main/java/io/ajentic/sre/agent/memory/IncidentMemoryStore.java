@@ -2,10 +2,10 @@ package io.ajentic.sre.agent.memory;
 
 import io.ajentic.sre.agent.masking.MaskingSession;
 import io.ajentic.sre.agent.masking.SensitiveDataMasker;
-import io.ajentic.sre.rl.episode.EpisodeResult;
-import io.ajentic.sre.rl.episode.StepRecord;
-import io.ajentic.sre.rl.simulation.Scenario;
-import io.ajentic.sre.rl.simulation.ScenarioRepository;
+import io.ajentic.sre.simulation.drill.SimulationResult;
+import io.ajentic.sre.simulation.drill.StepRecord;
+import io.ajentic.sre.simulation.Scenario;
+import io.ajentic.sre.simulation.ScenarioRepository;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -60,7 +60,7 @@ public class IncidentMemoryStore {
     /**
      * Persists a completed episode. Failures are logged, never thrown: memory must not break episode runs.
      */
-    public void save(EpisodeResult result) {
+    public void save(SimulationResult result) {
         if (!enabled) {
             return;
         }
@@ -207,7 +207,7 @@ public class IncidentMemoryStore {
         return file.resolveSibling(file.getFileName() + "." + index);
     }
 
-    private static String diagnosisOf(EpisodeResult result) {
+    private static String diagnosisOf(SimulationResult result) {
         String diagnosis = "";
         for (StepRecord step : result.trajectory()) {
             if (step.action().startsWith("declare ")) {
@@ -217,7 +217,7 @@ public class IncidentMemoryStore {
         return diagnosis;
     }
 
-    private static String remediationOf(EpisodeResult result) {
+    private static String remediationOf(SimulationResult result) {
         String remediation = "";
         for (StepRecord step : result.trajectory()) {
             if (step.action().startsWith("apply ")) {

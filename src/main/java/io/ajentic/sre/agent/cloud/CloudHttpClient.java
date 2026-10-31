@@ -1,6 +1,6 @@
 package io.ajentic.sre.agent.cloud;
 
-import io.ajentic.sre.rl.environment.CircuitBreaker;
+import io.ajentic.sre.simulation.environment.CircuitBreaker;
 
 import java.net.URI;
 import java.net.http.HttpClient;

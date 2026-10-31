@@ -1,6 +1,6 @@
 package io.ajentic.sre.state;
 
-import io.ajentic.sre.rl.episode.EpisodeResult;
+import io.ajentic.sre.simulation.drill.SimulationResult;
 import io.ajentic.sre.schedule.store.ScheduleDefinition;
 
 import java.util.List;
@@ -14,7 +14,7 @@ public interface StateStore {
 
     void saveSchedules(List<ScheduleDefinition> schedules);
 
-    List<EpisodeResult> loadDrills();
+    List<SimulationResult> loadDrills();
 
-    void saveDrills(List<EpisodeResult> drills);
+    void saveDrills(List<SimulationResult> drills);
 }

@@ -7,24 +7,24 @@ import io.ajentic.sre.agent.memory.IncidentMemoryStore;
 import io.ajentic.sre.agent.memory.StoredIncident;
 import io.ajentic.sre.agent.tool.ToolBox;
 import io.ajentic.sre.agent.tool.ToolContext;
-import io.ajentic.sre.rl.ObservedSignal;
-import io.ajentic.sre.rl.StepResult;
-import io.ajentic.sre.rl.TelemetrySignal;
-import io.ajentic.sre.rl.action.ApplyRemediation;
-import io.ajentic.sre.rl.action.CorrelateAnomalies;
-import io.ajentic.sre.rl.action.DeclareDiagnosis;
-import io.ajentic.sre.rl.action.InspectRecentChanges;
-import io.ajentic.sre.rl.action.ListRemediations;
-import io.ajentic.sre.rl.action.QueryTelemetry;
-import io.ajentic.sre.rl.action.ReadRunbook;
-import io.ajentic.sre.rl.action.RemediationKind;
-import io.ajentic.sre.rl.episode.EpisodeCursor;
-import io.ajentic.sre.rl.episode.EpisodeHandle;
-import io.ajentic.sre.rl.episode.EpisodeResult;
-import io.ajentic.sre.rl.episode.EpisodeService;
-import io.ajentic.sre.rl.simulation.Runbook;
-import io.ajentic.sre.rl.simulation.Scenario;
-import io.ajentic.sre.rl.simulation.ScenarioRepository;
+import io.ajentic.sre.simulation.ObservedSignal;
+import io.ajentic.sre.simulation.StepResult;
+import io.ajentic.sre.simulation.TelemetrySignal;
+import io.ajentic.sre.simulation.action.ApplyRemediation;
+import io.ajentic.sre.simulation.action.CorrelateAnomalies;
+import io.ajentic.sre.simulation.action.DeclareDiagnosis;
+import io.ajentic.sre.simulation.action.InspectRecentChanges;
+import io.ajentic.sre.simulation.action.ListRemediations;
+import io.ajentic.sre.simulation.action.QueryTelemetry;
+import io.ajentic.sre.simulation.action.ReadRunbook;
+import io.ajentic.sre.simulation.action.RemediationKind;
+import io.ajentic.sre.simulation.drill.SimulationCursor;
+import io.ajentic.sre.simulation.drill.SimulationHandle;
+import io.ajentic.sre.simulation.drill.SimulationResult;
+import io.ajentic.sre.simulation.drill.SimulationService;
+import io.ajentic.sre.simulation.Runbook;
+import io.ajentic.sre.simulation.Scenario;
+import io.ajentic.sre.simulation.ScenarioRepository;
 import io.ajentic.sre.schedule.drill.IncidentDrillRunner;
 import io.quarkiverse.mcp.server.McpConnection;
 import io.quarkiverse.mcp.server.Tool;
@@ -48,8 +48,8 @@ public class BuiltInSreTools {
 
     private final ScenarioRepository scenarios;
     private final NotificationChannel channel;
-    private final EpisodeService episodes;
-    private final EpisodeCursor cursor;
+    private final SimulationService episodes;
+    private final SimulationCursor cursor;
     private final IncidentDrillRunner drills;
     private final IncidentMemoryStore memory;
     private final String defaultScenarioId;
@@ -58,8 +58,8 @@ public class BuiltInSreTools {
     public BuiltInSreTools(
             ScenarioRepository scenarios,
             NotificationChannel channel,
-            EpisodeService episodes,
-            EpisodeCursor cursor,
+            SimulationService episodes,
+            SimulationCursor cursor,
             IncidentDrillRunner drills,
             IncidentMemoryStore memory,
             @ConfigProperty(name = "ajentic.mcp.default-scenario", defaultValue = "checkout-latency-db-pool")
@@ -260,10 +260,10 @@ public class BuiltInSreTools {
             McpConnection connection) {
         String target = scenarioId == null || scenarioId.isBlank() ? defaultScenarioId : scenarioId;
         long effectiveSeed = seed == null ? 42L : seed;
-        EpisodeHandle handle = episodes.start(target, effectiveSeed);
+        SimulationHandle handle = episodes.start(target, effectiveSeed);
         String scope = connection != null ? connection.id() : AgentExecutionContext.mcpScope();
         if (scope == null || scope.isBlank()) {
-            scope = AgentExecutionContext.sessionId() != null ? AgentExecutionContext.sessionId() : EpisodeCursor.DEFAULT_SCOPE;
+            scope = AgentExecutionContext.sessionId() != null ? AgentExecutionContext.sessionId() : SimulationCursor.DEFAULT_SCOPE;
         }
         cursor.activate(scope, handle.id());
         return ToolResponse.success("Started episode " + handle.id() + " for scenario " + target + ". episodeId: " + handle.id());
@@ -273,7 +273,7 @@ public class BuiltInSreTools {
     public ToolResponse runIncidentDrill(
             @ToolArg(name = "scenarioId", description = "Scenario to drill.") String scenarioId) {
         try {
-            EpisodeResult result = drills.drill(scenarioId);
+            SimulationResult result = drills.drill(scenarioId);
             return ToolResponse.success("Drill for %s finished: solved=%s diagnosed=%s resolved=%s reward=%.2f. {\"solved\":%s}"
                     .formatted(scenarioId, result.solved(), result.diagnosed(), result.resolved(), result.totalReward(), result.solved()));
         } catch (RuntimeException exception) {
@@ -288,16 +288,16 @@ public class BuiltInSreTools {
         }
         String scope = connection != null ? connection.id() : AgentExecutionContext.mcpScope();
         if (scope == null || scope.isBlank()) {
-            scope = AgentExecutionContext.sessionId() != null ? AgentExecutionContext.sessionId() : EpisodeCursor.DEFAULT_SCOPE;
+            scope = AgentExecutionContext.sessionId() != null ? AgentExecutionContext.sessionId() : SimulationCursor.DEFAULT_SCOPE;
         }
         String activeId = cursor.activeId(scope);
         if (activeId != null) {
-            Optional<EpisodeHandle> active = episodes.find(activeId);
+            Optional<SimulationHandle> active = episodes.find(activeId);
             if (active.isPresent()) {
                 return new ToolContext(active.get().id(), active.get().environment());
             }
         }
-        EpisodeHandle handle = episodes.start(defaultScenarioId, 42L);
+        SimulationHandle handle = episodes.start(defaultScenarioId, 42L);
         cursor.activate(scope, handle.id());
         return new ToolContext(handle.id(), handle.environment());
     }

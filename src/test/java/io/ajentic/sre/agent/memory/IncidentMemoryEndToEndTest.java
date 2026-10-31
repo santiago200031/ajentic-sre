@@ -1,9 +1,9 @@
 package io.ajentic.sre.agent.memory;
 
 import com.github.tomakehurst.wiremock.client.WireMock;
-import io.ajentic.sre.rl.episode.EpisodeResult;
-import io.ajentic.sre.rl.episode.StepRecord;
-import io.ajentic.sre.rl.TerminationReason;
+import io.ajentic.sre.simulation.drill.SimulationResult;
+import io.ajentic.sre.simulation.drill.StepRecord;
+import io.ajentic.sre.simulation.TerminationReason;
 import io.ajentic.sre.test.WireMockLlmTestResource;
 import io.quarkus.test.common.WithTestResource;
 import io.quarkus.test.junit.QuarkusTest;
@@ -109,7 +109,7 @@ class IncidentMemoryEndToEndTest {
 
     @Test
     void identifiersAreMaskedBeforePersistence() throws java.io.IOException {
-        EpisodeResult result = new EpisodeResult(
+        SimulationResult result = new SimulationResult(
                 "mem-1",
                 "orders-bad-deployment",
                 true,

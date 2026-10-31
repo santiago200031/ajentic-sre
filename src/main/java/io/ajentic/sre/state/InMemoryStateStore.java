@@ -1,6 +1,6 @@
 package io.ajentic.sre.state;
 
-import io.ajentic.sre.rl.episode.EpisodeResult;
+import io.ajentic.sre.simulation.drill.SimulationResult;
 import io.ajentic.sre.schedule.store.ScheduleDefinition;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Typed;
@@ -16,7 +16,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class InMemoryStateStore implements StateStore {
 
     private final List<ScheduleDefinition> schedules = new CopyOnWriteArrayList<>();
-    private final List<EpisodeResult> drills = new CopyOnWriteArrayList<>();
+    private final List<SimulationResult> drills = new CopyOnWriteArrayList<>();
 
     @Override
     public List<ScheduleDefinition> loadSchedules() {
@@ -32,12 +32,12 @@ public class InMemoryStateStore implements StateStore {
     }
 
     @Override
-    public List<EpisodeResult> loadDrills() {
+    public List<SimulationResult> loadDrills() {
         return List.copyOf(drills);
     }
 
     @Override
-    public void saveDrills(List<EpisodeResult> drills) {
+    public void saveDrills(List<SimulationResult> drills) {
         this.drills.clear();
         if (drills != null) {
             this.drills.addAll(drills);

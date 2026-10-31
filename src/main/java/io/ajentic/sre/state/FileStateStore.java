@@ -1,6 +1,6 @@
 package io.ajentic.sre.state;
 
-import io.ajentic.sre.rl.episode.EpisodeResult;
+import io.ajentic.sre.simulation.drill.SimulationResult;
 import io.ajentic.sre.schedule.store.ScheduleDefinition;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Typed;
@@ -68,12 +68,12 @@ public class FileStateStore implements StateStore {
     }
 
     @Override
-    public List<EpisodeResult> loadDrills() {
+    public List<SimulationResult> loadDrills() {
         return readSnapshot().drills();
     }
 
     @Override
-    public void saveDrills(List<EpisodeResult> drills) {
+    public void saveDrills(List<SimulationResult> drills) {
         updateSnapshot(current -> new StateSnapshot(
                 StateSnapshot.CURRENT_SCHEMA_VERSION,
                 current.schedules(),

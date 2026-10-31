@@ -92,7 +92,7 @@ class FileStateStoreTest {
     @Test
     void drillHistorySurvivesRestart() {
         FileStateStore store1 = new FileStateStore(mapper, STATE_FILE);
-        io.ajentic.sre.rl.episode.EpisodeResult result = new io.ajentic.sre.rl.episode.EpisodeResult(
+        io.ajentic.sre.simulation.drill.SimulationResult result = new io.ajentic.sre.simulation.drill.SimulationResult(
                 "ep-123",
                 "orders-bad-deployment",
                 true,
@@ -100,14 +100,14 @@ class FileStateStoreTest {
                 true,
                 1.5,
                 6,
-                io.ajentic.sre.rl.TerminationReason.RESOLVED,
-                List.of(new io.ajentic.sre.rl.episode.StepRecord(0, "check metrics", 0.1, "ok", false)));
+                io.ajentic.sre.simulation.TerminationReason.RESOLVED,
+                List.of(new io.ajentic.sre.simulation.drill.StepRecord(0, "check metrics", 0.1, "ok", false)));
 
         store1.saveDrills(List.of(result));
         assertEquals(1, store1.loadDrills().size());
 
         FileStateStore store2 = new FileStateStore(mapper, STATE_FILE);
-        List<io.ajentic.sre.rl.episode.EpisodeResult> loaded = store2.loadDrills();
+        List<io.ajentic.sre.simulation.drill.SimulationResult> loaded = store2.loadDrills();
         assertEquals(1, loaded.size());
         assertEquals("ep-123", loaded.getFirst().episodeId());
         assertEquals("orders-bad-deployment", loaded.getFirst().scenarioId());
